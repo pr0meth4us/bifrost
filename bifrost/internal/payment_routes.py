@@ -67,7 +67,7 @@ def create_secure_payment_intent():
             description=description,
             target_role=target_role,
             duration=duration,
-            ref_id=ref_id
+            client_ref_id=ref_id
         )
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
