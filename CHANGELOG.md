@@ -3,6 +3,12 @@
 All notable changes to the `bifrost` project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-03-25
+
+### Fixed
+- **Webhook Reliability**: Fixed a bug where the `subscription_success` webhook was not being dispatched to client applications when a pending transaction was completed via Bot admin approval, PayWay callback, or Gumroad callback. 
+- The `_trigger_event_for_user` call is now safely executed directly within `bifrost.models.payments.PaymentMixin.complete_transaction`, guaranteeing that role updates consistently flush local application caches.
+
 ## [0.8.1] - 2026-03-25
 
 ### Fixed

@@ -1,4 +1,4 @@
-# bifrost/models/payment.py
+# bifrost/models/payments.py
 import secrets
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -115,7 +115,22 @@ class PaymentMixin:
 
         log.info(f"✅ Transaction {transaction_id} completed. Granted '{target_role}' to {tx['account_id']} in app_specific_role.")
 
-        # 5. Return Data for Webhook
+        # --- FIX: Trigger Webhook automatically on completion ---
+        self._trigger_event_for_user(
+            account_id=tx['account_id'],
+            event_type="subscription_success",
+            specific_app_id=tx['app_id'],
+            extra_data={
+                "transaction_id": transaction_id,
+                "amount": tx.get('amount'),
+                "currency": tx.get('currency', 'USD'),
+                "role": target_role,
+                "duration": duration,
+                "expires_at": expires_at.isoformat() if expires_at else None
+            }
+        )
+
+        # 5. Return Data for general processing
         return True, {
             "account_id": str(tx['account_id']),
             "app_id": str(tx['app_id']),
