@@ -60,6 +60,7 @@ async def process_webhook_update(update_json):
         return
 
     await app.initialize()
+    await app.start()
 
     try:
         update = Update.de_json(update_json, app.bot)
@@ -67,6 +68,7 @@ async def process_webhook_update(update_json):
     except Exception as e:
         logger.error(f"Error processing update: {e}")
     finally:
+        await app.stop()
         await app.shutdown()
 
 def run_polling():
