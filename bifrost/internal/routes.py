@@ -150,7 +150,8 @@ def validate_token():
             "email": user.get('email'),
             "username": user.get('username'),
             "display_name": user.get('display_name'),
-            "telegram_id": user.get('telegram_id')
+            "telegram_id": user.get('telegram_id'),
+            "exp": payload.get('exp')
         })
 
     except jwt.ExpiredSignatureError:

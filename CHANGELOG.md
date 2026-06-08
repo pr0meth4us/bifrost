@@ -3,6 +3,11 @@
 All notable changes to the `bifrost` project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.5] - 2026-06-08
+
+### Added
+- **Explicit Expiration Output**: Modified the `/internal/validate-token` endpoint in `bifrost/internal/routes.py` to output the `exp` timestamp parsed directly from the JWT payload. This empowers relying services (like the Finance Core) to accurately cap their cache TTL without violating domain isolation by decoding the token themselves.
+
 ## [0.8.4] - 2026-06-08
 
 ### Fixed
