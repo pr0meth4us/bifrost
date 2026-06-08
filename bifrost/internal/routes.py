@@ -153,9 +153,15 @@ def validate_token():
             "telegram_id": user.get('telegram_id')
         })
 
+    except jwt.ExpiredSignatureError:
+        return jsonify({"is_valid": False, "error": "Token has expired"}), 401
+    except jwt.InvalidAudienceError:
+        return jsonify({"is_valid": False, "error": "Invalid audience"}), 401
+    except jwt.DecodeError:
+        return jsonify({"is_valid": False, "error": "Malformed token"}), 401
     except Exception as e:
         log.error(f"Token validation failed: {e}")
-        return jsonify({"is_valid": False, "error": "Invalid Token"}), 401
+        return jsonify({"is_valid": False, "error": f"Server Error: {str(e)}"}), 500
 
 
 @internal_bp.route('/generate-otp', methods=['POST'])

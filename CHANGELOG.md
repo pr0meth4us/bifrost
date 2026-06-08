@@ -3,6 +3,11 @@
 All notable changes to the `bifrost` project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.4] - 2026-06-08
+
+### Fixed
+- **Validation Debugging**: Improved `validate_token` endpoint to return specific JWT exceptions (e.g., ExpiredSignatureError, DecodeError) instead of a generic "Invalid Token" 401 error. This will assist client applications in diagnosing token rejections after webhook events.
+
 ## [0.8.3] - 2026-06-08
 
 ### Fixed
