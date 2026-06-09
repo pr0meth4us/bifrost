@@ -23,6 +23,10 @@ class Config:
     PAYWAY_MERCHANT_ID = os.environ.get('PAYWAY_MERCHANT_ID', 'ec462892')
     PAYWAY_API_KEY = os.environ.get('PAYWAY_API_KEY', '8f43f99f4b8bfb7b050f55f0c2b79858cc237dcb')
 
+    # --- ABA RECURRING PAYMENTS ---
+    # Placeholder key/token for recurring auto-renewal integration (Sandbox/Preview)
+    ABA_RECURRING_API_TOKEN = os.environ.get('ABA_RECURRING_API_TOKEN')
+
     # --- GUMROAD (International) ---
     # NO DEFAULT. Must be passed by client or set explicitly in ENV.
     GUMROAD_PRODUCT_PERMALINK = os.environ.get('GUMROAD_PRODUCT_PERMALINK')

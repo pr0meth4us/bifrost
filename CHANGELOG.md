@@ -3,6 +3,11 @@
 All notable changes to the `bifrost` project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.7] - 2026-06-09
+
+### Added
+- **Bank API Configuration (System-Level)**: Integrated the `ABA_RECURRING_API_TOKEN` environment variable in the Bifrost configuration (`config.py`) as a system-level placeholder/sandbox key to support future recurring payments, keeping it securely out of the user-facing backoffice settings.
+
 ## [0.8.6] - 2026-06-09
 
 ### Fixed
