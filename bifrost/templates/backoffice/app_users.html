@@ -173,6 +173,11 @@
                         <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Payment QR URL</label>
                         <input {{ 'disabled' if is_disabled else ':disabled="!editConfig"' }} type="url" name="qr_url" value="{{ app.app_qr_url }}" class="w-full text-sm p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 disabled:opacity-50">
                     </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Bank API Token (ABA Recurring)</label>
+                        <input {{ 'disabled' if is_disabled else ':disabled="!editConfig"' }} type="text" name="bank_recurring_api_token" value="{{ app.bank_recurring_api_token or '' }}" placeholder="aba_rt_live_..." class="w-full text-sm p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 disabled:opacity-50 font-mono">
+                        <p class="text-[10px] text-slate-400 mt-1">Used to facilitate automated recurring billing sweeps via local API integrations. Currently placeholder / sandbox simulation.</p>
+                    </div>
 
                     {% if not is_disabled %}
                     <div x-show="editConfig" class="pt-4 border-t border-slate-100">

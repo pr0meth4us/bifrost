@@ -3,6 +3,11 @@
 All notable changes to the `bifrost` project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.7] - 2026-06-09
+
+### Added
+- **Bank API Configuration Placeholder**: Added a configuration field `bank_recurring_api_token` to the Application model and registered it in the Bifrost Backoffice App settings view. This acts as a sandbox/preview placeholder for automated recurring billing integration via local banking APIs (like ABA Bank).
+
 ## [0.8.6] - 2026-06-09
 
 ### Fixed

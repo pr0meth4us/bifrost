@@ -34,6 +34,7 @@ class AppMixin:
             "app_api_url": api_url,
             "allowed_auth_methods": allowed_methods or ["email"],
             "telegram_bot_token": None,
+            "bank_recurring_api_token": None,
             "created_at": datetime.now(UTC)
         }
         self.db.applications.insert_one(app_doc)
@@ -46,7 +47,10 @@ class AppMixin:
 
     def update_app_details(self, app_id, data):
         """Updates non-sensitive app details."""
-        allowed_fields = ['app_name', 'app_callback_url', 'app_web_url', 'app_api_url', 'app_logo_url', 'app_qr_url', 'telegram_bot_token']
+        allowed_fields = [
+            'app_name', 'app_callback_url', 'app_web_url', 'app_api_url', 
+            'app_logo_url', 'app_qr_url', 'telegram_bot_token', 'bank_recurring_api_token'
+        ]
         updates = {k: v for k, v in data.items() if k in allowed_fields}
 
         if updates:
