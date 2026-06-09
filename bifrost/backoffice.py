@@ -295,8 +295,7 @@ def update_app_settings(app_id):
         'app_api_url': request.form.get('api_url'),
         'app_logo_url': request.form.get('logo_url'),
         'app_qr_url': request.form.get('qr_url'),
-        'telegram_bot_token': request.form.get('telegram_bot_token'),
-        'bank_recurring_api_token': request.form.get('bank_recurring_api_token')
+        'telegram_bot_token': request.form.get('telegram_bot_token')
     }
 
     if db.update_app_details(app_id, data):
