@@ -288,6 +288,7 @@ def login():
 
     # Link User to App
     db.link_user_to_app(user['_id'], app_config['_id'])
+    role = db.get_user_role_for_app(user['_id'], app_config['_id']) or "user"
 
     # Issue JWT
     token_payload = {
@@ -304,7 +305,9 @@ def login():
         "jwt": encoded_jwt,
         "account_id": str(user['_id']),
         "username": user.get('username'),
-        "display_name": user.get('display_name')
+        "display_name": user.get('display_name'),
+        "email": user.get('email', ''),
+        "role": role
     })
 
 
@@ -347,6 +350,7 @@ def verify_otp_login():
         username = user.get('username')
 
     db.link_user_to_app(user_id, app_config['_id'])
+    role = db.get_user_role_for_app(user_id, app_config['_id']) or "user"
 
     token_payload = {
         "sub": str(user_id),
@@ -362,7 +366,9 @@ def verify_otp_login():
         "jwt": encoded_jwt,
         "account_id": str(user_id),
         "username": username,
-        "display_name": "Telegram User" if not user else user.get('display_name')
+        "display_name": "Telegram User" if not user else user.get('display_name'),
+        "email": "" if not user else user.get('email', ''),
+        "role": role
     })
 
 
@@ -406,6 +412,7 @@ def telegram_login():
         username = user.get('username')
 
     db.link_user_to_app(user_id, app_config['_id'])
+    role = db.get_user_role_for_app(user_id, app_config['_id']) or "user"
 
     token_payload = {
         "sub": str(user_id),
@@ -421,7 +428,9 @@ def telegram_login():
         "jwt": encoded_jwt,
         "account_id": str(user_id),
         "username": username,
-        "display_name": user.get('display_name') if user else "Telegram User"
+        "display_name": user.get('display_name') if user else "Telegram User",
+        "email": "" if not user else user.get('email', ''),
+        "role": role
     })
 
 @auth_api_bp.route('/telegram-webhook', methods=['POST'])
