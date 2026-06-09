@@ -75,7 +75,7 @@ class AppMixin:
             return False
         return check_password_hash(app["client_secret_hash"], provided_secret)
 
-    def link_user_to_app(self, account_id, app_id, role="user", duration_str=None, suppress_webhook=False):
+    def link_user_to_app(self, account_id, app_id, role=None, duration_str=None, suppress_webhook=False):
         """
         Links a user to an app.
         STRICT: Writes to app_specific_role only.
@@ -103,9 +103,14 @@ class AppMixin:
         current_link = self.db.app_links.find_one({"account_id": ObjectId(account_id), "app_id": ObjectId(app_id)})
         old_role = current_link.get('app_specific_role') if current_link else None
 
+        target_role = role
+        if target_role is None:
+            target_role = old_role if old_role else "user"
+
         update_doc = {
             "last_login": datetime.now(UTC),
-            "app_specific_role": role  # <--- STRICT WRITE
+            "app_specific_role": target_role,  # <--- STRICT WRITE
+            "role": target_role                # Legacy support
         }
 
         if duration_str and duration_str != 'lifetime':
@@ -126,16 +131,20 @@ class AppMixin:
         if duration_str == 'lifetime':
             update_doc["expires_at"] = None
 
+        update_op = {
+            "$set": update_doc,
+            "$setOnInsert": {"linked_at": datetime.now(UTC)}
+        }
+        if target_role != "user":
+            update_op["$unset"] = {"warning_sent": ""}  # Clear warning flag on upgrade
+
         self.db.app_links.update_one(
             {"account_id": ObjectId(account_id), "app_id": ObjectId(app_id)},
-            {
-                "$set": update_doc,
-                "$setOnInsert": {"linked_at": datetime.now(UTC)}
-            },
+            update_op,
             upsert=True
         )
 
-        if old_role != role and not suppress_webhook:
+        if old_role != target_role and not suppress_webhook:
             self._trigger_event_for_user(account_id, "account_role_change", specific_app_id=app_id)
 
     def remove_user_from_app(self, account_id, app_id, is_self_action=False):

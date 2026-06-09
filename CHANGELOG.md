@@ -3,6 +3,17 @@
 All notable changes to the `bifrost` project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.6] - 2026-06-09
+
+### Fixed
+- **App Link Role Preservation on Login**: Resolved premium user demotions by ensuring `link_user_to_app` preserves the existing `app_specific_role` and `role` when not explicitly specified (such as during login calls).
+- **Expiration Sync in Reaper**: Updated the scheduler's expiration logic to verify both `app_specific_role` and legacy `role` fields, ensuring a robust downgrade sync across both fields.
+
+### Added
+- **Subscription Expiration Warnings**: Implemented `run_expiration_warning_check` in the background scheduler to run hourly. It queries active premium subscriptions expiring within 3 days that have not been warned yet, flags them, and fires the `subscription_warning` webhook.
+- **Legacy Role Compatibility**: Added automatic synchronization between legacy `role` and strict `app_specific_role` across models.
+- **Warning Flag Clearance**: Clears the `warning_sent` subscription expiration warning flag on database role upgrades, renewals, and downgrades to prevent stale states.
+
 ## [0.8.5] - 2026-06-08
 
 ### Added

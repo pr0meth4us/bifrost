@@ -90,6 +90,7 @@ class PaymentMixin:
 
         update_doc = {
             "app_specific_role": target_role,
+            "role": target_role,  # Legacy support
             "last_login": datetime.now(UTC)
         }
 
@@ -107,8 +108,8 @@ class PaymentMixin:
             },
             {
                 "$set": update_doc,
-                "$setOnInsert": {"linked_at": datetime.now(UTC)}
-                # NOTE: We intentionally DO NOT set "role": "user" here anymore.
+                "$setOnInsert": {"linked_at": datetime.now(UTC)},
+                "$unset": {"warning_sent": ""}  # Clear warning flag on upgrade
             },
             upsert=True
         )
