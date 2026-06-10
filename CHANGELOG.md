@@ -3,6 +3,14 @@
 All notable changes to the `bifrost` project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.8] - 2026-06-10
+
+### Added
+- **Free Trial API**: Implemented a new internal endpoint (`POST /internal/payments/free-trial/activate`) to seamlessly upgrade users to the `premium_user` role for a 14-day duration without requiring a Stripe or ABA payment intent.
+- **Trial Fraud Prevention**: Added a `trial_used` boolean flag to the `app_links` collection in MongoDB. The free trial endpoint validates this flag before granting access, effectively preventing users from claiming multiple trials across different applications within the Bifrost ecosystem.
+- **Bulk Role API**: Built a new internal endpoint (`POST /internal/get-roles-bulk`) that accepts an array of `account_ids` and securely returns their real-time application-specific roles directly from the identity database. This enables client applications to synchronize user privileges instantly without maintaining complex caching logic or violating microservice isolation principles.
+- **Role Assignment Controls**: Upgraded the internal data structures to support manual role overrides by system administrators via the Client Apps, bypassing automated billing flows when necessary.
+
 ## [0.8.7] - 2026-06-09
 
 ### Added
