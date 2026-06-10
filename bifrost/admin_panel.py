@@ -2,6 +2,8 @@
 from flask import session, redirect, url_for, request, flash
 from flask_admin import Admin, AdminIndexView, expose
 from flask_admin.contrib.pymongo import ModelView
+from flask_admin.actions import action
+from bson import ObjectId
 from werkzeug.security import check_password_hash, generate_password_hash
 from wtforms import form, fields, validators
 import secrets
@@ -106,6 +108,23 @@ class ApplicationsView(SecureModelView):
             model['allowed_auth_methods'] = [m.strip() for m in methods]
 
             flash(f"⚠️ NEW APP REGISTERED! COPY THIS SECRET NOW: {raw_secret}", "warning")
+
+    @action('rotate_secret', 'Rotate Secret', 'Are you sure you want to rotate the secret for the selected applications? This will invalidate the existing secret immediately.')
+    def action_rotate_secret(self, ids):
+        try:
+            for app_id in ids:
+                new_secret = secrets.token_urlsafe(32)
+                self.coll.update_one(
+                    {"_id": ObjectId(app_id)},
+                    {"$set": {"client_secret_hash": generate_password_hash(new_secret)}}
+                )
+                app = self.coll.find_one({"_id": ObjectId(app_id)})
+                app_name = app.get('app_name', 'Unknown App')
+                flash(f"⚠️ SECRET ROTATED FOR '{app_name}'! COPY NEW SECRET NOW: {new_secret}", "warning")
+        except Exception as ex:
+            if not self.handle_view_exception(ex):
+                raise
+            flash(f'Failed to rotate secrets. {str(ex)}', 'error')
 
 
 class AccountsView(SecureModelView):

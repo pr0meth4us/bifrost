@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [0.8.9] - 2026-06-10
 
+### Added
+- **Secret Management**: Added "Rotate Secret" action to the `ApplicationsView` in `admin_panel.py`. Administrators can now securely invalidate and regenerate Client Secrets directly from the Bifrost Admin Dashboard.
+
 ### Security
 - **Production Safety**: Removed hardcoded `debug=True` in `run.py`, ensuring interactive debuggers are disabled in production.
 
