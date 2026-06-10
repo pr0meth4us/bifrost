@@ -208,6 +208,7 @@ def grant_role_by_admin():
     """
     data = request.json
     telegram_id = data.get('telegram_id')
+    account_id = data.get('account_id')
     target_client_id = data.get('target_client_id')
 
     # Allow custom tiers (e.g. 'gold', 'pro'), default to 'premium_user'
@@ -222,8 +223,8 @@ def grant_role_by_admin():
     caller_client_id = request.authenticated_client_id
     app_client_id = target_client_id if target_client_id else caller_client_id
 
-    if not telegram_id:
-        return jsonify({"error": "Missing telegram_id"}), 400
+    if not telegram_id and not account_id:
+        return jsonify({"error": "Missing telegram_id or account_id"}), 400
 
     db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
     app_doc = db.get_app_by_client_id(app_client_id)
@@ -232,14 +233,18 @@ def grant_role_by_admin():
         return jsonify({"error": f"Target App ({app_client_id}) not found"}), 404
 
     # Find User
-    user = db.find_account_by_telegram(telegram_id)
+    if account_id:
+        user = db.db.accounts.find_one({"_id": ObjectId(account_id)})
+    else:
+        user = db.find_account_by_telegram(telegram_id)
+        
     if not user:
         return jsonify({"error": "User not found"}), 404
 
     # Update Role with Custom Tier and Duration
     db.link_user_to_app(user['_id'], app_doc['_id'], role=target_role, duration_str=duration)
 
-    log.info(f"Admin manually granted '{target_role}' for App '{app_doc.get('app_name')}' to User {telegram_id}")
+    log.info(f"Admin manually granted '{target_role}' for App '{app_doc.get('app_name')}' to User {user['_id']}")
 
     return jsonify({
         "success": True,
@@ -247,6 +252,37 @@ def grant_role_by_admin():
         "role": target_role,
         "app": app_doc.get('app_name')
     }), 200
+
+@internal_bp.route('/payments/activate-trial', methods=['POST'])
+@require_service_auth
+def activate_free_trial():
+    """
+    Activates a one-time free trial for the user.
+    """
+    data = request.json
+    account_id = data.get('account_id')
+    target_client_id = data.get('target_client_id')
+    duration = data.get('duration', '14d')
+
+    caller_client_id = request.authenticated_client_id
+    app_client_id = target_client_id if target_client_id else caller_client_id
+
+    if not account_id:
+        return jsonify({"error": "Missing account_id"}), 400
+
+    db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
+    app_doc = db.get_app_by_client_id(app_client_id)
+
+    if not app_doc:
+        return jsonify({"error": f"Target App ({app_client_id}) not found"}), 404
+
+    success, msg = db.activate_free_trial(account_id, app_doc['_id'], duration_str=duration)
+    
+    if success:
+        log.info(f"User {account_id} activated free trial for App '{app_doc.get('app_name')}'")
+        return jsonify({"success": True, "message": msg}), 200
+    else:
+        return jsonify({"error": msg}), 400
 
 
 @internal_bp.route('/payments/callback', methods=['POST'])

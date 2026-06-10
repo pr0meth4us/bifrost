@@ -311,6 +311,40 @@ def get_user_role_internal():
     return jsonify({"role": final_response}), 200
 
 
+@internal_bp.route('/get-roles-bulk', methods=['POST'])
+@require_service_auth
+def get_user_roles_bulk_internal():
+    """Allows a Service to check roles for multiple account IDs at once."""
+    data = request.json
+    account_ids = data.get('account_ids', [])
+    client_id = request.authenticated_client_id
+
+    if not account_ids:
+        return jsonify({"roles": {}}), 200
+
+    db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
+    app_doc = db.get_app_by_client_id(client_id)
+    if not app_doc:
+        return jsonify({"error": "Calling App not found"}), 404
+
+    from bson import ObjectId
+    object_ids = [ObjectId(aid) for aid in account_ids if ObjectId.is_valid(aid)]
+    
+    links = db.db.app_links.find({
+        "app_id": app_doc['_id'],
+        "account_id": {"$in": object_ids}
+    })
+
+    roles_map = {}
+    for link in links:
+        roles_map[str(link['account_id'])] = {
+            "role": link.get("role", "user"),
+            "has_used_trial": link.get("trial_used", False)
+        }
+
+    return jsonify({"roles": roles_map}), 200
+
+
 @internal_bp.route('/me', methods=['GET'])
 @require_service_auth
 def get_current_user():

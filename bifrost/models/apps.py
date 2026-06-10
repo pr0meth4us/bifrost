@@ -147,6 +147,36 @@ class AppMixin:
         if old_role != target_role and not suppress_webhook:
             self._trigger_event_for_user(account_id, "account_role_change", specific_app_id=app_id)
 
+    def activate_free_trial(self, account_id, app_id, duration_str="14d"):
+        """
+        Activates a one-time free trial for the user on a specific app.
+        """
+        query = {"account_id": ObjectId(account_id), "app_id": ObjectId(app_id)}
+        link = self.db.app_links.find_one(query)
+
+        if link and link.get('trial_used'):
+            return False, "Free trial has already been used."
+
+        now = datetime.now(UTC)
+        expires_at = now + timedelta(days=14)
+
+        update_doc = {
+            "app_specific_role": "premium_user",
+            "role": "premium_user",
+            "expires_at": expires_at,
+            "trial_used": True,
+            "last_login": now
+        }
+
+        self.db.app_links.update_one(
+            query,
+            {"$set": update_doc, "$setOnInsert": {"linked_at": now}},
+            upsert=True
+        )
+
+        self._trigger_event_for_user(account_id, "account_role_change", specific_app_id=app_id)
+        return True, "Free trial activated successfully."
+
     def remove_user_from_app(self, account_id, app_id, is_self_action=False):
         """
         Completely unlinks a user from an application.
