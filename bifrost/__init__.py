@@ -51,8 +51,11 @@ class DynamicCorsMiddleware:
                 db = mongo.cx[db_name]
                 new_origins = set()
 
-                new_origins.add("http://localhost:8000")
-                new_origins.add("http://localhost:5000")
+                env_origins = os.getenv("BIFROST_CORS_ORIGINS", "http://localhost:8000,http://localhost:5000")
+                for origin in env_origins.split(","):
+                    if origin.strip():
+                        new_origins.add(origin.strip())
+
                 if self.app.config.get('BIFROST_PUBLIC_URL'):
                     new_origins.add(self.app.config['BIFROST_PUBLIC_URL'])
 

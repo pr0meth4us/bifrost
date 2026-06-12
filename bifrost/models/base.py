@@ -18,14 +18,26 @@ class BaseMixin:
         def ensure_unique_sparse(collection, field):
             idx_name = f"client_id_1_{field}_1"
             try:
-                collection.create_index([("client_id", ASCENDING), (field, ASCENDING)], unique=True, sparse=True)
+                collection.create_index(
+                    [("client_id", ASCENDING), (field, ASCENDING)],
+                    unique=True,
+                    partialFilterExpression={field: {"$type": "string"}}
+                )
             except Exception:
                 try:
-                    log.info(f"Recreating index for {field} to ensure sparse constraint...")
-                    collection.drop_index(idx_name)
-                    collection.create_index([("client_id", ASCENDING), (field, ASCENDING)], unique=True, sparse=True)
+                    log.info(f"Recreating index for {field} to ensure partialFilter constraint...")
+                    try:
+                        collection.drop_index(idx_name)
+                    except Exception as e:
+                        if "index not found" not in str(e):
+                            raise e
+                    collection.create_index(
+                        [("client_id", ASCENDING), (field, ASCENDING)],
+                        unique=True,
+                        partialFilterExpression={field: {"$type": "string"}}
+                    )
                 except Exception as e:
-                    log.warning(f"Could not recreate sparse index for {field}: {e}")
+                    log.warning(f"Could not recreate partial index for {field}: {e}")
 
         # Ensure sparse indexes for optional fields per tenant
         ensure_unique_sparse(self.db.accounts, "email")
