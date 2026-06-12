@@ -126,13 +126,13 @@ class AuthMixin:
 
         return self.db.accounts.insert_one(account).inserted_id
 
-    def find_account_by_email(self, email, client_id):
-        if not email or not client_id: return None
-        return self.db.accounts.find_one({"email": email.lower(), "client_id": client_id})
+    def find_account_by_email(self, email, client_id=None):
+        if not email: return None
+        return self.db.accounts.find_one({"email": email.lower()})
 
-    def find_account_by_username(self, username, client_id):
-        if not username or not client_id: return None
-        return self.db.accounts.find_one({"username": username.lower(), "client_id": client_id})
+    def find_account_by_username(self, username, client_id=None):
+        if not username: return None
+        return self.db.accounts.find_one({"username": username.lower()})
 
     def find_account_by_id(self, account_id):
         try:
@@ -140,8 +140,8 @@ class AuthMixin:
         except:
             return None
 
-    def find_account_by_telegram(self, telegram_id, client_id):
-        return self.db.accounts.find_one({"telegram_id": str(telegram_id), "client_id": client_id})
+    def find_account_by_telegram(self, telegram_id, client_id=None):
+        return self.db.accounts.find_one({"telegram_id": str(telegram_id)})
 
     def update_password(self, email, new_password, client_id):
         user = self.find_account_by_email(email, client_id)
@@ -156,7 +156,7 @@ class AuthMixin:
 
     def link_email_credentials(self, account_id, email, password, client_id):
         email = email.lower()
-        existing = self.db.accounts.find_one({"email": email, "client_id": client_id, "_id": {"$ne": ObjectId(account_id)}})
+        existing = self.db.accounts.find_one({"email": email, "_id": {"$ne": ObjectId(account_id)}})
         if existing:
             return False, "Email is already associated with another account."
 
@@ -181,7 +181,7 @@ class AuthMixin:
 
     def link_telegram(self, account_id, telegram_id, display_name, client_id):
         telegram_id = str(telegram_id)
-        existing = self.db.accounts.find_one({"telegram_id": telegram_id, "client_id": client_id, "_id": {"$ne": ObjectId(account_id)}})
+        existing = self.db.accounts.find_one({"telegram_id": telegram_id, "_id": {"$ne": ObjectId(account_id)}})
         if existing:
             return False, "Telegram account already linked to another user."
 
@@ -208,14 +208,14 @@ class AuthMixin:
     def update_account_profile(self, account_id, updates, client_id):
         if 'email' in updates:
             updates['email'] = updates['email'].lower()
-            existing = self.db.accounts.find_one({"email": updates['email'], "client_id": client_id, "_id": {"$ne": ObjectId(account_id)}})
+            existing = self.db.accounts.find_one({"email": updates['email'], "_id": {"$ne": ObjectId(account_id)}})
             if existing:
                 return False, "Email is already in use by another account."
 
         if 'username' in updates:
             updates['username'] = updates['username'].lower()
             existing = self.db.accounts.find_one(
-                {"username": updates['username'], "client_id": client_id, "_id": {"$ne": ObjectId(account_id)}})
+                {"username": updates['username'], "_id": {"$ne": ObjectId(account_id)}})
             if existing:
                 return False, "Username is already taken."
 
