@@ -4,7 +4,7 @@ WORKDIR /app
 
 # 1. Install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --default-timeout=100 --no-cache-dir -r requirements.txt
 
 # 2. Copy the entire Bifrost project (API + Bot code)
 COPY . .

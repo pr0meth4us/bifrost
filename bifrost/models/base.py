@@ -15,20 +15,19 @@ class BaseMixin:
 
     def init_indexes(self):
         """Creates unique indexes to enforce data integrity."""
-        # Helper to ensure unique sparse index
         def ensure_unique_sparse(collection, field):
-            idx_name = f"{field}_1"
+            idx_name = f"client_id_1_{field}_1"
             try:
-                collection.create_index([(field, ASCENDING)], unique=True, sparse=True)
+                collection.create_index([("client_id", ASCENDING), (field, ASCENDING)], unique=True, sparse=True)
             except Exception:
                 try:
                     log.info(f"Recreating index for {field} to ensure sparse constraint...")
                     collection.drop_index(idx_name)
-                    collection.create_index([(field, ASCENDING)], unique=True, sparse=True)
+                    collection.create_index([("client_id", ASCENDING), (field, ASCENDING)], unique=True, sparse=True)
                 except Exception as e:
                     log.warning(f"Could not recreate sparse index for {field}: {e}")
 
-        # Ensure sparse indexes for optional fields
+        # Ensure sparse indexes for optional fields per tenant
         ensure_unique_sparse(self.db.accounts, "email")
         ensure_unique_sparse(self.db.accounts, "username")
         ensure_unique_sparse(self.db.accounts, "telegram_id")

@@ -30,13 +30,17 @@ def check_email():
     """
     data = request.json
     identifier = data.get('email') or data.get('username')
+    client_id = data.get('client_id')
+
+    if not client_id:
+        return jsonify({"error": "Missing client_id"}), 400
 
     db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
 
     # Check both fields
-    user = db.find_account_by_email(identifier)
+    user = db.find_account_by_email(identifier, client_id)
     if not user:
-        user = db.find_account_by_username(identifier)
+        user = db.find_account_by_username(identifier, client_id)
 
     return jsonify({"exists": bool(user)})
 
@@ -169,14 +173,14 @@ def complete_registration():
         return jsonify({"error": "Invalid client_id"}), 401
 
     # 2. Check Username Uniqueness if provided
-    if username and db.find_account_by_username(username):
+    if username and db.find_account_by_username(username, client_id):
         return jsonify({"error": "Username already taken"}), 409
 
     # 3. Create or Update Account
-    existing_user = db.find_account_by_email(email)
+    existing_user = db.find_account_by_email(email, client_id)
 
     if existing_user:
-        db.update_password(email, password)
+        db.update_password(email, password, client_id)
         # If updating, optionally set username if not set? 
         # For safety, we only set username on creation or explicit profile update,
         # but here we can allow it if the user doesn't have one.
@@ -186,6 +190,7 @@ def complete_registration():
         user_id = existing_user['_id']
     else:
         user_id = db.create_account({
+            "client_id": client_id,
             "email": email,
             "username": username,
             "password": password,
@@ -225,8 +230,9 @@ def reset_password():
     data = request.json
     proof_token = data.get('proof_token')
     password = data.get('password')
+    client_id = data.get('client_id')
 
-    if not proof_token or not password:
+    if not proof_token or not password or not client_id:
         return jsonify({"error": "Missing data"}), 400
 
     # 1. Verify Proof Token
@@ -240,12 +246,12 @@ def reset_password():
 
     db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
 
-    user = db.find_account_by_email(email)
+    user = db.find_account_by_email(email, client_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
     # 2. Update Password
-    db.update_password(email, password)
+    db.update_password(email, password, client_id)
 
     return jsonify({"success": True, "message": "Password updated successfully"})
 
@@ -275,9 +281,9 @@ def login():
         return jsonify({"error": "Invalid client_id"}), 401
 
     # Try finding by email first, then username
-    user = db.find_account_by_email(identifier)
+    user = db.find_account_by_email(identifier, client_id)
     if not user:
-        user = db.find_account_by_username(identifier)
+        user = db.find_account_by_username(identifier, client_id)
 
     # Validate Password
     if not user or not user.get('password_hash') or not check_password_hash(user['password_hash'], password):
@@ -336,10 +342,11 @@ def verify_otp_login():
         return jsonify({"error": "Invalid or expired code"}), 401
 
     # Find or Create Account
-    user = db.find_account_by_telegram(telegram_id)
+    user = db.find_account_by_telegram(telegram_id, client_id)
 
     if not user:
         user_id = db.create_account({
+            "client_id": client_id,
             "telegram_id": telegram_id,
             "display_name": "Telegram User",
             "auth_providers": ["telegram"]
@@ -398,10 +405,11 @@ def telegram_login():
         return jsonify({"error": "Authentication verification failed"}), 401
 
     telegram_id = str(tg_data['id'])
-    user = db.find_account_by_telegram(telegram_id)
+    user = db.find_account_by_telegram(telegram_id, client_id)
 
     if not user:
         user_id = db.create_account({
+            "client_id": client_id,
             "telegram_id": telegram_id,
             "display_name": tg_data.get('first_name', 'Unknown'),
             "auth_providers": ["telegram"]
