@@ -16,9 +16,11 @@ def get_db():
 # --- PERMISSION HELPERS ---
 
 def get_current_role_in_app(app_id):
-    """Returns: owner, super_admin, admin, or None/heimdall"""
+    """Returns: owner, super_admin, admin, or None/heimdall/pr0meth4us"""
     if session.get('is_heimdall'):
         return 'heimdall'
+    if session.get('is_pr0meth4us'):
+        return 'pr0meth4us'
 
     db = get_db()
     user_id = session.get('backoffice_user')
@@ -36,6 +38,7 @@ def check_permission(app_id, min_level):
     """
     role = get_current_role_in_app(app_id)
     if role == 'heimdall': return True
+    if role == 'pr0meth4us': return True
     if role == 'owner': return True  # Level 3
 
     if min_level <= 2 and role == 'super_admin': return True
@@ -69,6 +72,18 @@ def heimdall_required(f):
     return decorated_function
 
 
+def pr0meth4us_required(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('is_pr0meth4us'):
+            flash("Pr0meth4us (Bot Master) Access Required.", "danger")
+            return redirect(url_for('backoffice.dashboard'))
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
 # --- ROUTES ---
 
 @backoffice_bp.route('/login', methods=['GET', 'POST'])
@@ -78,7 +93,7 @@ def login():
         password = request.form.get('password')
         db = get_db()
 
-        # 1. Heimdall Check
+        # 1. Heimdall / Pr0meth4us Check
         admin_doc = db.db.admins.find_one({"email": identifier.lower()})
         if admin_doc and check_password_hash(admin_doc['password_hash'], password):
             if admin_doc.get('role') == 'heimdall':
@@ -86,8 +101,13 @@ def login():
                 session['is_heimdall'] = True
                 session['role'] = 'Heimdall'
                 return redirect(url_for('backoffice.dashboard'))
+            elif admin_doc.get('role') == 'pr0meth4us':
+                session['backoffice_user'] = str(admin_doc['_id'])
+                session['is_pr0meth4us'] = True
+                session['role'] = 'Pr0meth4us'
+                return redirect(url_for('backoffice.dashboard'))
             else:
-                flash("Role deprecated. Update to 'heimdall'.", "warning")
+                flash("Role deprecated. Update to 'heimdall' or 'pr0meth4us'.", "warning")
 
         # 2. App Tenant Check
         user = db.find_account_by_email(identifier)
@@ -174,6 +194,9 @@ def dashboard():
     if session.get('is_heimdall'):
         apps = db.get_all_apps()
         title = "Heimdall Dashboard"
+    elif session.get('is_pr0meth4us'):
+        apps = db.get_all_apps()
+        title = "Pr0meth4us Control Room"
     else:
         apps = db.get_managed_apps(session['backoffice_user'])
         if not apps:
@@ -406,3 +429,69 @@ def update_user_role(app_id, user_id):
             flash(f"User updated to {new_role}", "success")
 
     return redirect(url_for('backoffice.view_app', app_id=app_id))
+
+
+# --- PR0METH4US CONTROL ROOM ---
+
+@backoffice_bp.route('/control-room', methods=['GET', 'POST'])
+@login_required
+@pr0meth4us_required
+def control_room():
+    db = get_db()
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'trigger_streak':
+            # We can signal the bot by updating a flag in mongodb
+            db.db.tiktok_settings.update_one(
+                {"key": "force_run_signal"},
+                {"$set": {"value": True}},
+                upsert=True
+            )
+            flash("TikTok Streak Trigger Signal Sent! The bot will pick this up shortly.", "success")
+        elif action == 'update_settings':
+            import json
+            prod_test = request.form.get('prod_test_executions')
+            force_dice = request.form.get('force_dice_roll') == 'on'
+            db.db.tiktok_settings.update_one(
+                {"key": "PROD_TEST_EXECUTIONS"},
+                {"$set": {"value": int(prod_test) if prod_test else 5}},
+                upsert=True
+            )
+            db.db.tiktok_settings.update_one(
+                {"key": "FORCE_DICE_ROLL"},
+                {"$set": {"value": str(force_dice).lower()}},
+                upsert=True
+            )
+            
+            # Save Behavioral Config
+            behavioral_json_str = request.form.get('behavioral_config')
+            if behavioral_json_str:
+                try:
+                    parsed_config = json.loads(behavioral_json_str)
+                    db.db.tiktok_settings.update_one(
+                        {"key": "BEHAVIORAL_CONFIG"},
+                        {"$set": {"value": parsed_config}},
+                        upsert=True
+                    )
+                    flash("Settings and Behavioral Config updated successfully.", "success")
+                except json.JSONDecodeError:
+                    flash("Invalid JSON in Behavioral Config. Settings saved but Behavioral Config skipped.", "danger")
+            else:
+                flash("Settings updated successfully.", "success")
+            
+        return redirect(url_for('backoffice.control_room'))
+
+    # GET request
+    import json
+    logs = list(db.db.bot_logs.find().sort("timestamp", -1).limit(100))
+    settings = {doc['key']: doc.get('value') for doc in db.db.tiktok_settings.find()}
+    
+    # Retrieve behavioral config from DB, or fallback to default dict
+    behavioral_config_val = settings.get("BEHAVIORAL_CONFIG", {
+        "allow_slurs_globally": True,
+        "allow_romance_globally": True,
+        "special_friends": {}
+    })
+    behavioral_config_str = json.dumps(behavioral_config_val, indent=4)
+    
+    return render_template('backoffice/control_room.html', logs=logs, settings=settings, behavioral_config_str=behavioral_config_str)

@@ -3,6 +3,13 @@
 All notable changes to the `bifrost` project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-06-14
+
+### Added
+- **Centralized Control Room**: Added a new protected view in `backoffice.py` styled with Tailwind CSS, offering a terminal viewer for ecosystem logs and an interactive panel to manage the AI Keeper.
+- **pr0meth4us Role**: Added support for the `pr0meth4us` (Bot Master) role. `pr0meth4us` has Level 3 (Owner) privileges across all connected applications and exclusive access to the Control Room, but cannot register new apps or permanently delete users like `heimdall`.
+- **Dynamic Configuration Updates**: Implemented forms in the Control Room to push settings (`FORCE_DICE_ROLL`, `BEHAVIORAL_CONFIG`) directly to MongoDB, eliminating the need for hardcoded scripts.
+
 ## [0.8.9] - 2026-06-10
 
 ### Added
