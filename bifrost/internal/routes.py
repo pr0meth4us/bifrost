@@ -391,6 +391,7 @@ def ingest_logs():
     from bifrost import redis_client
     import json
     import time
+    import datetime
     
     data = request.json
     if not data:

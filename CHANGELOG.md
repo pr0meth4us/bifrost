@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Centralized Logging API**: Added `POST /internal/logs` endpoint (protected by `require_service_auth`) for tenant apps to securely stream their logs into Bifrost.
 - **Redis Integration**: Replaced MongoDB with an ultra-fast, in-memory Redis database specifically for streaming logs. Included auto-trimming (1000 items max) and a 7-day TTL to optimize storage usage.
 
+### Fixed
+- **Logging API Bug**: Resolved a `NameError` causing HTTP 500 responses in `/internal/logs` by importing the missing `datetime` module.
+
 ## [0.10.0] - 2026-06-14
 
 ### Changed
