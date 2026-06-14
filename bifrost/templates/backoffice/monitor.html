@@ -2,151 +2,285 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Heimdall Live Monitor | Bifrost</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Plus Jakarta Sans', sans-serif; }</style>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #020617; /* slate-950 */
+            color: #f8fafc;
+            overflow: hidden;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(16, 185, 129, 0.08), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(56, 189, 248, 0.08), transparent 25%);
+        }
+        
+        /* Terminal aesthetics */
+        .font-mono { font-family: 'Fira Code', monospace; }
+        
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.6); /* slate-900 with opacity */
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(51, 65, 85, 0.5); /* slate-700 */
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 
+                        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        /* Glowing text effects */
+        .text-glow-green {
+            color: #4ade80;
+            text-shadow: 0 0 10px rgba(74, 222, 128, 0.4);
+        }
+        .text-glow-blue {
+            color: #38bdf8;
+            text-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+        }
+        .text-glow-red {
+            color: #f87171;
+            text-shadow: 0 0 10px rgba(248, 113, 113, 0.6);
+        }
+        .text-glow-yellow {
+            color: #facc15;
+            text-shadow: 0 0 10px rgba(250, 204, 21, 0.4);
+        }
+
+        /* Custom Scrollbar */
+        #terminal-output::-webkit-scrollbar { width: 6px; }
+        #terminal-output::-webkit-scrollbar-track { background: transparent; }
+        #terminal-output::-webkit-scrollbar-thumb { 
+            background: rgba(51, 65, 85, 0.8); 
+            border-radius: 10px; 
+        }
+        #terminal-output::-webkit-scrollbar-thumb:hover { background: rgba(71, 85, 105, 1); }
+
+        /* Log Line Animations */
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .log-line {
+            animation: slideIn 0.2s ease-out forwards;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            word-wrap: break-word;
+        }
+        .log-line:hover { background-color: rgba(30, 41, 59, 0.5); }
+        
+        .log-time { color: #64748b; margin-right: 12px; }
+        .log-app { color: #818cf8; font-weight: 600; margin-right: 8px; }
+        
+        /* Level Colors */
+        .log-level-INFO { color: #4ade80; margin-right: 8px; }
+        .log-level-WARNING { color: #facc15; margin-right: 8px; }
+        .log-level-ERROR { color: #f87171; font-weight: bold; margin-right: 8px; }
+        .log-level-CRITICAL { 
+            color: #fff; 
+            background-color: rgba(220, 38, 38, 0.8);
+            padding: 0 4px;
+            border-radius: 2px;
+            font-weight: bold; 
+            margin-right: 8px; 
+            text-shadow: 0 0 8px rgba(255,255,255,0.5);
+        }
+        
+        .log-message { color: #cbd5e1; }
+
+        /* Pulse animation for live dot */
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .live-dot {
+            animation: pulse-red 2s infinite;
+        }
+    </style>
 </head>
-<body class="bg-slate-50 min-h-screen">
-    <div class="flex justify-between items-center mb-6">
-        <div>
-            <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Heimdall Monitor</h1>
-            <p class="text-slate-500 font-medium">Live Ecosystem Logs (Redis Stream)</p>
-        </div>
-        <div>
-            <a href="{{ url_for('backoffice.dashboard') }}" class="px-4 py-2 bg-slate-200 text-slate-700 font-semibold rounded-lg hover:bg-slate-300 transition-colors">
-                Back to Dashboard
+<body class="h-screen w-full flex flex-col p-4 sm:p-6 lg:p-8 box-border">
+    
+    <!-- Top Navigation Bar -->
+    <header class="flex justify-between items-center w-full mb-6 shrink-0 relative z-10">
+        <div class="flex items-center gap-4">
+            <!-- Back Button -->
+            <a href="{{ url_for('backoffice.dashboard') }}" 
+               class="group flex items-center justify-center w-10 h-10 rounded-full bg-slate-800/80 border border-slate-700 hover:bg-slate-700 hover:border-slate-500 transition-all shadow-lg hover:shadow-slate-500/20">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5 text-slate-300 group-hover:text-white transition-colors">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                </svg>
             </a>
+            
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight flex items-center gap-3">
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">Heimdall</span>
+                    <span class="text-white">Vision</span>
+                </h1>
+                <div class="flex items-center gap-2 mt-1">
+                    <div class="w-2 h-2 rounded-full bg-red-500 live-dot"></div>
+                    <p class="text-xs sm:text-sm font-mono text-slate-400 uppercase tracking-widest text-glow-blue opacity-80">
+                        Live Ecosystem Stream
+                    </p>
+                </div>
+            </div>
         </div>
-    </div>
+        
+        <!-- Status Badges -->
+        <div class="hidden sm:flex items-center gap-4">
+            <div class="glass-panel px-4 py-2 rounded-lg flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4 text-emerald-400">
+                    <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 01.359.852L12.982 9.75h7.268a.75.75 0 01.548 1.262l-10.5 11.25a.75.75 0 01-1.272-.71l1.992-7.302H3.75a.75.75 0 01-.548-1.262l10.5-11.25a.75.75 0 01.913-.143z" clip-rule="evenodd" />
+                </svg>
+                <span class="text-xs font-bold text-slate-200">Redis Connected</span>
+            </div>
+        </div>
+    </header>
 
     <!-- The Terminal Window -->
-    <div class="w-full bg-black rounded-xl shadow-2xl border border-slate-800 overflow-hidden" style="height: 70vh;">
-        <div class="bg-slate-900 px-4 py-2 flex items-center gap-2 border-b border-slate-800">
-            <div class="w-3 h-3 rounded-full bg-red-500"></div>
-            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
-            <div class="w-3 h-3 rounded-full bg-green-500"></div>
-            <span class="ml-4 text-xs font-mono text-slate-500">root@bifrost:~# tail -f /var/log/ecosystem.log</span>
-        </div>
+    <main class="flex-grow w-full glass-panel rounded-2xl flex flex-col overflow-hidden relative z-10 transition-all duration-500 hover:border-slate-600/60">
         
-        <div id="terminal-output" class="p-4 h-full overflow-y-auto font-mono text-sm leading-relaxed" style="color: #00ff00; background-color: #050505; padding-bottom: 60px;">
-            <div class="text-slate-500 mb-4">Initializing connection to Redis stream...</div>
-        </div>
-    </div>
-</div>
-
-<style>
-    /* Custom Scrollbar for Terminal */
-    #terminal-output::-webkit-scrollbar {
-        width: 8px;
-    }
-    #terminal-output::-webkit-scrollbar-track {
-        background: #111;
-    }
-    #terminal-output::-webkit-scrollbar-thumb {
-        background: #333;
-        border-radius: 4px;
-    }
-    #terminal-output::-webkit-scrollbar-thumb:hover {
-        background: #555;
-    }
-    .log-line {
-        margin-bottom: 4px;
-        word-break: break-all;
-    }
-    .log-time { color: #666; }
-    .log-app { color: #00ffff; font-weight: bold; }
-    .log-level-INFO { color: #00ff00; }
-    .log-level-WARNING { color: #ffff00; }
-    .log-level-ERROR { color: #ff0000; font-weight: bold; }
-    .log-level-CRITICAL { color: #ff00ff; font-weight: bold; background-color: #330000; }
-</style>
-
-<script>
-    const terminal = document.getElementById('terminal-output');
-    let knownLogSignatures = new Set();
-    
-    function formatTime(isoString) {
-        try {
-            const d = new Date(isoString);
-            return d.toISOString().split('T')[1].replace('Z', '');
-        } catch(e) {
-            return isoString;
-        }
-    }
-
-    function appendLog(log) {
-        // Create a unique signature to avoid duplicates
-        const sig = `${log.timestamp}-${log.client_id}-${log.message}`;
-        if (knownLogSignatures.has(sig)) return false;
-        knownLogSignatures.add(sig);
-        
-        // Keep set size manageable
-        if (knownLogSignatures.size > 2000) {
-            const it = knownLogSignatures.values();
-            knownLogSignatures.delete(it.next().value);
-        }
-
-        const div = document.createElement('div');
-        div.className = 'log-line';
-        
-        const timeSpan = document.createElement('span');
-        timeSpan.className = 'log-time';
-        timeSpan.textContent = `[${formatTime(log.timestamp)}] `;
-        
-        const appSpan = document.createElement('span');
-        appSpan.className = 'log-app';
-        appSpan.textContent = `<${log.app_name}> `;
-        
-        const levelSpan = document.createElement('span');
-        levelSpan.className = `log-level-${log.level}`;
-        levelSpan.textContent = `[${log.level}] `;
-        
-        const msgSpan = document.createElement('span');
-        msgSpan.className = 'log-message';
-        // Basic escaping
-        const safeMsg = log.message.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        msgSpan.innerHTML = safeMsg;
-
-        div.appendChild(timeSpan);
-        div.appendChild(appSpan);
-        div.appendChild(levelSpan);
-        div.appendChild(msgSpan);
-        
-        terminal.appendChild(div);
-        return true;
-    }
-
-    async function fetchLogs() {
-        try {
-            const res = await fetch("{{ url_for('backoffice.monitor_stream') }}");
-            if (!res.ok) throw new Error('Stream failed');
-            const data = await res.json();
+        <!-- Terminal Header -->
+        <div class="bg-slate-900/80 px-4 py-3 flex justify-between items-center border-b border-slate-700/50 shrink-0">
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-red-500/80 border border-red-500/50"></div>
+                <div class="w-3 h-3 rounded-full bg-yellow-500/80 border border-yellow-500/50"></div>
+                <div class="w-3 h-3 rounded-full bg-green-500/80 border border-green-500/50"></div>
+                <span class="ml-3 text-xs font-mono text-slate-500 font-medium">root@bifrost-heimdall:~# tail -f /var/log/ecosystem.log</span>
+            </div>
             
-            if (data.logs && data.logs.length > 0) {
-                // Logs come from LRANGE 0 100, so [0] is the newest.
-                // We want to process them oldest to newest to append correctly.
-                const orderedLogs = data.logs.reverse();
-                
-                let addedAny = false;
-                orderedLogs.forEach(log => {
-                    if (appendLog(log)) addedAny = true;
-                });
-                
-                if (addedAny) {
-                    // Auto-scroll to bottom
-                    terminal.scrollTop = terminal.scrollHeight;
-                }
-            }
-        } catch(e) {
-            console.error("Monitor polling error:", e);
-        }
-    }
+            <div class="text-xs font-mono text-slate-500 flex items-center gap-2">
+                <span id="log-counter">0</span> logs parsed
+            </div>
+        </div>
+        
+        <!-- Terminal Body -->
+        <div id="terminal-output" class="p-4 sm:p-6 h-full overflow-y-auto font-mono text-xs sm:text-sm leading-relaxed pb-20 relative">
+            <div class="text-slate-400 mb-6 flex items-center gap-3">
+                <svg class="animate-spin h-4 w-4 text-emerald-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="text-glow-green">Establishing secure connection to Helm Ecosystem Event Stream...</span>
+            </div>
+        </div>
+        
+        <!-- Terminal Gradient Overlay (for fade out at bottom) -->
+        <div class="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-slate-900/90 to-transparent pointer-events-none"></div>
+    </main>
 
-    // Poll every 1.5 seconds
-    setInterval(fetchLogs, 1500);
-    // Initial fetch
-    fetchLogs();
-</script>
+    <!-- Scripts -->
+    <script>
+        const terminal = document.getElementById('terminal-output');
+        const counterEl = document.getElementById('log-counter');
+        let knownLogSignatures = new Set();
+        let totalLogsParsed = 0;
+        
+        function formatTime(isoString) {
+            try {
+                const d = new Date(isoString);
+                // format like 14:05:32.412
+                const hours = String(d.getHours()).padStart(2, '0');
+                const mins = String(d.getMinutes()).padStart(2, '0');
+                const secs = String(d.getSeconds()).padStart(2, '0');
+                const ms = String(d.getMilliseconds()).padStart(3, '0');
+                return `${hours}:${mins}:${secs}.${ms}`;
+            } catch(e) {
+                return isoString;
+            }
+        }
+
+        function appendLog(log) {
+            // Create a unique signature to avoid duplicates
+            const sig = `${log.timestamp}-${log.client_id}-${log.message}`;
+            if (knownLogSignatures.has(sig)) return false;
+            knownLogSignatures.add(sig);
+            
+            // Keep set size manageable to prevent memory leak
+            if (knownLogSignatures.size > 2000) {
+                const it = knownLogSignatures.values();
+                knownLogSignatures.delete(it.next().value);
+            }
+
+            // Remove initial loading text if this is the first log
+            if (totalLogsParsed === 0) {
+                terminal.innerHTML = ''; 
+            }
+            totalLogsParsed++;
+            counterEl.textContent = totalLogsParsed;
+
+            const div = document.createElement('div');
+            div.className = 'log-line';
+            
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'log-time';
+            timeSpan.textContent = `[${formatTime(log.timestamp)}]`;
+            
+            const appSpan = document.createElement('span');
+            appSpan.className = 'log-app';
+            appSpan.textContent = `<${log.app_name || 'unknown'}>`;
+            
+            const levelSpan = document.createElement('span');
+            levelSpan.className = `log-level-${log.level || 'INFO'}`;
+            levelSpan.textContent = `[${log.level || 'INFO'}]`;
+            
+            const msgSpan = document.createElement('span');
+            msgSpan.className = 'log-message';
+            
+            // Basic escaping to prevent XSS
+            let safeMsg = (log.message || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            
+            // Highlight specific keywords for effect
+            safeMsg = safeMsg.replace(/(Successfully|ESTABLISHED|ENABLED)/g, '<span class="text-emerald-400 font-bold">$1</span>');
+            safeMsg = safeMsg.replace(/(FAILED|ERROR|Exception)/g, '<span class="text-rose-400 font-bold">$1</span>');
+            safeMsg = safeMsg.replace(/([0-9]+\.[0-9]+|\b[0-9]+\b)/g, '<span class="text-cyan-300">$1</span>'); // numbers
+            
+            msgSpan.innerHTML = safeMsg;
+
+            div.appendChild(timeSpan);
+            div.appendChild(appSpan);
+            div.appendChild(levelSpan);
+            div.appendChild(msgSpan);
+            
+            terminal.appendChild(div);
+            return true;
+        }
+
+        async function fetchLogs() {
+            try {
+                const res = await fetch("{{ url_for('backoffice.monitor_stream') }}");
+                if (!res.ok) throw new Error('Stream failed');
+                const data = await res.json();
+                
+                if (data.logs && data.logs.length > 0) {
+                    // Logs come from LRANGE 0 100, so [0] is the newest.
+                    // We want to process them oldest to newest to append correctly.
+                    const orderedLogs = data.logs.reverse();
+                    
+                    let addedAny = false;
+                    orderedLogs.forEach(log => {
+                        if (appendLog(log)) addedAny = true;
+                    });
+                    
+                    if (addedAny) {
+                        // Smooth auto-scroll to bottom
+                        terminal.scrollTo({
+                            top: terminal.scrollHeight,
+                            behavior: 'smooth'
+                        });
+                    }
+                }
+            } catch(e) {
+                console.error("Monitor polling error:", e);
+                // Optionally show a disconnected state, but keeping it silent is less intrusive
+            }
+        }
+
+        // Poll every 1.5 seconds
+        setInterval(fetchLogs, 1500);
+        // Initial fetch
+        fetchLogs();
+    </script>
 </body>
 </html>
