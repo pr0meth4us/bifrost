@@ -17,6 +17,7 @@ except ImportError:
         return "v0.0.0", datetime.datetime.now().strftime("%Y-%m-%d")
 
 mongo = PyMongo()
+redis_client = None
 
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, o):
@@ -126,6 +127,17 @@ def create_app(config_class):
 
     cors = DynamicCorsMiddleware(app)
     cors.attach()
+
+    # --- REDIS INITIALIZATION ---
+    import redis
+    global redis_client
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    try:
+        redis_client = redis.from_url(redis_url, decode_responses=True)
+        redis_client.ping()
+        logging.info("Connected to Redis successfully.")
+    except Exception as e:
+        logging.error(f"Failed to connect to Redis: {e}")
 
     # --- BLUEPRINTS ---
     from .auth.ui import auth_ui_bp

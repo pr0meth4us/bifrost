@@ -383,3 +383,43 @@ def telegram_webhook():
     except Exception as e:
         log.error(f"Bot Webhook Processing Error: {e}")
         return jsonify({"error": "Internal Error"}), 500
+
+@internal_bp.route('/logs', methods=['POST'])
+@require_service_auth
+def ingest_logs():
+    """Ingests streaming logs from Helm ecosystem apps into Redis."""
+    from bifrost import redis_client
+    import json
+    import time
+    
+    data = request.json
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+        
+    client_id = request.authenticated_client_id
+    db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
+    app_doc = db.get_app_by_client_id(client_id)
+    app_name = app_doc['app_name'] if app_doc else "Unknown App"
+    
+    if redis_client:
+        try:
+            log_entry = {
+                "app_name": app_name,
+                "client_id": client_id,
+                "level": data.get("level", "INFO"),
+                "logger": data.get("logger_name", "root"),
+                "message": data.get("message", ""),
+                "timestamp": data.get("timestamp", datetime.datetime.utcnow().isoformat()),
+                "ingested_at": time.time()
+            }
+            redis_client.lpush("ecosystem_logs", json.dumps(log_entry))
+            # Trim the list to max 1000 items to prevent unbounded growth
+            redis_client.ltrim("ecosystem_logs", 0, 999)
+            # Set TTL to 7 days
+            redis_client.expire("ecosystem_logs", 604800)
+            return jsonify({"status": "ok"}), 200
+        except Exception as e:
+            log.error(f"Redis log insertion failed: {e}")
+            return jsonify({"error": "Log storage failed"}), 500
+    else:
+        return jsonify({"error": "Redis not configured"}), 503
