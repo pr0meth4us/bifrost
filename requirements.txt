@@ -12,4 +12,5 @@ email-validator
 requests
 python-telegram-bot
 schedule
-markdownredis
+markdown
+redis
