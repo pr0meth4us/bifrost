@@ -1,7 +1,13 @@
-{% extends "base.html" %}
-
-{% block content %}
-<div class="p-6">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Heimdall Live Monitor | Bifrost</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Plus Jakarta Sans', sans-serif; }</style>
+</head>
+<body class="bg-slate-50 min-h-screen">
     <div class="flex justify-between items-center mb-6">
         <div>
             <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Heimdall Monitor</h1>
@@ -142,4 +148,5 @@
     // Initial fetch
     fetchLogs();
 </script>
-{% endblock %}
+</body>
+</html>
