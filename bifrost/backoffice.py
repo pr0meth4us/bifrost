@@ -438,13 +438,15 @@ def ai_metrics():
                 "alignment_period": {"seconds": 7 * 86400},
                 "per_series_aligner": monitoring_v3.Aggregation.Aligner.ALIGN_SUM,
                 "cross_series_reducer": monitoring_v3.Aggregation.Reducer.REDUCE_SUM,
-                "group_by_fields": ["resource.labels.model_id"],
+                "group_by_fields": ["resource.labels.model_user_id"],
             })
             for ts in safe_list(
                 'metric.type="aiplatform.googleapis.com/publisher/online_serving/token_count"',
                 agg=model_agg
             ):
-                model_id = ts.resource.labels.get("model_id", "unknown")
+                model_id = ts.resource.labels.get("model_user_id", "unknown")
+                if not model_id or model_id == "":
+                    model_id = "unknown"
                 for pt in ts.points:
                     val = int(pt.value.int64_value or pt.value.double_value or 0)
                     result["models"][model_id] = result["models"].get(model_id, 0) + val
