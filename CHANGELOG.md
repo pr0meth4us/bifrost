@@ -3,6 +3,16 @@
 All notable changes to the `bifrost` project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.2] - 2026-06-15
+
+### Added
+- **Global API Vault**: Added a centralized, read-only dashboard (`/heimdall/api-keys`) for Heimdall super-admins to monitor configured API keys across all registered applications.
+- **API Vault Navigation**: Integrated the "API VAULT" quick-link into the main Backoffice Dashboard and the Global Users List navigation bars.
+
+### Fixed
+- **API Keys Manager UI**: Moved the API Keys Manager section outside of the strict Owner block in `app_users.html` to ensure Super Admins can configure keys properly.
+- **Key Migration**: Automated the parsing of local `.env` keys (such as `EXCHANGERATE_API_KEY`, `TELEGRAM_TOKEN`, `MONGODB_URI`, `PAYWAY_API_KEY`) and securely encrypted them directly into the Bifrost database. Added placeholders for `GEMINI_API_KEY` for the TikTok streak features.
+
 ## [0.12.1] - 2026-06-15
 
 ### Fixed

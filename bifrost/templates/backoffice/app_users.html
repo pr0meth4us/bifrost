@@ -211,6 +211,14 @@
                 </div>
             </div>
 
+            {% else %}
+            <div class="bg-slate-100 p-6 rounded-2xl border border-slate-200 text-center">
+                <div class="text-3xl mb-2">🔒</div>
+                <h3 class="font-bold text-slate-400">Restricted Area</h3>
+                <p class="text-xs text-slate-400 mt-1">Secrets are only visible to the App Owner.</p>
+            </div>
+            {% endif %}
+
             <!-- API Keys Manager -->
             {% if current_role in ['super_admin', 'owner', 'heimdall'] %}
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
@@ -246,14 +254,6 @@
                     </div>
                     <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-sm">Add / Update Key</button>
                 </form>
-            </div>
-            {% endif %}
-
-            {% else %}
-            <div class="bg-slate-100 p-6 rounded-2xl border border-slate-200 text-center">
-                <div class="text-3xl mb-2">🔒</div>
-                <h3 class="font-bold text-slate-400">Restricted Area</h3>
-                <p class="text-xs text-slate-400 mt-1">Secrets are only visible to the App Owner.</p>
             </div>
             {% endif %}
         </div>

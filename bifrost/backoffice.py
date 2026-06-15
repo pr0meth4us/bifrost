@@ -205,6 +205,49 @@ def global_users():
     return render_template('backoffice/global_users.html', users=users, query=query)
 
 
+@backoffice_bp.route('/heimdall/users/<user_id>/details')
+@login_required
+def global_user_details(user_id):
+    if not session.get('is_heimdall'):
+        return {"error": "Unauthorized"}, 403
+    
+    db = get_db()
+    user = db.db.accounts.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        return {"error": "Not found"}, 404
+
+    links = list(db.db.app_links.find({"account_id": ObjectId(user_id)}))
+    apps = []
+    for link in links:
+        app = db.db.applications.find_one({"_id": link['app_id']})
+        if app:
+            apps.append({
+                "app_name": app['app_name'],
+                "role": link.get('app_specific_role', 'user')
+            })
+
+    return {
+        "id": str(user['_id']),
+        "display_name": user.get('display_name'),
+        "telegram_id": user.get('telegram_id'),
+        "email": user.get('email'),
+        "linked_apps": apps
+    }
+
+
+@backoffice_bp.route('/heimdall/api-keys')
+@login_required
+def global_api_keys():
+    if not session.get('is_heimdall'):
+        flash("Access Denied: Only Heimdall can view the Global API Vault.", "danger")
+        return redirect(url_for('backoffice.dashboard'))
+    
+    db = get_db()
+    apps = list(db.db.applications.find({}))
+    
+    return render_template('backoffice/global_api_keys.html', apps=apps)
+
+
 @backoffice_bp.route('/users/<user_id>/details', methods=['GET'])
 @login_required
 @heimdall_required
