@@ -246,7 +246,6 @@ def fetch_ai_metrics(db_hook):
     # Antigravity Data
     try:
         from google.cloud import monitoring_v3
-        import tempfile
         
         ag_creds = db_hook("bifrost_client_5dd70ad3a86c4f51") 
         fd, tmp = tempfile.mkstemp(suffix=".json")
