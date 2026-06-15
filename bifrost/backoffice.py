@@ -329,23 +329,44 @@ def ai_metrics():
             }
         )
 
-        def fetch_token_metric(metric_type):
-            results = client.list_time_series(
-                request={
-                    "name": project_name,
-                    "filter": f'metric.type="{metric_type}"',
-                    "interval": interval,
-                    "view": monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
-                }
-            )
-            total = 0
-            for result in results:
-                for point in result.points:
-                    total += point.value.int64_value
-            return total
+        def fetch_token_metric(metric_type, token_type_filter=None):
+            """Fetch a metric total, returning 0 if no data exists yet."""
+            try:
+                filter_str = f'metric.type="{metric_type}"'
+                if token_type_filter:
+                    filter_str += f' AND metric.labels.token_type="{token_type_filter}"'
+                results = list(client.list_time_series(
+                    request={
+                        "name": project_name,
+                        "filter": filter_str,
+                        "interval": interval,
+                        "view": monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
+                    }
+                ))
+                total = 0
+                for result in results:
+                    for point in result.points:
+                        v = point.value
+                        total += v.int64_value or v.double_value or 0
+                return total
+            except Exception:
+                return 0
 
-        input_tokens = fetch_token_metric("aiplatform.googleapis.com/generate_content/input_token_count")
-        output_tokens = fetch_token_metric("aiplatform.googleapis.com/generate_content/output_token_count")
+        # Try the two most common Vertex AI token metric paths
+        # Path 1: publisher/online_serving (most common for Gemini API)
+        input_tokens = fetch_token_metric(
+            "aiplatform.googleapis.com/publisher/online_serving/token_count",
+            token_type_filter="input"
+        )
+        output_tokens = fetch_token_metric(
+            "aiplatform.googleapis.com/publisher/online_serving/token_count",
+            token_type_filter="output"
+        )
+
+        # Fallback: generate_content metrics (older SDK versions)
+        if input_tokens == 0 and output_tokens == 0:
+            input_tokens = fetch_token_metric("aiplatform.googleapis.com/generate_content/input_token_count")
+            output_tokens = fetch_token_metric("aiplatform.googleapis.com/generate_content/output_token_count")
 
         # Vertex AI gemini-3.5-flash pricing
         cost = (input_tokens / 1_000_000.0) * 0.075 + (output_tokens / 1_000_000.0) * 0.30
