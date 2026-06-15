@@ -1,5 +1,9 @@
 from flask import Blueprint, request, jsonify, current_app
-from ..models import get_db
+from .models import BifrostDB
+from . import mongo
+
+def get_db():
+    return BifrostDB(mongo.cx, current_app.config['DB_NAME'])
 
 config_api_bp = Blueprint('config_api', __name__, url_prefix='/api/v1')
 
