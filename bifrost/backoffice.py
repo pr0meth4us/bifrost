@@ -431,7 +431,7 @@ def ai_metrics():
                     day_offset = int((end_secs - pt.interval.end_time.timestamp()) / 86400)
                     idx = 6 - day_offset
                     if 0 <= idx < 7:
-                        result["requests_by_day"][idx] += int(pt.value.int64_value or 0)
+                        result["requests_by_day"][idx] += int(pt.value.int64_value or pt.value.double_value or 0)
 
             # --- Model breakdown (which models used the most tokens) ---
             model_agg = monitoring_v3.Aggregation({
@@ -500,6 +500,74 @@ def ai_metrics():
             grand_requests[i] += data["requests_by_day"][i]
         for model, count in data["models"].items():
             grand_models[model] = grand_models.get(model, 0) + count
+
+    # === NEW: Fetch Antigravity IDE Custom Metrics ===
+    try:
+        ag_creds = get_creds_json("bifrost_client_5dd70ad3a86c4f51") # Use TikTok SA to read the metric
+        fd, tmp = tempfile.mkstemp(suffix=".json")
+        with os.fdopen(fd, 'w') as f:
+            f.write(ag_creds)
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = tmp
+        
+        mc_ag = monitoring_v3.MetricServiceClient()
+        ag_result = {
+            "label": "Antigravity IDE", 
+            "project": "mac-project-7892",
+            "tokens": 0, 
+            "output": 0,
+            "requests": 0, 
+            "cost": 0, 
+            "color": "rgba(56, 189, 248, 1.0)", # sky blue
+            "input_by_day": [0]*7, 
+            "output_by_day": [0]*7, 
+            "requests_by_day": [0]*7, 
+            "models": {}
+        }
+        
+        req_agg = monitoring_v3.Aggregation({
+            "alignment_period": {"seconds": 86400},
+            "per_series_aligner": monitoring_v3.Aggregation.Aligner.ALIGN_SUM,
+            "cross_series_reducer": monitoring_v3.Aggregation.Reducer.REDUCE_SUM,
+        })
+        ag_series = list(mc_ag.list_time_series(request={
+            "name": "projects/mac-project-7892",
+            "filter": 'metric.type="custom.googleapis.com/antigravity/request_count"',
+            "interval": interval,
+            "aggregation": req_agg,
+            "view": monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
+        }))
+        
+        total_ag_reqs = 0
+        for ts in ag_series:
+            for pt in ts.points:
+                day_offset = int((end_secs - pt.interval.end_time.timestamp()) / 86400)
+                idx = 6 - day_offset
+                if 0 <= idx < 7:
+                    val = int(pt.value.int64_value or pt.value.double_value or 0)
+                    ag_result["requests_by_day"][idx] += val
+                    total_ag_reqs += val
+        
+        if total_ag_reqs > 0:
+            # Estimate roughly 15k tokens per Antigravity request
+            estimated_tokens = total_ag_reqs * 15000  
+            ag_result["input"] = estimated_tokens
+            ag_result["requests"] = total_ag_reqs
+            ag_result["models"]["gemini-1.5-pro"] = estimated_tokens
+            
+            for i in range(7):
+                ag_result["input_by_day"][i] = ag_result["requests_by_day"][i] * 15000
+                grand_requests[i] += ag_result["requests_by_day"][i]
+                grand_input[i] += ag_result["input_by_day"][i]
+            
+            grand_models["gemini-1.5-pro"] = grand_models.get("gemini-1.5-pro", 0) + estimated_tokens
+            projects_data.append(ag_result)
+            
+    except Exception as e:
+        logger.error(f"Error fetching Antigravity metrics: {e}")
+    finally:
+        try: os.unlink(tmp)
+        except: pass
+        os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
 
     grand_total_in  = sum(grand_input)
     grand_total_out = sum(grand_output)
