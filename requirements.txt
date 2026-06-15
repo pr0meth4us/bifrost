@@ -15,3 +15,4 @@ schedule
 markdown
 redis
 cryptography
+google-cloud-monitoring

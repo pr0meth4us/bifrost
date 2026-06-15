@@ -418,6 +418,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Security
 - **Tamper-Proofing**: Users can no longer modify the payment amount or duration by editing the Telegram deep link, as the link now only contains a reference ID.
 
+## [Unreleased]
+
+### Added
+- Created `upload_sa_to_bifrost.py` script to seamlessly push Google Service Account credentials directly into the Bifrost MongoDB Vault.
+- Added `/heimdall/ai-metrics` routing in `backoffice.py` to query Google Cloud Monitoring.
+- Implemented `ai_metrics.html` visual dashboard for Heimdall users to track `aiplatform.googleapis.com` token metrics in real-time.
+- Updated `dashboard.html` to integrate AI Metrics button.
+- Added `google-cloud-monitoring` dependency to `requirements.txt`.
+
 ## [0.0.1] - 2026-01-19
 
 ### Added

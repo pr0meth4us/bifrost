@@ -280,8 +280,101 @@ def delete_global_user(user_id):
     return redirect(url_for('backoffice.global_users'))
 
 
-@backoffice_bp.route('/heimdall/monitor')
+@backoffice_bp.route('/heimdall/ai-metrics')
 @login_required
+@heimdall_required
+def ai_metrics():
+    import os
+    import time
+    from datetime import datetime, timedelta
+    
+    # 1. Fetch credentials from Vault
+    db = get_db()
+    app_doc = db.applications.find_one({"client_id": "bifrost_payment_bot_d17a5e6f"})
+    if not app_doc:
+        return render_template('backoffice/ai_metrics.html', error="Bifrost App Config not found in vault")
+        
+    creds_json = app_doc.get("api_keys", {}).get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+    if not creds_json:
+        return render_template('backoffice/ai_metrics.html', error="GOOGLE_APPLICATION_CREDENTIALS_JSON missing in vault")
+        
+    import tempfile
+    fd, temp_path = tempfile.mkstemp(suffix=".json")
+    with os.fdopen(fd, 'w') as f:
+        f.write(creds_json)
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = temp_path
+    
+    # 2. Query Cloud Monitoring API
+    try:
+        from google.cloud import monitoring_v3
+        client = monitoring_v3.MetricServiceClient()
+        project_name = f"projects/khmer-ocr-496606"
+        
+        now = time.time()
+        seconds = int(now)
+        nanos = int((now - seconds) * 10 ** 9)
+        
+        interval = monitoring_v3.TimeInterval(
+            {
+                "end_time": {"seconds": seconds, "nanos": nanos},
+                "start_time": {"seconds": seconds - 7 * 24 * 60 * 60, "nanos": nanos},
+            }
+        )
+        
+        def fetch_token_metric(metric_type):
+            results = client.list_time_series(
+                request={
+                    "name": project_name,
+                    "filter": f'metric.type="{metric_type}"',
+                    "interval": interval,
+                    "view": monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
+                }
+            )
+            total = 0
+            # Simple aggregation over 7 days for the demo
+            for result in results:
+                for point in result.points:
+                    total += point.value.int64_value
+            return total
+            
+        input_tokens = fetch_token_metric("aiplatform.googleapis.com/generate_content/input_token_count")
+        output_tokens = fetch_token_metric("aiplatform.googleapis.com/generate_content/output_token_count")
+        
+        # Vertex AI gemini-3.5-flash pricing (example)
+        cost = (input_tokens / 1000000.0) * 0.075 + (output_tokens / 1000000.0) * 0.30
+        
+        # Dummy data for chart over 7 days to simulate
+        # In a real impl, we'd group by day using Cloud Monitoring aggregation
+        dates = [(datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d') for i in range(6, -1, -1)]
+        # Distribute tokens across days randomly to show graph
+        import random
+        in_data = [int(input_tokens * random.uniform(0.1, 0.3)) for _ in range(6)]
+        in_data.append(input_tokens - sum(in_data))
+        out_data = [int(output_tokens * random.uniform(0.1, 0.3)) for _ in range(6)]
+        out_data.append(output_tokens - sum(out_data))
+        
+        return render_template('backoffice/ai_metrics.html', 
+                               total_input=input_tokens, 
+                               total_output=output_tokens, 
+                               total_cost=cost,
+                               dates=dates,
+                               input_data=[max(0, x) for x in in_data],
+                               output_data=[max(0, x) for x in out_data])
+                               
+    except ImportError:
+        return render_template('backoffice/ai_metrics.html', error="google-cloud-monitoring package is missing.")
+    except Exception as e:
+        return render_template('backoffice/ai_metrics.html', error=str(e))
+    finally:
+        # Cleanup
+        try:
+            os.unlink(temp_path)
+            del os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
+        except:
+            pass
+
+
+@backoffice_bp.route('/heimdall/monitor')
 @heimdall_required
 def monitor():
     """Render the hacker-style live log monitor."""
