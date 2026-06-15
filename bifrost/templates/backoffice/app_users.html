@@ -106,8 +106,8 @@
                     <td class="px-6 py-4 text-sm text-slate-500">{{ user.expires_at.strftime('%b %d, %Y') if user.expires_at else 'Lifetime' }}</td>
                     <td class="px-6 py-4 text-right">
                         {% set ranks = {'guest':0,'user':0,'premium_user':0,'admin':1,'super_admin':2,'owner':3,'heimdall':4} %}
-                        {% set my_rank = ranks[current_role] %}
-                        {% set user_rank = ranks[user.role] %}
+                        {% set my_rank = ranks.get(current_role, 0) %}
+                        {% set user_rank = ranks.get(user.role, 0) %}
 
                         {% if my_rank > user_rank or current_role == 'heimdall' %}
                         <button @click="$dispatch('open-user-modal', {id: '{{ user.account_id }}', name: '{{ user.display_name }}', role: '{{ user.role }}'})"
