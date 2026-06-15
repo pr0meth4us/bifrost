@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
-PRICING = {"input": 0.075, "output": 0.30}   # per 1M tokens, gemini-flash
+PRICING = {"input": 0.075, "output": 0.30, "pro_input": 1.25, "pro_output": 3.75}   # per 1M tokens
 
 APP_CONFIGS = [
     {
@@ -299,6 +299,7 @@ def fetch_ai_metrics(db_hook):
             estimated_tokens = total_ag_reqs * 15000  
             ag_result["input"] = estimated_tokens
             ag_result["requests"] = total_ag_reqs
+            ag_result["cost"] = (estimated_tokens / 1_000_000) * PRICING["pro_input"]
             ag_result["models"]["gemini-1.5-pro"] = estimated_tokens
             
             for i in range(7):
