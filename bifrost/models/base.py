@@ -89,3 +89,22 @@ class BaseMixin:
                 )
         except Exception as e:
             log.error(f"Failed to trigger events for user {account_id}: {e}")
+
+    def _trigger_event_for_app(self, app_id, event_type, extra_data=None):
+        """
+        Triggers a webhook specifically for an application configuration event.
+        """
+        try:
+            app_doc = self.db.applications.find_one({"_id": ObjectId(app_id)})
+            if not app_doc:
+                return
+
+            WebhookService.send_event(
+                app_doc=app_doc,
+                event_type=event_type,
+                account_id=None,
+                token=None,
+                extra_data=extra_data
+            )
+        except Exception as e:
+            log.error(f"Failed to trigger app event for {app_id}: {e}")

@@ -67,7 +67,20 @@
                 <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-xl">🚀</div>
                 {% endif %}
                 <div>
-                    <h3 class="font-bold text-slate-900">{{ app.app_name }}</h3>
+                    <div class="flex items-center gap-2">
+                        <h3 class="font-bold text-slate-900">{{ app.app_name }}</h3>
+                        {% if app.app_api_url %}
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200" title="Webhook Config Sync Active">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            LIVE SYNC
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200" title="No API URL set. Automatic secret sync disabled.">
+                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                            MANUAL
+                        </span>
+                        {% endif %}
+                    </div>
                     <p class="text-xs text-slate-400 font-mono mt-0.5">ID: ...{{ app.client_id[-6:] }}</p>
                 </div>
             </div>

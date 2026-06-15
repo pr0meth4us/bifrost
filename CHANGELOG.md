@@ -3,6 +3,13 @@
 All notable changes to the `bifrost` project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-06-15
+
+### Added
+- **Config Webhooks (Secret Zero)**: Bifrost now emits a `config_updated` webhook event to an application's `app_api_url` whenever its API keys, details, or Client Secret are rotated. This allows client applications to seamlessly refresh their cached secrets without latency overhead or restarts.
+- **Client SecretManager**: Added a reusable `bifrost_secret_manager.py` Python snippet to easily integrate the webhook auto-refresh mechanism into downstream client applications.
+- **Vault UI Sync Status**: Updated the Global API Vault frontend to display the Webhook Sync status for applications, allowing Heimdall administrators to see at a glance if an application is hooked up to real-time configuration updates.
+
 ## [0.12.2] - 2026-06-15
 
 ### Added

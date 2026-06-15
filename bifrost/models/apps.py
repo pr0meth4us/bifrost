@@ -54,6 +54,7 @@ class AppMixin:
                 {"_id": ObjectId(app_id)},
                 {"$set": updates}
             )
+            self._trigger_event_for_app(app_id, "config_updated")
             return True
         return False
 
@@ -64,6 +65,7 @@ class AppMixin:
             {"_id": ObjectId(app_id)},
             {"$set": {"client_secret_hash": generate_password_hash(new_secret)}}
         )
+        self._trigger_event_for_app(app_id, "config_updated")
         return new_secret
 
     def add_app_api_key(self, app_id, key_name, key_value):
@@ -83,6 +85,7 @@ class AppMixin:
             {"_id": ObjectId(app_id)},
             {"$set": {f"api_keys.{safe_key_name}": encrypted_value}}
         )
+        self._trigger_event_for_app(app_id, "config_updated")
         return True
 
     def remove_app_api_key(self, app_id, key_name):
@@ -91,6 +94,7 @@ class AppMixin:
             {"_id": ObjectId(app_id)},
             {"$unset": {f"api_keys.{key_name}": ""}}
         )
+        self._trigger_event_for_app(app_id, "config_updated")
         return True
 
     def get_app_by_client_id(self, client_id):
