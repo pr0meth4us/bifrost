@@ -66,6 +66,33 @@ class AppMixin:
         )
         return new_secret
 
+    def add_app_api_key(self, app_id, key_name, key_value):
+        """Adds or updates an API Key for an application using its own webhook_secret."""
+        from ..utils.encryption import encrypt_value
+        
+        # Fetch app to get its webhook_secret
+        app = self.db.applications.find_one({"_id": ObjectId(app_id)})
+        if not app or "webhook_secret" not in app:
+            return False
+            
+        secret = app["webhook_secret"]
+        safe_key_name = key_name.strip().upper()
+        encrypted_value = encrypt_value(key_value, secret)
+        
+        self.db.applications.update_one(
+            {"_id": ObjectId(app_id)},
+            {"$set": {f"api_keys.{safe_key_name}": encrypted_value}}
+        )
+        return True
+
+    def remove_app_api_key(self, app_id, key_name):
+        """Removes an API Key from an application."""
+        self.db.applications.update_one(
+            {"_id": ObjectId(app_id)},
+            {"$unset": {f"api_keys.{key_name}": ""}}
+        )
+        return True
+
     def get_app_by_client_id(self, client_id):
         return self.db.applications.find_one({"client_id": client_id})
 

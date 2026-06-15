@@ -3,9 +3,14 @@
 All notable changes to the `bifrost` project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.11.0] - 2026-06-14
+## [0.12.0] - 2026-06-15
 
 ### Added
+- **Remote Config Server**: Upgraded Bifrost to act as an HTTP-based centralized Remote Config Server utilizing End-to-End Encryption at Rest.
+- **Server-Side Decryption**: Added `GET /api/v1/config` endpoint. Bifrost decrypts stored API keys and Configs using the specific app's `webhook_secret` and returns them securely over HTTPS to authenticated clients.
+- **API Key Management UI**: Added dynamic API key management panel in the Backoffice configuration tab.
+
+## [0.11.0] - 2026-06-14
 - **Heimdall Monitor**: Implemented a cinematic, live-scrolling terminal UI for Heimdall users to monitor all Helm ecosystem apps centrally.
 - **Centralized Logging API**: Added `POST /internal/logs` endpoint (protected by `require_service_auth`) for tenant apps to securely stream their logs into Bifrost.
 - **Redis Integration**: Replaced MongoDB with an ultra-fast, in-memory Redis database specifically for streaming logs. Included auto-trimming (1000 items max) and a 7-day TTL to optimize storage usage.

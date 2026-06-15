@@ -144,11 +144,13 @@ def create_app(config_class):
     from .auth.api import auth_api_bp
     from .internal import internal_bp
     from .backoffice import backoffice_bp
+    from .config_api import config_api_bp
 
     app.register_blueprint(auth_ui_bp)
     app.register_blueprint(auth_api_bp)
     app.register_blueprint(internal_bp)
     app.register_blueprint(backoffice_bp)
+    app.register_blueprint(config_api_bp)
 
     from .scheduler import start_scheduler
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':

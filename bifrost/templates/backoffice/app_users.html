@@ -210,6 +210,45 @@
                     </form>
                 </div>
             </div>
+
+            <!-- API Keys Manager -->
+            {% if current_role in ['super_admin', 'owner', 'heimdall'] %}
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-slate-900">API Keys Manager</h3>
+                </div>
+                
+                <div class="space-y-3 mb-6">
+                    {% if app.api_keys %}
+                        {% for key_name, key_value in app.api_keys.items() %}
+                        <div class="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                            <div>
+                                <span class="block text-xs font-bold text-indigo-600 mb-0.5">{{ key_name }}</span>
+                                <code class="text-xs font-mono text-slate-500" x-text="showSecrets ? '{{ key_value }}' : '••••••••••••••••'"></code>
+                            </div>
+                            <form action="{{ url_for('backoffice.delete_api_key', app_id=app._id) }}" method="POST" onsubmit="return confirm('Revoke this key?');">
+                                <input type="hidden" name="key_name" value="{{ key_name }}">
+                                <button type="submit" class="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors">Revoke</button>
+                            </form>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-xs text-slate-400 font-bold">No API keys configured.</p>
+                    {% endif %}
+                </div>
+
+                <form action="{{ url_for('backoffice.add_api_key', app_id=app._id) }}" method="POST" class="space-y-3 pt-4 border-t border-slate-100">
+                    <div>
+                        <input type="text" name="key_name" placeholder="Key Name (e.g. GEMINI_API_KEY)" class="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 font-bold" required>
+                    </div>
+                    <div>
+                        <input type="password" name="key_value" placeholder="Paste your API Key here..." class="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 font-mono" required>
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-sm">Add / Update Key</button>
+                </form>
+            </div>
+            {% endif %}
+
             {% else %}
             <div class="bg-slate-100 p-6 rounded-2xl border border-slate-200 text-center">
                 <div class="text-3xl mb-2">🔒</div>

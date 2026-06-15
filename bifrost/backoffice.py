@@ -353,6 +353,41 @@ def rotate_secret(app_id):
     return redirect(url_for('backoffice.view_app', app_id=app_id))
 
 
+@backoffice_bp.route('/app/<app_id>/api-keys/add', methods=['POST'])
+@login_required
+def add_api_key(app_id):
+    db = get_db()
+    if not check_permission(app_id, 2): # Super Admin or Owner
+        flash("Access Denied: Only Admins can manage API Keys.", "danger")
+        return redirect(url_for('backoffice.view_app', app_id=app_id))
+    
+    key_name = request.form.get('key_name')
+    key_value = request.form.get('key_value')
+    if key_name and key_value:
+        db.add_app_api_key(app_id, key_name, key_value)
+        flash(f"API Key '{key_name.upper()}' updated successfully.", "success")
+    else:
+        flash("Key Name and Key Value are required.", "danger")
+    
+    return redirect(url_for('backoffice.view_app', app_id=app_id))
+
+
+@backoffice_bp.route('/app/<app_id>/api-keys/delete', methods=['POST'])
+@login_required
+def delete_api_key(app_id):
+    db = get_db()
+    if not check_permission(app_id, 2):
+        flash("Access Denied: Only Admins can manage API Keys.", "danger")
+        return redirect(url_for('backoffice.view_app', app_id=app_id))
+    
+    key_name = request.form.get('key_name')
+    if key_name:
+        db.remove_app_api_key(app_id, key_name)
+        flash(f"API Key '{key_name}' removed.", "success")
+        
+    return redirect(url_for('backoffice.view_app', app_id=app_id))
+
+
 @backoffice_bp.route('/app/<app_id>/add', methods=['POST'])
 @login_required
 def add_user_to_app(app_id):
