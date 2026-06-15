@@ -5,7 +5,9 @@ from bson import ObjectId
 from . import mongo
 from .models import BifrostDB
 from .services.email_service import send_invite_email, send_reset_email
+import logging
 
+logger = logging.getLogger(__name__)
 backoffice_bp = Blueprint('backoffice', __name__, url_prefix='/backoffice')
 
 
@@ -503,6 +505,9 @@ def ai_metrics():
 
     # === NEW: Fetch Antigravity IDE Custom Metrics ===
     try:
+        from google.cloud import monitoring_v3
+        import tempfile
+        
         ag_creds = get_creds_json("bifrost_client_5dd70ad3a86c4f51") # Use TikTok SA to read the metric
         fd, tmp = tempfile.mkstemp(suffix=".json")
         with os.fdopen(fd, 'w') as f:
@@ -528,6 +533,10 @@ def ai_metrics():
             "alignment_period": {"seconds": 86400},
             "per_series_aligner": monitoring_v3.Aggregation.Aligner.ALIGN_SUM,
             "cross_series_reducer": monitoring_v3.Aggregation.Reducer.REDUCE_SUM,
+        })
+        interval = monitoring_v3.TimeInterval({
+            "end_time":   {"seconds": end_secs,   "nanos": 0},
+            "start_time": {"seconds": start_secs, "nanos": 0},
         })
         ag_series = list(mc_ag.list_time_series(request={
             "name": "projects/mac-project-7892",
