@@ -517,7 +517,7 @@ def ai_metrics():
             "output": 0,
             "requests": 0, 
             "cost": 0, 
-            "color": "rgba(56, 189, 248, 1.0)", # sky blue
+            "color": "rgba(56, 189, 248", # sky blue
             "input_by_day": [0]*7, 
             "output_by_day": [0]*7, 
             "requests_by_day": [0]*7, 
