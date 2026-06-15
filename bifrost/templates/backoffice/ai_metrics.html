@@ -60,107 +60,151 @@
             <p class="text-slate-300 font-mono text-sm">{{ error }}</p>
         </div>
         {% else %}
-        <!-- Top Stats Row -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="glass-panel p-6 rounded-2xl flex flex-col justify-between">
-                <h3 class="text-slate-400 text-sm font-semibold uppercase tracking-wider">Total Tokens</h3>
-                <div class="mt-4 flex items-end justify-between">
-                    <span class="text-4xl font-bold text-white">{{ "{:,}".format(total_input + total_output) }}</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-cyan-400 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                </div>
+        
+        <!-- Grand Totals -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="glass-panel p-5 rounded-2xl">
+                <p class="text-xs font-mono text-slate-400 uppercase tracking-widest mb-1">Total Tokens</p>
+                <p class="text-3xl font-bold text-white">{{ "{:,}".format(grand_input + grand_output) }}</p>
             </div>
-            
-            <div class="glass-panel p-6 rounded-2xl flex flex-col justify-between">
-                <h3 class="text-slate-400 text-sm font-semibold uppercase tracking-wider">Estimated Cost</h3>
-                <div class="mt-4 flex items-end justify-between">
-                    <span class="text-4xl font-bold text-emerald-400">${{ "%.4f"|format(total_cost) }}</span>
-                    <span class="text-xs font-mono text-slate-500 mb-1">gemini-3.5-flash</span>
-                </div>
+            <div class="glass-panel p-5 rounded-2xl">
+                <p class="text-xs font-mono text-slate-400 uppercase tracking-widest mb-1">Total Requests</p>
+                <p class="text-3xl font-bold text-white">{{ "{:,}".format(grand_requests) }}</p>
             </div>
-            
-            <div class="glass-panel p-6 rounded-2xl flex flex-col justify-between">
-                <h3 class="text-slate-400 text-sm font-semibold uppercase tracking-wider">Input vs Output</h3>
-                <div class="mt-4">
-                    <div class="flex justify-between text-xs font-mono mb-1">
-                        <span class="text-blue-400">Input: {{ "{:,}".format(total_input) }}</span>
-                        <span class="text-fuchsia-400">Output: {{ "{:,}".format(total_output) }}</span>
-                    </div>
-                    <div class="w-full bg-slate-800 rounded-full h-2.5 mt-2">
-                        {% set total = total_input + total_output %}
-                        {% if total > 0 %}
-                            <div class="bg-blue-500 h-2.5 rounded-full" style="width: {{ (total_input / total) * 100 }}%"></div>
-                        {% endif %}
-                    </div>
+            <div class="glass-panel p-5 rounded-2xl">
+                <p class="text-xs font-mono text-slate-400 uppercase tracking-widest mb-1">Est. Total Cost</p>
+                <p class="text-3xl font-bold text-emerald-400">${{ "%.4f"|format(grand_cost) }}</p>
+            </div>
+            <div class="glass-panel p-5 rounded-2xl">
+                <p class="text-xs font-mono text-slate-400 uppercase tracking-widest mb-1">Input / Output</p>
+                <div class="flex flex-col gap-1 mt-1">
+                    <span class="text-xs font-mono text-blue-400">IN: {{ "{:,}".format(grand_input) }}</span>
+                    <span class="text-xs font-mono text-fuchsia-400">OUT: {{ "{:,}".format(grand_output) }}</span>
                 </div>
             </div>
         </div>
 
-        <!-- Chart -->
-        <div class="glass-panel p-6 rounded-2xl h-[500px]">
-            <canvas id="metricsChart"></canvas>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left Column: Project Breakdown & Models -->
+            <div class="lg:col-span-1 space-y-6">
+                <!-- Projects -->
+                <div class="glass-panel p-5 rounded-2xl">
+                    <h3 class="text-sm font-bold text-slate-200 uppercase tracking-widest mb-4">Projects</h3>
+                    <div class="space-y-4">
+                        {% for p in projects %}
+                        <div class="p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-bold text-sm" style="color: {{ p.color | replace('rgba(', 'rgb(') | replace(', 0.7)', ')') }}">{{ p.label }}</span>
+                                <span class="text-emerald-400 font-mono text-xs">${{ "%.4f"|format(p.cost) }}</span>
+                            </div>
+                            <div class="flex justify-between text-xs text-slate-400 font-mono">
+                                <span>Tokens: {{ "{:,}".format(p.input + p.output) }}</span>
+                                <span>Reqs: {{ "{:,}".format(p.requests) }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <!-- Models -->
+                <div class="glass-panel p-5 rounded-2xl">
+                    <h3 class="text-sm font-bold text-slate-200 uppercase tracking-widest mb-4">Models Used</h3>
+                    <div class="space-y-3">
+                        {% for model, tokens in grand_models.items() %}
+                        <div class="flex justify-between items-center text-sm font-mono border-b border-slate-700/30 pb-2">
+                            <span class="text-slate-300">{{ model }}</span>
+                            <span class="text-blue-400">{{ "{:,}".format(tokens) }}</span>
+                        </div>
+                        {% endfor %}
+                        {% if not grand_models %}
+                        <p class="text-xs text-slate-500 italic">No model breakdown available.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Charts -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Token Chart -->
+                <div class="glass-panel p-5 rounded-2xl h-[320px]">
+                    <h3 class="text-xs font-mono text-slate-400 uppercase tracking-widest mb-2">Daily Tokens by Project</h3>
+                    <canvas id="tokenChart"></canvas>
+                </div>
+                <!-- Requests Chart -->
+                <div class="glass-panel p-5 rounded-2xl h-[280px]">
+                    <h3 class="text-xs font-mono text-slate-400 uppercase tracking-widest mb-2">Daily API Requests by Project</h3>
+                    <canvas id="requestChart"></canvas>
+                </div>
+            </div>
         </div>
         {% endif %}
     </main>
 
     {% if not error %}
     <script>
-        const ctx = document.getElementById('metricsChart').getContext('2d');
         const dates = {{ dates | tojson }};
-        const inputData = {{ input_data | tojson }};
-        const outputData = {{ output_data | tojson }};
+        const projects = {{ projects | tojson }};
+        
+        // Build datasets for Tokens (stacked)
+        const tokenDatasets = [];
+        const reqDatasets = [];
+        
+        projects.forEach(p => {
+            const rgbColor = p.color + ", 1)";
+            const bgToken = p.color + ", 0.7)";
+            const bgReq = p.color + ", 0.5)";
+            
+            // Combine input+output per day for the token chart
+            const dailyTokens = p.input_by_day.map((inp, i) => inp + p.output_by_day[i]);
+            
+            tokenDatasets.push({
+                label: p.label + ' Tokens',
+                data: dailyTokens,
+                backgroundColor: bgToken,
+                borderColor: rgbColor,
+                borderWidth: 1,
+                stack: 'Stack 0',
+            });
+            
+            reqDatasets.push({
+                label: p.label + ' Reqs',
+                data: p.requests_by_day,
+                backgroundColor: bgReq,
+                borderColor: rgbColor,
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true
+            });
+        });
 
-        new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: dates,
-                datasets: [
-                    {
-                        label: 'Input Tokens',
-                        data: inputData,
-                        backgroundColor: 'rgba(56, 189, 248, 0.7)',
-                        borderColor: 'rgb(56, 189, 248)',
-                        borderWidth: 1,
-                        stack: 'Stack 0',
-                    },
-                    {
-                        label: 'Output Tokens',
-                        data: outputData,
-                        backgroundColor: 'rgba(217, 70, 239, 0.7)',
-                        borderColor: 'rgb(217, 70, 239)',
-                        borderWidth: 1,
-                        stack: 'Stack 0',
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { labels: { color: '#cbd5e1' } },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                        titleColor: '#fff',
-                        bodyColor: '#cbd5e1',
-                        borderColor: 'rgba(51, 65, 85, 0.5)',
-                        borderWidth: 1
-                    }
-                },
-                scales: {
-                    x: {
-                        ticks: { color: '#94a3b8' },
-                        grid: { color: 'rgba(51, 65, 85, 0.3)' }
-                    },
-                    y: {
-                        stacked: true,
-                        ticks: { color: '#94a3b8' },
-                        grid: { color: 'rgba(51, 65, 85, 0.3)' }
-                    }
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { labels: { color: '#cbd5e1', font: {family: 'Plus Jakarta Sans'} } },
+                tooltip: {
+                    mode: 'index', intersect: false,
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                    titleColor: '#fff', bodyColor: '#cbd5e1',
+                    borderColor: 'rgba(51, 65, 85, 0.5)', borderWidth: 1
                 }
+            },
+            scales: {
+                x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51, 65, 85, 0.2)' } },
+                y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51, 65, 85, 0.2)' } }
             }
+        };
+
+        new Chart(document.getElementById('tokenChart').getContext('2d'), {
+            type: 'bar',
+            data: { labels: dates, datasets: tokenDatasets },
+            options: { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, stacked: true } } }
+        });
+
+        new Chart(document.getElementById('requestChart').getContext('2d'), {
+            type: 'line',
+            data: { labels: dates, datasets: reqDatasets },
+            options: commonOptions
         });
     </script>
     {% endif %}
