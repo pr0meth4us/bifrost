@@ -48,12 +48,13 @@
                 </div>
             </div>
 
+            {% if product.app_web_url %}
             <p class="text-slate-500 mb-10 flex-grow">
                 Integrated with Bifrost for secure SSO and centralized user management.
             </p>
 
             <div class="flex flex-col space-y-3">
-                <a href="{{ product.app_web_url or '#' }}" target="_blank"
+                <a href="{{ product.app_web_url }}" target="_blank"
                    class="w-full py-4 bg-slate-900 text-white text-center font-bold rounded-2xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-200">
                     Visit {{ product.app_name }}
                 </a>
@@ -63,6 +64,17 @@
                     Sign In with Bifrost
                 </a>
             </div>
+            {% else %}
+            <p class="text-slate-500 mb-10 flex-grow">
+                A backend service or local tool securely managing its configuration via the Bifrost Vault.
+            </p>
+
+            <div class="flex flex-col space-y-3">
+                <div class="w-full py-4 bg-slate-50 text-slate-400 text-center font-bold rounded-2xl border border-slate-200 border-dashed select-none">
+                    No Public Frontend
+                </div>
+            </div>
+            {% endif %}
         </div>
         {% endfor %}
     </div>
