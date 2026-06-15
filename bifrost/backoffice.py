@@ -286,6 +286,239 @@ def delete_global_user(user_id):
 def ai_metrics():
     import os
     import time
+    import tempfile
+    from datetime import datetime, timedelta, timezone
+    from .utils.encryption import decrypt_value
+
+    db = get_db()
+
+    # The 3 projects to monitor, mapped to their Bifrost vault entries
+    APP_CONFIGS = [
+        {
+            "label": "TikTok Keeper",
+            "client_id": "bifrost_client_5dd70ad3a86c4f51",
+            "project_id": "mac-project-7892",
+            "color": "rgba(217, 70, 239",   # fuchsia
+        },
+        {
+            "label": "OCR Tools",
+            "client_id": "random_project_abf21112",
+            "project_id": "khmer-ocr-496606",
+            "color": "rgba(56, 189, 248",    # cyan
+        },
+        {
+            "label": "Auto Texter",
+            "client_id": "auto_texter_77cb5d03",
+            "project_id": "gen-lang-client-0429923800",
+            "color": "rgba(74, 222, 128",    # green
+        },
+    ]
+
+    now = time.time()
+    end_secs = int(now)
+    start_secs = end_secs - 7 * 24 * 60 * 60
+
+    # Build the 7 day label list (oldest → newest)
+    dates = [(datetime.now(timezone.utc) - timedelta(days=i)).strftime('%b %d')
+             for i in range(6, -1, -1)]
+
+    def get_creds_json(client_id):
+        """Fetch and decrypt SA JSON from Bifrost vault for a given client."""
+        app_doc = db.get_app_by_client_id(client_id)
+        if not app_doc:
+            return None
+        enc = app_doc.get("api_keys", {}).get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+        if not enc:
+            return None
+        return decrypt_value(enc, app_doc.get("webhook_secret", ""))
+
+    def query_project(project_id, creds_json):
+        """
+        Returns a dict with:
+          - input_by_day: list[int] (7 values, oldest first)
+          - output_by_day: list[int]
+          - requests_by_day: list[int]
+          - models: dict[model_id -> token_count]
+        """
+        result = {
+            "input_by_day":    [0] * 7,
+            "output_by_day":   [0] * 7,
+            "requests_by_day": [0] * 7,
+            "models": {},
+        }
+        if not creds_json:
+            return result
+
+        fd, tmp = tempfile.mkstemp(suffix=".json")
+        try:
+            with os.fdopen(fd, "w") as f:
+                f.write(creds_json)
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = tmp
+
+            from google.cloud import monitoring_v3
+            mc = monitoring_v3.MetricServiceClient()
+            proj = f"projects/{project_id}"
+
+            interval = monitoring_v3.TimeInterval({
+                "end_time":   {"seconds": end_secs,   "nanos": 0},
+                "start_time": {"seconds": start_secs, "nanos": 0},
+            })
+
+            # Align data to 1-day buckets
+            aggregation = monitoring_v3.Aggregation({
+                "alignment_period": {"seconds": 86400},
+                "per_series_aligner": monitoring_v3.Aggregation.Aligner.ALIGN_SUM,
+                "cross_series_reducer": monitoring_v3.Aggregation.Reducer.REDUCE_SUM,
+                "group_by_fields": ["metric.labels.token_type"],
+            })
+
+            def safe_list(filter_str, agg=None):
+                try:
+                    req = {
+                        "name": proj, "filter": filter_str,
+                        "interval": interval,
+                        "view": monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
+                    }
+                    if agg:
+                        req["aggregation"] = agg
+                    return list(mc.list_time_series(request=req))
+                except Exception:
+                    return []
+
+            # --- Token counts (per day, per token_type) ---
+            token_series = safe_list(
+                'metric.type="aiplatform.googleapis.com/publisher/online_serving/token_count"',
+                agg=aggregation,
+            )
+            for ts in token_series:
+                token_type = ts.metric.labels.get("token_type", "")
+                for pt in ts.points:
+                    day_offset = int((end_secs - pt.interval.end_time.timestamp()) / 86400)
+                    idx = 6 - day_offset
+                    if 0 <= idx < 7:
+                        val = int(pt.value.int64_value or pt.value.double_value or 0)
+                        if token_type == "input":
+                            result["input_by_day"][idx] += val
+                        elif token_type == "output":
+                            result["output_by_day"][idx] += val
+
+            # Fallback: older generate_content metrics (no per-day aggregation, just totals)
+            if all(v == 0 for v in result["input_by_day"]):
+                for ts in safe_list('metric.type="aiplatform.googleapis.com/generate_content/input_token_count"'):
+                    for pt in ts.points:
+                        day_offset = int((end_secs - pt.interval.end_time.timestamp()) / 86400)
+                        idx = 6 - day_offset
+                        if 0 <= idx < 7:
+                            result["input_by_day"][idx] += int(pt.value.int64_value or 0)
+                for ts in safe_list('metric.type="aiplatform.googleapis.com/generate_content/output_token_count"'):
+                    for pt in ts.points:
+                        day_offset = int((end_secs - pt.interval.end_time.timestamp()) / 86400)
+                        idx = 6 - day_offset
+                        if 0 <= idx < 7:
+                            result["output_by_day"][idx] += int(pt.value.int64_value or 0)
+
+            # --- Request counts (per day) ---
+            req_agg = monitoring_v3.Aggregation({
+                "alignment_period": {"seconds": 86400},
+                "per_series_aligner": monitoring_v3.Aggregation.Aligner.ALIGN_SUM,
+                "cross_series_reducer": monitoring_v3.Aggregation.Reducer.REDUCE_SUM,
+            })
+            for ts in safe_list(
+                'metric.type="aiplatform.googleapis.com/publisher/online_serving/model_invocation_count"',
+                agg=req_agg
+            ):
+                for pt in ts.points:
+                    day_offset = int((end_secs - pt.interval.end_time.timestamp()) / 86400)
+                    idx = 6 - day_offset
+                    if 0 <= idx < 7:
+                        result["requests_by_day"][idx] += int(pt.value.int64_value or 0)
+
+            # --- Model breakdown (which models used the most tokens) ---
+            model_agg = monitoring_v3.Aggregation({
+                "alignment_period": {"seconds": 7 * 86400},
+                "per_series_aligner": monitoring_v3.Aggregation.Aligner.ALIGN_SUM,
+                "cross_series_reducer": monitoring_v3.Aggregation.Reducer.REDUCE_SUM,
+                "group_by_fields": ["resource.labels.model_id"],
+            })
+            for ts in safe_list(
+                'metric.type="aiplatform.googleapis.com/publisher/online_serving/token_count"',
+                agg=model_agg
+            ):
+                model_id = ts.resource.labels.get("model_id", "unknown")
+                for pt in ts.points:
+                    val = int(pt.value.int64_value or pt.value.double_value or 0)
+                    result["models"][model_id] = result["models"].get(model_id, 0) + val
+
+        except Exception:
+            pass
+        finally:
+            try:
+                os.unlink(tmp)
+            except Exception:
+                pass
+            os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
+
+        return result
+
+    # --- Gather data for all 3 projects ---
+    PRICING = {"input": 0.075, "output": 0.30}   # per 1M tokens, gemini-flash
+
+    projects_data = []
+    grand_input = [0] * 7
+    grand_output = [0] * 7
+    grand_requests = [0] * 7
+    grand_models = {}
+
+    for cfg in APP_CONFIGS:
+        creds = get_creds_json(cfg["client_id"])
+        data = query_project(cfg["project_id"], creds)
+
+        total_in  = sum(data["input_by_day"])
+        total_out = sum(data["output_by_day"])
+        total_req = sum(data["requests_by_day"])
+        cost = (total_in / 1_000_000) * PRICING["input"] + (total_out / 1_000_000) * PRICING["output"]
+
+        projects_data.append({
+            "label":    cfg["label"],
+            "project":  cfg["project_id"],
+            "color":    cfg["color"],
+            "input":    total_in,
+            "output":   total_out,
+            "requests": total_req,
+            "cost":     round(cost, 6),
+            "input_by_day":    data["input_by_day"],
+            "output_by_day":   data["output_by_day"],
+            "requests_by_day": data["requests_by_day"],
+            "models":   data["models"],
+        })
+
+        for i in range(7):
+            grand_input[i]    += data["input_by_day"][i]
+            grand_output[i]   += data["output_by_day"][i]
+            grand_requests[i] += data["requests_by_day"][i]
+        for model, count in data["models"].items():
+            grand_models[model] = grand_models.get(model, 0) + count
+
+    grand_total_in  = sum(grand_input)
+    grand_total_out = sum(grand_output)
+    grand_cost = (grand_total_in / 1_000_000) * PRICING["input"] + \
+                 (grand_total_out / 1_000_000) * PRICING["output"]
+
+    return render_template('backoffice/ai_metrics.html',
+                           dates=dates,
+                           projects=projects_data,
+                           grand_input=grand_total_in,
+                           grand_output=grand_total_out,
+                           grand_requests=sum(grand_requests),
+                           grand_cost=round(grand_cost, 6),
+                           grand_input_by_day=grand_input,
+                           grand_output_by_day=grand_output,
+                           grand_requests_by_day=grand_requests,
+                           grand_models=grand_models)
+
+
+    import os
+    import time
     from datetime import datetime, timedelta
     from .utils.encryption import decrypt_value
     
