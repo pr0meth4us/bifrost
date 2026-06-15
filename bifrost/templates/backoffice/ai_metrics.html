@@ -84,7 +84,37 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Financial Overview (BigQuery) -->
+        {% if billing %}
+        <div class="glass-panel p-5 rounded-2xl mb-8 flex flex-col md:flex-row justify-between items-center bg-gradient-to-r from-blue-900/40 to-purple-900/40 border border-blue-500/30">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-mono text-slate-400 uppercase tracking-widest">Billing Export</h3>
+                    {% if billing.status == 'ready' %}
+                        <p class="text-xs text-green-400 font-mono mt-1">● Live Sync Active</p>
+                    {% else %}
+                        <p class="text-xs text-amber-400 font-mono mt-1">● Waiting for GCP (up to 24h)</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="flex gap-8 mt-4 md:mt-0 text-right">
+                <div>
+                    <p class="text-xs font-mono text-slate-400 uppercase tracking-widest">Total Spend</p>
+                    <p class="text-2xl font-bold text-white">${{ "%.2f"|format(billing.total_spend) }}</p>
+                </div>
+                <div>
+                    <p class="text-xs font-mono text-slate-400 uppercase tracking-widest">Credits Remaining</p>
+                    <p class="text-2xl font-bold text-green-400">${{ "%.2f"|format(billing.credits_remaining) }}</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             <!-- Left Column: Project Breakdown & Models -->
             <div class="lg:col-span-1 space-y-6">
                 <!-- Projects -->

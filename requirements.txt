@@ -16,3 +16,4 @@ markdown
 redis
 cryptography
 google-cloud-monitoring
+google-cloud-bigquery

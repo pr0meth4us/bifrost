@@ -569,22 +569,94 @@ def ai_metrics():
         except: pass
         os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
 
-    grand_total_in  = sum(grand_input)
-    grand_total_out = sum(grand_output)
-    grand_cost = (grand_total_in / 1_000_000) * PRICING["input"] + \
-                 (grand_total_out / 1_000_000) * PRICING["output"]
+    # === NEW: Fetch BigQuery Billing Data ===
+    billing_data = {
+        "status": "waiting",
+        "total_spend": 0,
+        "credits_remaining": 300.0, # Default GCP free trial credit
+        "services": {}
+    }
+    
+    try:
+        from google.cloud import bigquery
+        from google.oauth2 import service_account
+        sa_path = f"/app/secrets/khmer-tiktok-sa.json"
+        
+        # In local dev fallback
+        if not os.path.exists(sa_path):
+            try:
+                ag_creds = get_creds_json("bifrost_client_5dd70ad3a86c4f51")
+                fd, tmp = tempfile.mkstemp(suffix=".json")
+                with os.fdopen(fd, 'w') as f:
+                    f.write(ag_creds)
+                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = tmp
+                bq_client = bigquery.Client(project="mac-project-7892")
+            except:
+                bq_client = bigquery.Client(project="mac-project-7892")
+        else:
+            bq_client = bigquery.Client(project="mac-project-7892", credentials=service_account.Credentials.from_service_account_file(sa_path))
+            
+        query = """
+        SELECT 
+            service.description as service_name,
+            SUM(cost) as total_cost,
+            SUM(CASE WHEN credit.name IS NOT NULL THEN credit.amount ELSE 0 END) as total_credits
+        FROM `mac-project-7892.billing_export.gcp_billing_export_v1_016306_312143_6117C7`
+        LEFT JOIN UNNEST(credits) as credit
+        GROUP BY 1
+        ORDER BY total_cost DESC
+        """
+        
+        # Execute query
+        query_job = bq_client.query(query)
+        results = query_job.result()
+        
+        billing_data["status"] = "ready"
+        total_real_spend = 0
+        total_real_credits = 0
+        
+        for row in results:
+            service = row.service_name
+            cost = row.total_cost
+            credits = row.total_credits
+            total_real_spend += cost
+            total_real_credits += credits
+            billing_data["services"][service] = {"cost": cost, "credits": credits}
+            
+        billing_data["total_spend"] = total_real_spend
+        # Assuming the standard 300$ free trial:
+        billing_data["credits_remaining"] = 300.0 + total_real_credits # credits are usually negative values
+        
+    except Exception as e:
+        logger.error(f"Error fetching BigQuery billing data: {e}")
+        # Not found means we are waiting for Google to drop the first batch
+    finally:
+        try: os.unlink(tmp)
+        except: pass
 
-    return render_template('backoffice/ai_metrics.html',
-                           dates=dates,
-                           projects=projects_data,
-                           grand_input=grand_total_in,
-                           grand_output=grand_total_out,
-                           grand_requests=sum(grand_requests),
-                           grand_cost=round(grand_cost, 6),
-                           grand_input_by_day=grand_input,
-                           grand_output_by_day=grand_output,
-                           grand_requests_by_day=grand_requests,
-                           grand_models=grand_models)
+    # Prepare final payload
+    dates = []
+    end_dt = datetime.fromtimestamp(end_secs)
+    for i in range(6, -1, -1):
+        d = end_dt - timedelta(days=i)
+        dates.append(d.strftime("%Y-%m-%d"))
+
+    return render_template(
+        "backoffice/ai_metrics.html",
+        dates=dates,
+        projects=projects_data,
+        grand_total_tokens=sum(grand_input) + sum(grand_output),
+        grand_total_requests=sum(grand_requests),
+        grand_cost=(sum(grand_input) / 1_000_000) * PRICING["input"] + (sum(grand_output) / 1_000_000) * PRICING["output"],
+        grand_input=sum(grand_input),
+        grand_output=sum(grand_output),
+        grand_models=grand_models,
+        billing=billing_data,
+        grand_requests=sum(grand_requests),
+        grand_input_by_day=grand_input,
+        grand_output_by_day=grand_output,
+        grand_requests_by_day=grand_requests
+    )
 
 
     import os
