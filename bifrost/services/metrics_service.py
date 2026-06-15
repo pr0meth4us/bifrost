@@ -85,7 +85,7 @@ def fetch_billing_data(db_hook):
             billing_data["services"][service] = {"cost": cost, "credits": credits}
             
         billing_data["total_spend"] = total_real_spend
-        billing_data["credits_remaining"] = 300.0 + total_real_credits 
+        # Removed hardcoded $300 free trial assumption 
         
     except Exception as e:
         logger.error(f"Error fetching BigQuery billing data: {e}")

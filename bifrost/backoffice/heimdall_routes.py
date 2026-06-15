@@ -97,9 +97,7 @@ def ai_metrics():
     grand_total_tokens = sum(metrics["grand_input"]) + sum(metrics["grand_output"])
     grand_cost = (sum(metrics["grand_input"]) / 1_000_000) * PRICING["input"] + (sum(metrics["grand_output"]) / 1_000_000) * PRICING["output"]
 
-    # If BigQuery is empty, estimate the remaining credits using the live AI token cost
-    if billing["status"] == "waiting":
-        billing["credits_remaining"] = 300.0 - grand_cost
+    # (Removed the $300 hardcode assumption)
 
     return render_template(
         "backoffice/ai_metrics.html",
