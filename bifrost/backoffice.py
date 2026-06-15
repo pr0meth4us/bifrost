@@ -369,7 +369,7 @@ def ai_metrics():
                 "alignment_period": {"seconds": 86400},
                 "per_series_aligner": monitoring_v3.Aggregation.Aligner.ALIGN_SUM,
                 "cross_series_reducer": monitoring_v3.Aggregation.Reducer.REDUCE_SUM,
-                "group_by_fields": ["metric.labels.token_type"],
+                "group_by_fields": ["metric.labels.type"],
             })
 
             def safe_list(filter_str, agg=None):
@@ -385,13 +385,13 @@ def ai_metrics():
                 except Exception:
                     return []
 
-            # --- Token counts (per day, per token_type) ---
+            # --- Token counts (per day, per type) ---
             token_series = safe_list(
                 'metric.type="aiplatform.googleapis.com/publisher/online_serving/token_count"',
                 agg=aggregation,
             )
             for ts in token_series:
-                token_type = ts.metric.labels.get("token_type", "")
+                token_type = ts.metric.labels.get("type", "")
                 for pt in ts.points:
                     day_offset = int((end_secs - pt.interval.end_time.timestamp()) / 86400)
                     idx = 6 - day_offset
