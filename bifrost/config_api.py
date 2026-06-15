@@ -20,7 +20,7 @@ def get_config():
         return jsonify({"error": "Missing credentials. Require X-Client-ID and X-Webhook-Secret"}), 401
 
     db = get_db()
-    app = db.applications.find_one({"client_id": client_id})
+    app = db.get_app_by_client_id(client_id)
 
     if not app:
         return jsonify({"error": "Application not found"}), 404
@@ -62,7 +62,7 @@ def bulk_upload_config():
         return jsonify({"error": "Missing credentials. Require X-Client-ID and X-Webhook-Secret"}), 401
 
     db = get_db()
-    app = db.applications.find_one({"client_id": client_id})
+    app = db.get_app_by_client_id(client_id)
 
     if not app:
         return jsonify({"error": "Application not found"}), 404
