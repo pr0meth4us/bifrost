@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template, current_app, request, make_response
+from flask import Flask, jsonify, render_template, current_app, request, make_response, send_from_directory
 from flask_pymongo import PyMongo
 from flask.json.provider import JSONProvider
 import json
@@ -165,6 +165,11 @@ def create_app(config_class):
             return render_template('index.html', apps=apps, app=None)
         except Exception as e:
             return jsonify(status="error", message=f"Portal error: {e}"), 500
+
+    @app.route('/favicon.ico')
+    def favicon():
+        return send_from_directory(os.path.join(app.root_path, 'static'),
+                                   'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
     @app.route('/docs')
     def documentation():
