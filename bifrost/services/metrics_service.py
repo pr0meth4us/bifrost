@@ -101,13 +101,13 @@ def fetch_ai_metrics(db_hook):
     """Fetches AI metrics via Cloud Monitoring for Vertex AI and custom Antigravity."""
     now = time.time()
     end_secs = int(now)
-    start_secs = end_secs - 7 * 24 * 60 * 60
+    start_secs = end_secs - 30 * 24 * 60 * 60
 
     def query_project(project_id, creds_json):
         result = {
-            "input_by_day":    [0] * 7,
-            "output_by_day":   [0] * 7,
-            "requests_by_day": [0] * 7,
+            "input_by_day":    [0] * 30,
+            "output_by_day":   [0] * 30,
+            "requests_by_day": [0] * 30,
             "models": {},
         }
         if not creds_json:
@@ -156,8 +156,8 @@ def fetch_ai_metrics(db_hook):
                 token_type = ts.metric.labels.get("type", "")
                 for pt in ts.points:
                     day_offset = int((end_secs - pt.interval.end_time.timestamp()) / 86400)
-                    idx = 6 - day_offset
-                    if 0 <= idx < 7:
+                    idx = 29 - day_offset
+                    if 0 <= idx < 30:
                         val = int(pt.value.int64_value or pt.value.double_value or 0)
                         if token_type == "input":
                             result["input_by_day"][idx] += val
@@ -175,12 +175,12 @@ def fetch_ai_metrics(db_hook):
             ):
                 for pt in ts.points:
                     day_offset = int((end_secs - pt.interval.end_time.timestamp()) / 86400)
-                    idx = 6 - day_offset
-                    if 0 <= idx < 7:
+                    idx = 29 - day_offset
+                    if 0 <= idx < 30:
                         result["requests_by_day"][idx] += int(pt.value.int64_value or pt.value.double_value or 0)
 
             model_agg = monitoring_v3.Aggregation({
-                "alignment_period": {"seconds": 7 * 86400},
+                "alignment_period": {"seconds": 30 * 86400},
                 "per_series_aligner": monitoring_v3.Aggregation.Aligner.ALIGN_SUM,
                 "cross_series_reducer": monitoring_v3.Aggregation.Reducer.REDUCE_SUM,
                 "group_by_fields": ["resource.labels.model_user_id"],
@@ -208,9 +208,9 @@ def fetch_ai_metrics(db_hook):
         return result
 
     projects_data = []
-    grand_input = [0] * 7
-    grand_output = [0] * 7
-    grand_requests = [0] * 7
+    grand_input = [0] * 30
+    grand_output = [0] * 30
+    grand_requests = [0] * 30
     grand_models = {}
 
     for cfg in APP_CONFIGS:
@@ -236,7 +236,7 @@ def fetch_ai_metrics(db_hook):
             "models":   data["models"],
         })
 
-        for i in range(7):
+        for i in range(30):
             grand_input[i]    += data["input_by_day"][i]
             grand_output[i]   += data["output_by_day"][i]
             grand_requests[i] += data["requests_by_day"][i]

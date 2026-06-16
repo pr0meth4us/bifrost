@@ -90,7 +90,7 @@ def ai_metrics():
 
     dates = []
     end_dt = datetime.fromtimestamp(metrics["end_secs"])
-    for i in range(6, -1, -1):
+    for i in range(29, -1, -1):
         d = end_dt - timedelta(days=i)
         dates.append(d.strftime("%Y-%m-%d"))
 
