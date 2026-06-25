@@ -27,6 +27,12 @@ APP_CONFIGS = [
         "project_id": "gen-lang-client-0429923800",
         "color": "rgba(74, 222, 128",    # green
     },
+    {
+        "label": "EGD AI Platform",
+        "client_id": "egd_platform_b916ff42",
+        "project_id": "egd-ai-services-1782364268",
+        "color": "rgba(251, 191, 36",    # amber
+    },
 ]
 
 def fetch_billing_data(db_hook):
