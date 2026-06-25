@@ -8,34 +8,8 @@ logger = logging.getLogger(__name__)
 
 PRICING = {"input": 0.075, "output": 0.30, "pro_input": 1.25, "pro_output": 3.75}   # per 1M tokens
 
-APP_CONFIGS = [
-    {
-        "label": "TikTok Keeper",
-        "client_id": "bifrost_client_5dd70ad3a86c4f51",
-        "project_id": "mac-project-7892",
-        "color": "rgba(217, 70, 239",   # fuchsia
-    },
-    {
-        "label": "OCR Tools",
-        "client_id": "random_project_abf21112",
-        "project_id": "khmer-ocr-496606",
-        "color": "rgba(56, 189, 248",    # cyan
-    },
-    {
-        "label": "Auto Texter",
-        "client_id": "auto_texter_77cb5d03",
-        "project_id": "gen-lang-client-0429923800",
-        "color": "rgba(74, 222, 128",    # green
-    },
-    {
-        "label": "EGD AI Platform",
-        "client_id": "egd_platform_b916ff42",
-        "project_id": "egd-ai-services-1782364268",
-        "color": "rgba(251, 191, 36",    # amber
-    },
-]
 
-def fetch_billing_data(db_hook):
+def fetch_billing_data(dynamic_configs):
     """Fetches real financial data from BigQuery Billing Export."""
     from google.cloud import bigquery
     from google.oauth2 import service_account
@@ -53,7 +27,9 @@ def fetch_billing_data(db_hook):
         
         if not os.path.exists(sa_path):
             try:
-                ag_creds = db_hook("bifrost_client_5dd70ad3a86c4f51")
+                ag_creds = next((c["creds"] for c in dynamic_configs if c["client_id"] == "bifrost_client_5dd70ad3a86c4f51"), None)
+                if not ag_creds:
+                    raise Exception("Creds not found")
                 fd, tmp = tempfile.mkstemp(suffix=".json")
                 with os.fdopen(fd, 'w') as f:
                     f.write(ag_creds)
@@ -103,7 +79,7 @@ def fetch_billing_data(db_hook):
     return billing_data
 
 
-def fetch_ai_metrics(db_hook):
+def fetch_ai_metrics(dynamic_configs):
     """Fetches AI metrics via Cloud Monitoring for Vertex AI and custom Antigravity."""
     now = time.time()
     end_secs = int(now)
@@ -219,8 +195,8 @@ def fetch_ai_metrics(db_hook):
     grand_requests = [0] * 30
     grand_models = {}
 
-    for cfg in APP_CONFIGS:
-        creds = db_hook(cfg["client_id"])
+    for cfg in dynamic_configs:
+        creds = cfg["creds"]
         data = query_project(cfg["project_id"], creds)
 
         total_in  = sum(data["input_by_day"])

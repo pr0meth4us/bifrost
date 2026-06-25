@@ -77,16 +77,35 @@ def delete_global_user(user_id):
 def ai_metrics():
     db = get_db()
     
-    def db_hook(client_id):
-        app_doc = db.get_app_by_client_id(client_id)
-        if not app_doc: return None
-        enc = app_doc.get("api_keys", {}).get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
-        if not enc: return None
-        return decrypt_value(enc, app_doc.get("webhook_secret", ""))
+    apps = list(db.db.applications.find({"api_keys.GOOGLE_APPLICATION_CREDENTIALS_JSON": {"$exists": True}}))
+    dynamic_configs = []
+    colors = ["rgba(217, 70, 239", "rgba(56, 189, 248", "rgba(74, 222, 128", "rgba(251, 191, 36", "rgba(248, 113, 113", "rgba(167, 139, 250"]
+    
+    import json
+    for idx, app in enumerate(apps):
+        enc = app.get("api_keys", {}).get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+        if not enc: continue
+        
+        sa_json_str = decrypt_value(enc, app.get("webhook_secret", ""))
+        if not sa_json_str: continue
+        
+        try:
+            sa_data = json.loads(sa_json_str)
+            project_id = sa_data.get("project_id")
+            if project_id:
+                dynamic_configs.append({
+                    "label": app.get("app_name", "Unknown App"),
+                    "client_id": app.get("client_id", ""),
+                    "project_id": project_id,
+                    "color": colors[idx % len(colors)],
+                    "creds": sa_json_str
+                })
+        except Exception:
+            pass
 
     # Fetch Data from Service Layer
-    metrics = fetch_ai_metrics(db_hook)
-    billing = fetch_billing_data(db_hook)
+    metrics = fetch_ai_metrics(dynamic_configs)
+    billing = fetch_billing_data(dynamic_configs)
 
     dates = []
     end_dt = datetime.fromtimestamp(metrics["end_secs"])
