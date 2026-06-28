@@ -81,6 +81,10 @@ def bulk_upload_config():
     count = 0
     for key_name, key_value in keys.items():
         if key_name and key_value:
+            # Sync the top-level telegram_bot_token for Telegram Auth verification
+            if key_name in ("TELEGRAM_TOKEN", "BIFROST_BOT_TOKEN"):
+                db.update_app_details(app['_id'], {"telegram_bot_token": str(key_value)})
+                
             # add_app_api_key securely encrypts the value and automatically triggers config_updated webhook
             db.add_app_api_key(app['_id'], key_name, str(key_value))
             count += 1
