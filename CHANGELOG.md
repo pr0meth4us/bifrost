@@ -3,6 +3,10 @@
 All notable changes to the `bifrost` project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+- **Heimdall Vision OCR Metrics**: The Heimdall AI Metrics dashboard now queries and displays usage and cost metrics for Google Cloud Vision API (`vision.googleapis.com`) under the model name `vision-ocr-pages`.
+
 ## [0.13.0] - 2026-06-15
 
 ### Added

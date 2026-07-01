@@ -161,6 +161,25 @@ def fetch_ai_metrics(dynamic_configs):
                     if 0 <= idx < 30:
                         result["requests_by_day"][idx] += int(pt.value.int64_value or pt.value.double_value or 0)
 
+            # --- ADD VISION API METRICS ---
+            vision_req_agg = monitoring_v3.Aggregation({
+                "alignment_period": {"seconds": 86400},
+                "per_series_aligner": monitoring_v3.Aggregation.Aligner.ALIGN_SUM,
+                "cross_series_reducer": monitoring_v3.Aggregation.Reducer.REDUCE_SUM,
+            })
+            for ts in safe_list(
+                'metric.type="serviceruntime.googleapis.com/api/request_count" AND metric.labels.service="vision.googleapis.com"',
+                agg=vision_req_agg
+            ):
+                for pt in ts.points:
+                    day_offset = int((end_secs - pt.interval.end_time.timestamp()) / 86400)
+                    idx = 29 - day_offset
+                    if 0 <= idx < 30:
+                        val = int(pt.value.int64_value or pt.value.double_value or 0)
+                        result["requests_by_day"][idx] += val
+                        result["models"]["vision-ocr-pages"] = result["models"].get("vision-ocr-pages", 0) + val
+            # ------------------------------
+
             model_agg = monitoring_v3.Aggregation({
                 "alignment_period": {"seconds": 30 * 86400},
                 "per_series_aligner": monitoring_v3.Aggregation.Aligner.ALIGN_SUM,
@@ -202,7 +221,10 @@ def fetch_ai_metrics(dynamic_configs):
         total_in  = sum(data["input_by_day"])
         total_out = sum(data["output_by_day"])
         total_req = sum(data["requests_by_day"])
+        vision_pages = data["models"].get("vision-ocr-pages", 0)
+        
         cost = (total_in / 1_000_000) * PRICING["input"] + (total_out / 1_000_000) * PRICING["output"]
+        cost += (vision_pages / 1000) * 1.50  # Vision OCR Document Text Detection is ~$1.50 per 1000 pages
 
         projects_data.append({
             "label":    cfg["label"],
