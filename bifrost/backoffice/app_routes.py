@@ -10,13 +10,13 @@ def dashboard():
     db = get_db()
     if session.get('is_heimdall'):
         apps = db.get_all_apps()
-        title = "Heimdall Dashboard"
+        title = "Bifrost Console (Admin)"
     else:
         apps = db.get_managed_apps(session['backoffice_user'])
         if not apps:
             session.clear()
             return redirect(url_for('backoffice.login'))
-        title = "Tenant Dashboard"
+        title = "Bifrost Console"
     return render_template('backoffice/dashboard.html', apps=apps, title=title)
 
 
