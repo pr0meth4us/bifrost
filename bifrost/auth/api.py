@@ -535,7 +535,7 @@ def telegram_webhook(client_id=None):
         db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
         app_config = db.get_app_by_client_id(client_id)
         if app_config:
-            bot_token = app_config.get("api_keys", {}).get("TELEGRAM_BOT_TOKEN")
+            bot_token = app_config.get("telegram_bot_token") or app_config.get("api_keys", {}).get("TELEGRAM_BOT_TOKEN")
 
     # We must run the async bot logic in a sync Flask context
     try:
