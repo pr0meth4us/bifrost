@@ -37,6 +37,7 @@
         {% endwith %}
 
         <!-- Segment Tab Control -->
+        {% if phone_otp_enabled %}
         <div class="flex bg-slate-100 p-1.5 rounded-2xl mb-8">
             <button type="button" onclick="switchLoginTab('credentials')" id="tabBtn-credentials" class="flex-grow flex items-center justify-center py-2.5 text-xs font-bold text-indigo-600 bg-white rounded-xl shadow-sm transition-all outline-none">
                 Password
@@ -45,6 +46,7 @@
                 Phone OTP
             </button>
         </div>
+        {% endif %}
 
         <div id="credentialsForm" class="space-y-5">
             <form action="{{ url_for('auth_ui.login', client_id=app.client_id) }}" method="POST" class="space-y-5">
@@ -55,7 +57,9 @@
                 <div>
                     <div class="flex justify-between mb-2">
                         <label class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Password</label>
+                        {% if email_otp_enabled %}
                         <a href="{{ url_for('auth_ui.forgot_password', client_id=app.client_id) }}" class="text-xs font-bold text-indigo-600">Forgot?</a>
+                        {% endif %}
                     </div>
                     <div class="relative">
                         <input type="password" id="password" name="password" required 

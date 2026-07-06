@@ -75,6 +75,15 @@ def update_app_settings(app_id):
         flash("Access Denied: App Admins cannot change configuration.", "danger")
         return redirect(url_for('backoffice.view_app', app_id=app_id))
 
+    enabled_services = {
+        'sso': bool(request.form.get('service_sso')),
+        'phone_otp': bool(request.form.get('service_phone_otp')),
+        'email_otp': bool(request.form.get('service_email_otp')),
+        'secrets_vault': bool(request.form.get('service_secrets_vault')),
+        'payment_bot': bool(request.form.get('service_payment_bot')),
+        'heimdall_monitor': bool(request.form.get('service_heimdall_monitor'))
+    }
+
     data = {
         'app_name': request.form.get('app_name'),
         'app_web_url': request.form.get('web_url'),
@@ -82,7 +91,8 @@ def update_app_settings(app_id):
         'app_api_url': request.form.get('api_url'),
         'app_logo_url': request.form.get('logo_url'),
         'app_qr_url': request.form.get('qr_url'),
-        'telegram_bot_token': request.form.get('telegram_bot_token')
+        'telegram_bot_token': request.form.get('telegram_bot_token'),
+        'enabled_services': enabled_services
     }
 
     if db.update_app_details(app_id, data):

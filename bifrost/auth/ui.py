@@ -63,20 +63,28 @@ def login():
         else:
             flash("Invalid email or password", "danger")
 
+    sso_enabled = app_config.get("enabled_services", {}).get("sso", True)
+    phone_otp_enabled = app_config.get("enabled_services", {}).get("phone_otp", True)
+    email_otp_enabled = app_config.get("enabled_services", {}).get("email_otp", True)
+
     sso_providers = {
-        "google": bool(current_app.config.get('GOOGLE_CLIENT_ID')),
-        "github": bool(current_app.config.get('GITHUB_CLIENT_ID')),
-        "microsoft": bool(current_app.config.get('MICROSOFT_CLIENT_ID')),
-        "apple": bool(current_app.config.get('APPLE_CLIENT_ID')),
-        "facebook": bool(current_app.config.get('FACEBOOK_CLIENT_ID'))
+        "google": bool(current_app.config.get('GOOGLE_CLIENT_ID')) if sso_enabled else False,
+        "github": bool(current_app.config.get('GITHUB_CLIENT_ID')) if sso_enabled else False,
+        "microsoft": bool(current_app.config.get('MICROSOFT_CLIENT_ID')) if sso_enabled else False,
+        "apple": bool(current_app.config.get('APPLE_CLIENT_ID')) if sso_enabled else False,
+        "facebook": bool(current_app.config.get('FACEBOOK_CLIENT_ID')) if sso_enabled else False
     }
-    return render_template('auth/login.html', app=app_config, sso_providers=sso_providers)
+    return render_template('auth/login.html', app=app_config, sso_providers=sso_providers, phone_otp_enabled=phone_otp_enabled, email_otp_enabled=email_otp_enabled)
 
 
 @auth_ui_bp.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
     client_id = request.args.get('client_id')
     db, app_config = get_app_config(client_id)
+
+    if not app_config.get("enabled_services", {}).get("email_otp", True):
+        flash("Email password reset service is disabled for this application.", "danger")
+        return redirect(url_for('auth_ui.login', client_id=client_id))
 
     if request.method == 'POST':
         email = request.form.get('email').strip().lower()
@@ -214,6 +222,9 @@ def sso_login(provider):
     if not app_config:
         return render_template('auth/error.html', error="Invalid client_id")
 
+    if not app_config.get("enabled_services", {}).get("sso", True):
+        return render_template('auth/error.html', error="OAuth SSO Service is disabled for this application")
+
     session['sso_client_id'] = client_id
     redirect_uri = url_for('auth_ui.sso_callback', provider=provider, _external=True)
 
@@ -302,6 +313,9 @@ def sso_callback(provider):
     db, app_config = get_app_config(client_id)
     if not app_config:
         return render_template('auth/error.html', error="Invalid application client configuration")
+
+    if not app_config.get("enabled_services", {}).get("sso", True):
+        return render_template('auth/error.html', error="OAuth SSO Service is disabled for this application")
 
     redirect_uri = url_for('auth_ui.sso_callback', provider=provider, _external=True)
     email = None
@@ -481,6 +495,9 @@ def request_phone_otp_ui():
     if not app_config:
         return render_template('auth/error.html', error="Invalid client_id")
 
+    if not app_config.get("enabled_services", {}).get("phone_otp", True):
+        return render_template('auth/error.html', error="Phone SMS OTP service is disabled for this application")
+
     phone = phone.strip()
     code, verification_id = db.create_otp(phone, channel="sms")
     
@@ -502,6 +519,9 @@ def verify_phone_otp_ui():
     db, app_config = get_app_config(client_id)
     if not app_config or not ver_id:
         return render_template('auth/error.html', error="Invalid verification request parameters")
+
+    if not app_config.get("enabled_services", {}).get("phone_otp", True):
+        return render_template('auth/error.html', error="Phone SMS OTP service is disabled for this application")
 
     if request.method == 'POST':
         code = request.form.get('otp')

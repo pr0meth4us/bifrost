@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Heimdall Billing Breakdown Table**: Enhanced the dashboard interface (`ai_metrics.html`) to display a detailed tabular breakdown of individual GCP service costs, applied credits, and net costs.
 - **Bifrost Console Branding**: Refined backoffice titles and templates to standardize management dashboard naming to "Bifrost Console" for tenant and admin screens.
 - **Bifrost Integration Sandbox**: Built an interactive mock client app (`sandbox/app.py`) using Flask to demonstrate integration flows. Showcases session authorization redirection, token callback parsing, local JWT claims decoding, multi-provider SSO/SMS OTP routing, and live SDK vault key loading diagnostics.
+- **Service Segmentation & Toggles**: Introduced a comprehensive service toggle configuration system (`enabled_services`) for registered applications. Supports toggling of OAuth SSO, Phone SMS OTP, Email OTP, Secrets Vault, Payment Verification Bot, and Heimdall AI Monitor individually. Dynamically updates UI elements and enforces service-level permission checks across all API and authentication endpoints.
 
 ## [0.13.0] - 2026-06-15
 

@@ -400,6 +400,9 @@ def ingest_logs():
     client_id = request.authenticated_client_id
     db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
     app_doc = db.get_app_by_client_id(client_id)
+    if app_doc and not app_doc.get("enabled_services", {}).get("heimdall_monitor", True):
+        return jsonify({"error": "Heimdall AI Monitor Service is disabled for this application"}), 403
+
     app_name = app_doc['app_name'] if app_doc else "Unknown App"
     
     if redis_client:
