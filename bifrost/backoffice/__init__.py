@@ -26,22 +26,50 @@ def get_current_role_in_app(app_id):
     return db.get_user_role_for_app(user_id, app_id)
 
 
-def check_permission(app_id, min_level):
+ROLE_PERMISSIONS = {
+    "owner": {
+        "read:config", "write:config", "manage:users", "view:secrets", "manage:secrets", "transfer:ownership", "view:metrics"
+    },
+    "super_admin": {
+        "read:config", "write:config", "manage:users", "view:secrets", "manage:secrets", "view:metrics"
+    },
+    "admin": {
+        "read:config", "manage:users", "view:metrics"
+    },
+    "member": {
+        "read:config", "view:metrics"
+    },
+    "user": {
+        "read:config", "view:metrics"
+    },
+    "viewer": {
+        "read:config"
+    }
+}
+
+def check_permission(app_id, permission_or_level):
     """
-    Levels:
-    3 = Owner/Heimdall (Secrets, Transfer Ownership)
-    2 = Super Admin (Config, Manage Admins)
-    1 = Admin (Manage Users only)
+    Role-Based Access Control (RBAC) Checker.
+    Supports both explicit permission strings (professional) and legacy levels (fallback).
     """
     role = get_current_role_in_app(app_id)
-    if role == 'heimdall': return True
-    if role == 'pr0meth4us': return True
-    if role == 'owner': return True  # Level 3
+    if role in ('heimdall', 'pr0meth4us'):
+        return True
 
-    if min_level <= 2 and role == 'super_admin': return True
-    if min_level <= 1 and role == 'admin': return True
+    if not role:
+        return False
 
-    return False
+    # Legacy numeric fallback compatibility
+    if isinstance(permission_or_level, int):
+        level = permission_or_level
+        if role == 'owner': return True
+        if level <= 2 and role == 'super_admin': return True
+        if level <= 1 and role == 'admin': return True
+        return False
+
+    # Explicit string permission check
+    allowed_permissions = ROLE_PERMISSIONS.get(role, set())
+    return permission_or_level in allowed_permissions
 
 
 # --- AUTH DECORATORS ---
