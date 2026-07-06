@@ -54,7 +54,7 @@ def create_app():
 def view_app(app_id):
     db = get_db()
     # Check if user has ANY access
-    if not check_permission(app_id, 1):  # Level 1 = Admin or higher
+    if not check_permission(app_id, "read:config"):
         flash("Unauthorized.", "danger")
         return redirect(url_for('backoffice.dashboard'))
 
@@ -70,8 +70,8 @@ def view_app(app_id):
 @login_required
 def update_app_settings(app_id):
     db = get_db()
-    # HIERARCHY CHECK: Super Admin (2) or Owner (3) required
-    if not check_permission(app_id, 2):
+    # HIERARCHY CHECK: Super Admin or Owner required
+    if not check_permission(app_id, "write:config"):
         flash("Access Denied: App Admins cannot change configuration.", "danger")
         return redirect(url_for('backoffice.view_app', app_id=app_id))
 
@@ -107,8 +107,8 @@ def update_app_settings(app_id):
 @login_required
 def rotate_secret(app_id):
     db = get_db()
-    # HIERARCHY CHECK: Owner (3) Only
-    if not check_permission(app_id, 3):
+    # HIERARCHY CHECK: Owner Only
+    if not check_permission(app_id, "transfer:ownership"):
         flash("Access Denied: Only the Owner can rotate secrets.", "danger")
         return redirect(url_for('backoffice.view_app', app_id=app_id))
 
@@ -121,7 +121,7 @@ def rotate_secret(app_id):
 @login_required
 def add_api_key(app_id):
     db = get_db()
-    if not check_permission(app_id, 2): # Super Admin or Owner
+    if not check_permission(app_id, "manage:secrets"): # Super Admin or Owner
         flash("Access Denied: Only Admins can manage API Keys.", "danger")
         return redirect(url_for('backoffice.view_app', app_id=app_id))
     
@@ -140,7 +140,7 @@ def add_api_key(app_id):
 @login_required
 def delete_api_key(app_id):
     db = get_db()
-    if not check_permission(app_id, 2):
+    if not check_permission(app_id, "manage:secrets"):
         flash("Access Denied: Only Admins can manage API Keys.", "danger")
         return redirect(url_for('backoffice.view_app', app_id=app_id))
     
