@@ -19,17 +19,18 @@ from bot.handlers import (
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger("bifrost-bot")
 
-def create_bifrost_bot():
+def create_bifrost_bot(bot_token=None):
     """Factory function to build the PTB Application."""
-    if not Config.BIFROST_BOT_TOKEN or not Config.MONGO_URI:
-        logger.critical("Missing BIFROST_BOT_TOKEN or MONGO_URI in Config!")
+    token = bot_token or Config.BIFROST_BOT_TOKEN
+    if not token or not Config.MONGO_URI:
+        logger.critical("Missing Bot Token or MONGO_URI!")
         return None
 
     # 1. Setup Persistence
     persistence = MongoPersistence(mongo_uri=Config.MONGO_URI)
 
     # 2. Build App
-    app = Application.builder().token(Config.BIFROST_BOT_TOKEN).persistence(persistence).build()
+    app = Application.builder().token(token).persistence(persistence).build()
 
     # 3. Register Handlers
     payment_conv = ConversationHandler(
@@ -53,9 +54,9 @@ def create_bifrost_bot():
 
     return app
 
-async def process_webhook_update(update_json):
+async def process_webhook_update(update_json, bot_token=None):
     """PRODUCTION ENTRY POINT (Flask)"""
-    app = create_bifrost_bot()
+    app = create_bifrost_bot(bot_token=bot_token)
     if not app:
         return
 

@@ -521,19 +521,27 @@ def telegram_login():
         "role": role
     })
 
+@auth_api_bp.route('/telegram-webhook/<client_id>', methods=['POST'])
 @auth_api_bp.route('/telegram-webhook', methods=['POST'])
-def telegram_webhook():
+def telegram_webhook(client_id=None):
     """
     Receives updates from Telegram and passes them to the Bot.
     This runs inside the Flask Process!
     """
     data = request.get_json(force=True)
+    bot_token = None
+
+    if client_id:
+        db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
+        app_config = db.get_app_by_client_id(client_id)
+        if app_config:
+            bot_token = app_config.get("api_keys", {}).get("TELEGRAM_BOT_TOKEN")
 
     # We must run the async bot logic in a sync Flask context
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(process_webhook_update(data))
+        loop.run_until_complete(process_webhook_update(data, bot_token=bot_token))
         loop.close()
         return "OK", 200
     except Exception as e:
