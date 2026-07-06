@@ -143,6 +143,15 @@ class AuthMixin:
     def find_account_by_telegram(self, telegram_id, client_id=None):
         return self.db.accounts.find_one({"telegram_id": str(telegram_id)})
 
+    def find_account_by_sso(self, provider, provider_id):
+        if not provider or not provider_id: return None
+        return self.db.accounts.find_one({
+            "$or": [
+                {f"{provider}_id": str(provider_id)},
+                {f"identities.{provider}.id": str(provider_id)}
+            ]
+        })
+
     def update_password(self, email, new_password, client_id):
         user = self.find_account_by_email(email, client_id)
         if not user:
@@ -202,6 +211,42 @@ class AuthMixin:
                 extra_data={"telegram_id": telegram_id}
             )
             return True, "Telegram linked."
+        else:
+            return False, "Account not found."
+
+    def link_sso(self, account_id, provider, provider_id):
+        provider_id = str(provider_id)
+        existing = self.db.accounts.find_one({
+            "$or": [
+                {f"{provider}_id": provider_id},
+                {f"identities.{provider}.id": provider_id}
+            ],
+            "_id": {"$ne": ObjectId(account_id)}
+        })
+        if existing:
+            return False, f"{provider.capitalize()} account already linked to another user."
+
+        result = self.db.accounts.update_one(
+            {"_id": ObjectId(account_id)},
+            {
+                "$set": {
+                    f"identities.{provider}": {
+                        "id": provider_id,
+                        "linked_at": datetime.now(UTC)
+                    },
+                    f"{provider}_id": provider_id
+                },
+                "$addToSet": {"auth_providers": provider}
+            }
+        )
+
+        if result.modified_count > 0:
+            self._trigger_event_for_user(
+                account_id,
+                "account_update",
+                extra_data={f"{provider}_id": provider_id}
+            )
+            return True, f"{provider.capitalize()} linked."
         else:
             return False, "Account not found."
 
