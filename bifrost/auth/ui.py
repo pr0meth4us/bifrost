@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 from .. import mongo
 from ..models import BifrostDB
 from ..services.email_service import send_otp_email
+from ..services.sms_service import send_otp_sms
 
 auth_ui_bp = Blueprint('auth_ui', __name__, url_prefix='/auth/ui')
 UTC = ZoneInfo("UTC")
@@ -462,3 +463,79 @@ def sso_callback(provider):
     callback_url = app_config.get('app_callback_url')
     separator = '&' if '?' in callback_url else '?'
     return redirect(f"{callback_url}{separator}token={token}")
+
+
+# ---------------------------------------------------------
+# PHONE OTP MULTI-PROVIDER AUTHENTICATION
+# ---------------------------------------------------------
+
+@auth_ui_bp.route('/request-phone-otp', methods=['POST'])
+def request_phone_otp_ui():
+    phone = request.form.get('phone_number')
+    client_id = request.form.get('client_id')
+    
+    if not phone or not client_id:
+        return render_template('auth/error.html', error="Missing phone_number or client_id")
+
+    db, app_config = get_app_config(client_id)
+    if not app_config:
+        return render_template('auth/error.html', error="Invalid client_id")
+
+    phone = phone.strip()
+    code, verification_id = db.create_otp(phone, channel="sms")
+    
+    app_name = app_config.get('app_name', 'Bifrost Identity')
+    if send_otp_sms(to_phone=phone, otp=code, app_name=app_name):
+        return redirect(url_for('auth_ui.verify_phone_otp_ui', 
+                                verification_id=verification_id, 
+                                client_id=client_id))
+    else:
+        flash("Failed to dispatch SMS code. Please check server configurations.", "danger")
+        return redirect(url_for('auth_ui.login', client_id=client_id))
+
+
+@auth_ui_bp.route('/verify-phone-otp', methods=['GET', 'POST'])
+def verify_phone_otp_ui():
+    ver_id = request.args.get('verification_id')
+    client_id = request.args.get('client_id')
+    
+    db, app_config = get_app_config(client_id)
+    if not app_config or not ver_id:
+        return render_template('auth/error.html', error="Invalid verification request parameters")
+
+    if request.method == 'POST':
+        code = request.form.get('otp')
+        record = db.verify_otp(verification_id=ver_id, code=code)
+
+        if record:
+            phone_number = record['identifier']
+            user = db.find_account_by_phone(phone_number)
+            
+            if not user:
+                account_data = {
+                    "client_id": client_id,
+                    "phone_number": phone_number,
+                    "display_name": f"User {phone_number[-4:]}",
+                    "auth_providers": ["sms"]
+                }
+                new_id = db.create_account(account_data)
+                user = db.find_account_by_id(new_id)
+
+            db.link_user_to_app(user['_id'], app_config['_id'])
+            token = create_session_token(user, client_id)
+            callback_url = app_config.get('app_callback_url')
+            separator = '&' if '?' in callback_url else '?'
+            return redirect(f"{callback_url}{separator}token={token}")
+        else:
+            flash("Invalid or expired SMS verification code.", "danger")
+
+    action_url = url_for('auth_ui.verify_phone_otp_ui', verification_id=ver_id, client_id=client_id)
+    resend_url = url_for('auth_ui.login', client_id=client_id)
+    description = "Check your phone for a 6-digit SMS OTP code."
+    
+    return render_template('auth/verify_otp.html', 
+                           app=app_config, 
+                           verification_id=ver_id,
+                           action_url=action_url,
+                           resend_url=resend_url,
+                           description=description)
