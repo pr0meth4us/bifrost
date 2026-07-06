@@ -10,6 +10,7 @@ import asyncio
 from .. import mongo
 from ..models import BifrostDB
 from ..services.email_service import send_otp_email
+from ..services.sms_service import send_otp_sms
 from ..utils.telegram import verify_telegram_data
 
 auth_api_bp = Blueprint('auth_api', __name__, url_prefix='/auth/api')
@@ -132,6 +133,85 @@ def verify_email_otp():
         "success": True,
         "proof_token": proof_token,
         "email": email
+    })
+
+
+@auth_api_bp.route('/request-phone-otp', methods=['POST'])
+def request_phone_otp():
+    """
+    Generates an OTP for a phone number and dispatches via Twilio SMS.
+    Payload: { "phone_number": "+85512345678", "client_id": "..." }
+    """
+    data = request.json
+    phone = data.get('phone_number')
+    client_id = data.get('client_id')
+
+    if not phone or not client_id:
+        return jsonify({"error": "Missing phone_number or client_id"}), 400
+
+    db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
+    app_config = db.get_app_by_client_id(client_id)
+    if not app_config:
+        return jsonify({"error": "Invalid client_id"}), 401
+
+    app_name = app_config.get('app_name', 'Bifrost Identity')
+    code, verification_id = db.create_otp(phone, channel="sms")
+
+    if send_otp_sms(to_phone=phone, otp=code, app_name=app_name):
+        return jsonify({
+            "message": "SMS OTP sent successfully",
+            "verification_id": verification_id
+        })
+    else:
+        return jsonify({"error": "Failed to send SMS. Check server logs."}), 500
+
+
+@auth_api_bp.route('/verify-phone-otp', methods=['POST'])
+def verify_phone_otp():
+    """
+    Verifies the phone OTP and returns a signed proof token.
+    Payload: { "verification_id": "...", "code": "123456" }
+    """
+    data = request.json
+    verification_id = data.get('verification_id')
+    code = data.get('code')
+
+    if not verification_id or not code:
+        return jsonify({"error": "Missing verification_id or code"}), 400
+
+    db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
+
+    try:
+        oid = db.db.verification_codes.find_one({"_id": ObjectId(verification_id)})
+    except Exception:
+        return jsonify({"error": "Invalid verification ID format"}), 400
+
+    if not oid:
+        return jsonify({"error": "Invalid or expired verification session"}), 400
+
+    phone = oid['identifier']
+
+    if not db.verify_otp(verification_id=verification_id, code=code):
+        return jsonify({"error": "Invalid code"}), 401
+
+    proof_payload = {
+        "phone_number": phone,
+        "scope": "credential_change",
+        "verified": True,
+        "iss": "bifrost",
+        "exp": datetime.now(UTC_TZ).timestamp() + 300
+    }
+
+    proof_token = jwt.encode(
+        proof_payload,
+        current_app.config['JWT_SECRET_KEY'],
+        algorithm="HS256"
+    )
+
+    return jsonify({
+        "success": True,
+        "proof_token": proof_token,
+        "phone_number": phone
     })
 
 

@@ -19,7 +19,7 @@
         <div class="text-center mb-8">
             <div class="h-16 w-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-6">🔐</div>
             <h1 class="text-3xl font-extrabold text-slate-900">Enter Code</h1>
-            <p class="text-slate-500 mt-2">Check your email for a 6-digit code.</p>
+            <p class="text-slate-500 mt-2">{{ description or "Check your email for a 6-digit code." }}</p>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -32,7 +32,7 @@
         {% endif %}
         {% endwith %}
 
-        <form id="otpForm" action="{{ url_for('auth_ui.verify_otp', verification_id=verification_id, client_id=app.client_id) }}" method="POST" class="space-y-6">
+        <form id="otpForm" action="{{ action_url or url_for('auth_ui.verify_otp', verification_id=verification_id, client_id=app.client_id) }}" method="POST" class="space-y-6">
             <input type="text" name="otp" maxlength="6" required placeholder="000000" autofocus
                    class="w-full text-center text-4xl tracking-[0.5em] font-black py-5 bg-white/50 border-2 border-slate-100 rounded-2xl focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 outline-none transition-all">
 
@@ -42,7 +42,7 @@
         </form>
 
         <div class="text-center mt-6">
-            <a href="{{ url_for('auth_ui.forgot_password', client_id=app.client_id) }}" class="text-xs font-bold text-slate-400 hover:text-indigo-600 uppercase tracking-wider">
+            <a href="{{ resend_url or url_for('auth_ui.forgot_password', client_id=app.client_id) }}" class="text-xs font-bold text-slate-400 hover:text-indigo-600 uppercase tracking-wider">
                 Resend Code
             </a>
         </div>

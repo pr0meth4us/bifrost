@@ -143,6 +143,10 @@ class AuthMixin:
     def find_account_by_telegram(self, telegram_id, client_id=None):
         return self.db.accounts.find_one({"telegram_id": str(telegram_id)})
 
+    def find_account_by_phone(self, phone):
+        if not phone: return None
+        return self.db.accounts.find_one({"phone_number": str(phone).strip()})
+
     def find_account_by_sso(self, provider, provider_id):
         if not provider or not provider_id: return None
         return self.db.accounts.find_one({
