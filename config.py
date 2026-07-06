@@ -37,6 +37,12 @@ class Config:
     GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
     GITHUB_CLIENT_ID = os.environ.get('GITHUB_CLIENT_ID')
     GITHUB_CLIENT_SECRET = os.environ.get('GITHUB_CLIENT_SECRET')
+    MICROSOFT_CLIENT_ID = os.environ.get('MICROSOFT_CLIENT_ID')
+    MICROSOFT_CLIENT_SECRET = os.environ.get('MICROSOFT_CLIENT_SECRET')
+    APPLE_CLIENT_ID = os.environ.get('APPLE_CLIENT_ID')
+    APPLE_CLIENT_SECRET = os.environ.get('APPLE_CLIENT_SECRET')
+    FACEBOOK_CLIENT_ID = os.environ.get('FACEBOOK_CLIENT_ID')
+    FACEBOOK_CLIENT_SECRET = os.environ.get('FACEBOOK_CLIENT_SECRET')
 
     if not SECRET_KEY or not MONGO_URI or not JWT_SECRET_KEY or not EMAIL_PASSWORD:
         raise RuntimeError("CRITICAL: Missing .env keys (EMAIL_PASSWORD, SECRET_KEY, etc.)")

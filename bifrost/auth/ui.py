@@ -62,7 +62,14 @@ def login():
         else:
             flash("Invalid email or password", "danger")
 
-    return render_template('auth/login.html', app=app_config)
+    sso_providers = {
+        "google": bool(current_app.config.get('GOOGLE_CLIENT_ID')),
+        "github": bool(current_app.config.get('GITHUB_CLIENT_ID')),
+        "microsoft": bool(current_app.config.get('MICROSOFT_CLIENT_ID')),
+        "apple": bool(current_app.config.get('APPLE_CLIENT_ID')),
+        "facebook": bool(current_app.config.get('FACEBOOK_CLIENT_ID'))
+    }
+    return render_template('auth/login.html', app=app_config, sso_providers=sso_providers)
 
 
 @auth_ui_bp.route('/forgot-password', methods=['GET', 'POST'])
@@ -213,7 +220,6 @@ def sso_login(provider):
         google_id = current_app.config.get('GOOGLE_CLIENT_ID')
         if not google_id:
             return render_template('auth/error.html', error="Google SSO is not configured on this server")
-        
         params = {
             "client_id": google_id,
             "redirect_uri": redirect_uri,
@@ -228,7 +234,6 @@ def sso_login(provider):
         github_id = current_app.config.get('GITHUB_CLIENT_ID')
         if not github_id:
             return render_template('auth/error.html', error="GitHub SSO is not configured on this server")
-        
         params = {
             "client_id": github_id,
             "redirect_uri": redirect_uri,
@@ -238,16 +243,58 @@ def sso_login(provider):
         auth_url = f"https://github.com/login/oauth/authorize?{urllib.parse.urlencode(params)}"
         return redirect(auth_url)
 
+    elif provider == "microsoft":
+        ms_id = current_app.config.get('MICROSOFT_CLIENT_ID')
+        if not ms_id:
+            return render_template('auth/error.html', error="Microsoft SSO is not configured on this server")
+        params = {
+            "client_id": ms_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": "openid email profile User.Read",
+            "state": client_id
+        }
+        auth_url = f"https://login.microsoftonline.com/common/oauth2/v2.0/authorize?{urllib.parse.urlencode(params)}"
+        return redirect(auth_url)
+
+    elif provider == "apple":
+        apple_id = current_app.config.get('APPLE_CLIENT_ID')
+        if not apple_id:
+            return render_template('auth/error.html', error="Apple SSO is not configured on this server")
+        params = {
+            "client_id": apple_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code id_token",
+            "response_mode": "form_post",
+            "scope": "name email",
+            "state": client_id
+        }
+        auth_url = f"https://appleid.apple.com/auth/authorize?{urllib.parse.urlencode(params)}"
+        return redirect(auth_url)
+
+    elif provider == "facebook":
+        fb_id = current_app.config.get('FACEBOOK_CLIENT_ID')
+        if not fb_id:
+            return render_template('auth/error.html', error="Facebook SSO is not configured on this server")
+        params = {
+            "client_id": fb_id,
+            "redirect_uri": redirect_uri,
+            "scope": "email public_profile",
+            "state": client_id
+        }
+        auth_url = f"https://www.facebook.com/v12.0/dialog/oauth?{urllib.parse.urlencode(params)}"
+        return redirect(auth_url)
+
     return render_template('auth/error.html', error=f"Unsupported SSO provider: {provider}")
 
 
-@auth_ui_bp.route('/sso/<provider>/callback')
+@auth_ui_bp.route('/sso/<provider>/callback', methods=['GET', 'POST'])
 def sso_callback(provider):
-    code = request.args.get('code')
-    if not code:
-        return render_template('auth/error.html', error="Auth code missing from SSO callback redirect")
-
-    client_id = session.get('sso_client_id') or request.args.get('state')
+    code = request.form.get('code') or request.args.get('code')
+    id_token = request.form.get('id_token')
+    
+    state = request.form.get('state') or request.args.get('state')
+    client_id = session.get('sso_client_id') or state
     if not client_id:
         return render_template('auth/error.html', error="SSO login session expired. Please try again.")
 
@@ -309,6 +356,82 @@ def sso_callback(provider):
                 emails = email_res.json()
                 primary_email = next((e.get("email") for e in emails if e.get("primary")), None)
                 email = primary_email or (emails[0].get("email") if emails else None)
+
+        elif provider == "microsoft":
+            res = requests.post("https://login.microsoftonline.com/common/oauth2/v2.0/token", data={
+                "code": code,
+                "client_id": current_app.config['MICROSOFT_CLIENT_ID'],
+                "client_secret": current_app.config['MICROSOFT_CLIENT_SECRET'],
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code"
+            }, timeout=10)
+            res.raise_for_status()
+            tokens = res.json()
+            access_token = tokens.get("access_token")
+
+            profile_res = requests.get("https://graph.microsoft.com/v1.0/me", headers={
+                "Authorization": f"Bearer {access_token}"
+            }, timeout=10)
+            profile_res.raise_for_status()
+            profile = profile_res.json()
+            email = profile.get("mail") or profile.get("userPrincipalName")
+            display_name = profile.get("displayName", email.split('@')[0] if email else "Microsoft User")
+            provider_id = str(profile.get("id"))
+
+        elif provider == "apple":
+            if id_token:
+                decoded = jwt.decode(id_token, options={"verify_signature": False})
+                email = decoded.get("email")
+                provider_id = str(decoded.get("sub"))
+                
+                user_payload = request.form.get('user')
+                if user_payload:
+                    try:
+                        user_info = json.loads(user_payload)
+                        name_info = user_info.get("name", {})
+                        first = name_info.get("firstName", "")
+                        last = name_info.get("lastName", "")
+                        display_name = f"{first} {last}".strip() or "Apple User"
+                    except Exception:
+                        pass
+                if not display_name or display_name == "SSO User":
+                    display_name = email.split('@')[0] if email else "Apple User"
+            else:
+                res = requests.post("https://appleid.apple.com/auth/token", data={
+                    "code": code,
+                    "client_id": current_app.config['APPLE_CLIENT_ID'],
+                    "client_secret": current_app.config['APPLE_CLIENT_SECRET'],
+                    "redirect_uri": redirect_uri,
+                    "grant_type": "authorization_code"
+                }, timeout=10)
+                res.raise_for_status()
+                tokens = res.json()
+                id_token = tokens.get("id_token")
+                decoded = jwt.decode(id_token, options={"verify_signature": False})
+                email = decoded.get("email")
+                provider_id = str(decoded.get("sub"))
+                display_name = email.split('@')[0] if email else "Apple User"
+
+        elif provider == "facebook":
+            res = requests.get("https://graph.facebook.com/v12.0/oauth/access_token", params={
+                "code": code,
+                "client_id": current_app.config['FACEBOOK_CLIENT_ID'],
+                "client_secret": current_app.config['FACEBOOK_CLIENT_SECRET'],
+                "redirect_uri": redirect_uri
+            }, timeout=10)
+            res.raise_for_status()
+            tokens = res.json()
+            access_token = tokens.get("access_token")
+
+            profile_res = requests.get("https://graph.facebook.com/me", params={
+                "fields": "id,name,email",
+                "access_token": access_token
+            }, timeout=10)
+            profile_res.raise_for_status()
+            profile = profile_res.json()
+            email = profile.get("email")
+            display_name = profile.get("name", "Facebook User")
+            provider_id = str(profile.get("id"))
 
     except Exception as e:
         return render_template('auth/error.html', error=f"SSO Handshake failed: {str(e)}")

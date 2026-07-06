@@ -79,6 +79,7 @@
                     }
                 }
             </script>
+            {% if sso_providers and sso_providers.values()|select|list|length > 0 %}
             <div class="relative flex py-4 items-center">
                 <div class="flex-grow border-t border-slate-200"></div>
                 <span class="flex-shrink mx-4 text-slate-400 text-xs font-bold uppercase tracking-wider">Or continue with</span>
@@ -86,6 +87,7 @@
             </div>
 
             <div class="grid grid-cols-2 gap-4">
+                {% if sso_providers.google %}
                 <a href="{{ url_for('auth_ui.sso_login', provider='google', client_id=app.client_id) }}" 
                    class="flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all font-bold text-slate-700 text-sm">
                     <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -93,6 +95,9 @@
                     </svg>
                     Google
                 </a>
+                {% endif %}
+
+                {% if sso_providers.github %}
                 <a href="{{ url_for('auth_ui.sso_login', provider='github', client_id=app.client_id) }}" 
                    class="flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all font-bold text-slate-700 text-sm">
                     <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -100,7 +105,42 @@
                     </svg>
                     GitHub
                 </a>
+                {% endif %}
+
+                {% if sso_providers.microsoft %}
+                <a href="{{ url_for('auth_ui.sso_login', provider='microsoft', client_id=app.client_id) }}" 
+                   class="flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all font-bold text-slate-700 text-sm">
+                    <svg class="h-5 w-5" viewBox="0 0 23 23">
+                        <path fill="#f35325" d="M0 0h11v11H0z"/>
+                        <path fill="#81bc06" d="M12 0h11v11H12z"/>
+                        <path fill="#05a6f0" d="M0 12h11v11H0z"/>
+                        <path fill="#ffba08" d="M12 12h11v11H12z"/>
+                    </svg>
+                    Microsoft
+                </a>
+                {% endif %}
+
+                {% if sso_providers.apple %}
+                <a href="{{ url_for('auth_ui.sso_login', provider='apple', client_id=app.client_id) }}" 
+                   class="flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all font-bold text-slate-700 text-sm">
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-1 .04-2.22.67-2.94 1.51-.62.71-1.16 1.85-1.01 2.96 1.1.09 2.24-.57 2.96-1.41z"/>
+                    </svg>
+                    Apple
+                </a>
+                {% endif %}
+
+                {% if sso_providers.facebook %}
+                <a href="{{ url_for('auth_ui.sso_login', provider='facebook', client_id=app.client_id) }}" 
+                   class="flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all font-bold text-slate-700 text-sm">
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c4.56-.93 8-4.96 8-9.75z"/>
+                    </svg>
+                    Facebook
+                </a>
+                {% endif %}
             </div>
+            {% endif %}
         </form>
     </div>
     <p class="text-center text-slate-400 text-xs mt-8">Secured by <strong>Bifrost Identity</strong></p>
