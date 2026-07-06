@@ -11,7 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Phone OTP SMS Authentication**: Built a dedicated SMS dispatch service (`services/sms_service.py`) leveraging the Twilio HTTP API (with local stdout sandbox fallback). Implemented headless REST API endpoints (`/request-phone-otp` & `/verify-phone-otp`) and Flask UI routes (`/request-phone-otp` & `/verify-phone-otp`) with automatic user provisioning and a togglable Phone tab on the login screen.
 - **Heimdall Vision OCR Metrics**: The Heimdall AI Metrics dashboard now queries and displays usage and cost metrics for Google Cloud Vision API (`vision.googleapis.com`) under the model name `vision-ocr-pages`.
 - **Heimdall Billing Breakdown Table**: Enhanced the dashboard interface (`ai_metrics.html`) to display a detailed tabular breakdown of individual GCP service costs, applied credits, and net costs.
-- **Database Maintenance**: Added a utility script `scripts/purge_app_keys.py` to strip unauthorized GCP/AI credentials from the database for Bifrost Payment Bot and Random Project.
+- **Bifrost Console Branding**: Refined backoffice titles and templates to standardize management dashboard naming to "Bifrost Console" for tenant and admin screens.
+- **Bifrost Integration Sandbox**: Built an interactive mock client app (`sandbox/app.py`) using Flask to demonstrate integration flows. Showcases session authorization redirection, token callback parsing, local JWT claims decoding, multi-provider SSO/SMS OTP routing, and live SDK vault key loading diagnostics.
 
 ## [0.13.0] - 2026-06-15
 

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bifrost Integration Sandbox</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: radial-gradient(circle at 10% 20%, rgb(242, 235, 243) 0%, rgb(228, 237, 246) 90.1%); }
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.3); }
+    </style>
+</head>
+<body class="min-h-screen py-12 px-6 flex flex-col items-center justify-center">
+
+    <div class="w-full max-w-4xl space-y-8">
+        
+        <!-- Header -->
+        <div class="text-center">
+            <div class="h-16 w-16 bg-gradient-to-tr from-indigo-500 to-fuchsia-500 rounded-3xl flex items-center justify-center text-white text-3xl font-extrabold mx-auto mb-6 shadow-xl shadow-indigo-100">🛟</div>
+            <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">Bifrost Integration Sandbox</h1>
+            <p class="text-slate-500 mt-2 text-lg">A working mockup client demonstrating multi-provider SSO and SDK vault operations.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            
+            <!-- Auth card -->
+            <div class="md:col-span-1 flex flex-col">
+                <div class="glass rounded-[2rem] p-8 shadow-xl flex-grow flex flex-col justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800 mb-4">Authentication</h2>
+                        
+                        {% if user %}
+                        <div class="space-y-4">
+                            <div class="flex items-center gap-4">
+                                <div class="h-12 w-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-xl font-bold">
+                                    {{ user.name[0]|upper }}
+                                </div>
+                                <div>
+                                    <h3 class="font-extrabold text-slate-950">{{ user.name }}</h3>
+                                    <span class="text-xs font-bold text-indigo-600 uppercase tracking-widest">{{ user.role }}</span>
+                                </div>
+                            </div>
+                            <div class="border-t border-slate-200/50 pt-4 space-y-2">
+                                <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">Email</p>
+                                <p class="text-sm font-semibold text-slate-700 break-all">{{ user.email }}</p>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-6">
+                            <p class="text-slate-400 text-sm mb-6">No session detected. Sign in using the centralized Bifrost Identity provider.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mt-8">
+                        {% if user %}
+                        <a href="{{ url_for('logout') }}" class="block w-full py-4 text-center bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl shadow-lg transition-all transform active:scale-95 text-sm">
+                            Sign Out
+                        </a>
+                        {% else %}
+                        <a href="{{ url_for('login') }}" class="block w-full py-4 text-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-lg shadow-indigo-100 transition-all transform active:scale-95 text-sm">
+                            Log In via Bifrost
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Diagnostics & Integration Details -->
+            <div class="md:col-span-2 space-y-8">
+                
+                <!-- SDK Diagnostic -->
+                <div class="glass rounded-[2rem] p-8 shadow-xl">
+                    <h2 class="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                        <span class="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Bifrost SDK Diagnostics
+                    </h2>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-200">
+                                    <th class="py-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Secret / Config Key</th>
+                                    <th class="py-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Status / Value</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {% for key, val in diagnostics.items() %}
+                                <tr>
+                                    <td class="py-4 font-mono text-xs font-bold text-slate-500">{{ key }}</td>
+                                    <td class="py-4">
+                                        <span class="text-xs font-extrabold px-3 py-1.5 rounded-lg 
+                                            {% if 'Missing' in val or 'NOT' in val %}bg-red-50 text-red-600 border border-red-100
+                                            {% elif 'Loaded' in val %}bg-emerald-50 text-emerald-600 border border-emerald-100
+                                            {% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %}">
+                                            {{ val }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Developer Guide -->
+                <div class="glass rounded-[2rem] p-8 shadow-xl">
+                    <h2 class="text-lg font-bold text-slate-800 mb-4">Integration Reference Code</h2>
+                    <p class="text-slate-500 text-sm mb-6">Client applications can perform authentication callbacks with just a few lines of Python using standard JWT validation:</p>
+                    
+                    <pre class="bg-slate-900 rounded-2xl p-6 font-mono text-xs text-slate-300 overflow-x-auto">
+<span class="text-indigo-400">import</span> jwt
+
+<span class="text-emerald-400"># Verify the token returned on redirect callback</span>
+<span class="text-indigo-400">try</span>:
+    payload = jwt.decode(
+        token, 
+        JWT_SECRET_KEY, 
+        algorithms=[<span class="text-fuchsia-400">"HS256"</span>], 
+        audience=CLIENT_ID
+    )
+    user_email = payload.get(<span class="text-fuchsia-400">"email"</span>)
+    user_name = payload.get(<span class="text-fuchsia-400">"name"</span>)
+<span class="text-indigo-400">except</span> jwt.InvalidTokenError:
+    print(<span class="text-red-400">"Signature verification failed!"</span>)</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
