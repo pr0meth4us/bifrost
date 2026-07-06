@@ -11,6 +11,7 @@ from .. import mongo
 from ..models import BifrostDB
 from ..services.email_service import send_otp_email
 from ..services.sms_service import send_otp_sms
+from ..utils.token import create_client_jwt
 from ..utils.telegram import verify_telegram_data
 
 auth_api_bp = Blueprint('auth_api', __name__, url_prefix='/auth/api')
@@ -282,15 +283,8 @@ def complete_registration():
     db.link_user_to_app(user_id, app_config['_id'])
 
     # 5. Issue App JWT
-    token_payload = {
-        "sub": str(user_id),
-        "iss": "bifrost",
-        "aud": client_id,
-        "iat": datetime.now(UTC_TZ),
-        "exp": datetime.now(UTC_TZ).timestamp() + 3600 * 24 * 7 # 7 Days
-    }
-
-    encoded_jwt = jwt.encode(token_payload, current_app.config['JWT_SECRET_KEY'], algorithm="HS256")
+    user_obj = {"_id": user_id, "display_name": display_name or email, "email": email}
+    encoded_jwt = create_client_jwt(user_obj, client_id, db, app_config)
 
     return jsonify({
         "success": True,
@@ -377,15 +371,7 @@ def login():
     role = db.get_user_role_for_app(user['_id'], app_config['_id']) or "user"
 
     # Issue JWT
-    token_payload = {
-        "sub": str(user['_id']),
-        "iss": "bifrost",
-        "aud": client_id,
-        "iat": datetime.now(UTC_TZ),
-        "exp": datetime.now(UTC_TZ).timestamp() + 3600 * 24 * 7
-    }
-
-    encoded_jwt = jwt.encode(token_payload, current_app.config['JWT_SECRET_KEY'], algorithm="HS256")
+    encoded_jwt = create_client_jwt(user, client_id, db, app_config)
 
     return jsonify({
         "jwt": encoded_jwt,
@@ -439,15 +425,12 @@ def verify_otp_login():
     db.link_user_to_app(user_id, app_config['_id'])
     role = db.get_user_role_for_app(user_id, app_config['_id']) or "user"
 
-    token_payload = {
-        "sub": str(user_id),
-        "iss": "bifrost",
-        "aud": client_id,
-        "iat": datetime.now(UTC_TZ),
-        "exp": datetime.now(UTC_TZ).timestamp() + 3600 * 24 * 7
+    user_obj = {
+        "_id": user_id,
+        "display_name": "Telegram User" if not user else user.get('display_name'),
+        "email": "" if not user else user.get('email', '')
     }
-
-    encoded_jwt = jwt.encode(token_payload, current_app.config['JWT_SECRET_KEY'], algorithm="HS256")
+    encoded_jwt = create_client_jwt(user_obj, client_id, db, app_config)
 
     return jsonify({
         "jwt": encoded_jwt,
@@ -502,15 +485,12 @@ def telegram_login():
     db.link_user_to_app(user_id, app_config['_id'])
     role = db.get_user_role_for_app(user_id, app_config['_id']) or "user"
 
-    token_payload = {
-        "sub": str(user_id),
-        "iss": "bifrost",
-        "aud": client_id,
-        "iat": datetime.now(UTC_TZ),
-        "exp": datetime.now(UTC_TZ).timestamp() + 3600 * 24 * 7
+    user_obj = {
+        "_id": user_id,
+        "display_name": user.get('display_name') if user else tg_data.get('first_name', 'Unknown'),
+        "email": "" if not user else user.get('email', '')
     }
-
-    encoded_jwt = jwt.encode(token_payload, current_app.config['JWT_SECRET_KEY'], algorithm="HS256")
+    encoded_jwt = create_client_jwt(user_obj, client_id, db, app_config)
 
     return jsonify({
         "jwt": encoded_jwt,
