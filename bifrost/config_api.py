@@ -25,6 +25,9 @@ def get_config():
     if not app:
         return jsonify({"error": "Application not found"}), 404
 
+    if not app.get("enabled_services", {}).get("secrets_vault", True):
+        return jsonify({"error": "Secrets Vault Service is disabled for this application"}), 403
+
     # The webhook_secret acts as the master decryption key for the client.
     # We verify it here to ensure only the authorized client can download its config.
     if app.get("webhook_secret") != webhook_secret:
@@ -66,6 +69,9 @@ def bulk_upload_config():
 
     if not app:
         return jsonify({"error": "Application not found"}), 404
+
+    if not app.get("enabled_services", {}).get("secrets_vault", True):
+        return jsonify({"error": "Secrets Vault Service is disabled for this application"}), 403
 
     if app.get("webhook_secret") != webhook_secret:
         return jsonify({"error": "Invalid webhook secret"}), 403

@@ -535,6 +535,8 @@ def telegram_webhook(client_id=None):
         db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
         app_config = db.get_app_by_client_id(client_id)
         if app_config:
+            if not app_config.get("enabled_services", {}).get("payment_bot", True):
+                return "Payment Bot Service is disabled for this application", 403
             bot_token = app_config.get("telegram_bot_token") or app_config.get("api_keys", {}).get("TELEGRAM_BOT_TOKEN")
 
     # We must run the async bot logic in a sync Flask context
