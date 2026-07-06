@@ -9,6 +9,7 @@ from .. import mongo
 from ..models import BifrostDB
 from ..services.email_service import send_otp_email
 from ..services.sms_service import send_otp_sms
+from ..utils.token import create_client_jwt
 
 auth_ui_bp = Blueprint('auth_ui', __name__, url_prefix='/auth/ui')
 UTC = ZoneInfo("UTC")
@@ -18,23 +19,9 @@ def get_app_config(client_id):
     db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
     return db, db.get_app_by_client_id(client_id)
 
-def create_session_token(user, client_id):
+def create_session_token(user, client_id, db, app_config):
     """Helper to generate the JWT for the client app."""
-    token_payload = {
-        "sub": str(user['_id']),
-        "iss": "bifrost",
-        "aud": client_id,
-        "iat": datetime.datetime.now(UTC),
-        "exp": datetime.datetime.now(UTC) + datetime.timedelta(days=7),
-        "email": user.get('email'),
-        "name": user.get('display_name'),
-        "role": "user"
-    }
-    return jwt.encode(
-        token_payload,
-        current_app.config['JWT_SECRET_KEY'],
-        algorithm="HS256"
-    )
+    return create_client_jwt(user, client_id, db, app_config)
 
 @auth_ui_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -56,7 +43,7 @@ def login():
 
         if user and user.get('password_hash') and check_password_hash(user['password_hash'], password):
             db.link_user_to_app(user['_id'], app_config['_id'])
-            token = create_session_token(user, client_id)
+            token = create_session_token(user, client_id, db, app_config)
             callback_url = app_config.get('app_callback_url')
             separator = '&' if '?' in callback_url else '?'
             return redirect(f"{callback_url}{separator}token={token}")
@@ -195,7 +182,7 @@ def set_password():
                 db.link_user_to_app(user['_id'], app_config['_id'])
 
                 # Log them in automatically
-                token = create_session_token(user, client_id)
+                token = create_session_token(user, client_id, db, app_config)
                 callback_url = app_config.get('app_callback_url')
                 separator = '&' if '?' in callback_url else '?'
                 flash("Account activated! Welcome.", "success")
@@ -473,7 +460,7 @@ def sso_callback(provider):
             user = db.find_account_by_id(new_id)
 
     db.link_user_to_app(user['_id'], app_config['_id'])
-    token = create_session_token(user, client_id)
+    token = create_session_token(user, client_id, db, app_config)
     callback_url = app_config.get('app_callback_url')
     separator = '&' if '?' in callback_url else '?'
     return redirect(f"{callback_url}{separator}token={token}")
@@ -542,7 +529,7 @@ def verify_phone_otp_ui():
                 user = db.find_account_by_id(new_id)
 
             db.link_user_to_app(user['_id'], app_config['_id'])
-            token = create_session_token(user, client_id)
+            token = create_session_token(user, client_id, db, app_config)
             callback_url = app_config.get('app_callback_url')
             separator = '&' if '?' in callback_url else '?'
             return redirect(f"{callback_url}{separator}token={token}")
