@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 - **Unified Python Client SDK**: Created the canonical `bifrost_client.py` client SDK under `sdk/python/` to allow downstream Python applications to pull secrets, inject environment variables, and manage local config caching dynamically.
 - **Heimdall Vision OCR Metrics**: The Heimdall AI Metrics dashboard now queries and displays usage and cost metrics for Google Cloud Vision API (`vision.googleapis.com`) under the model name `vision-ocr-pages`.
+- **Database Maintenance**: Added a utility script `scripts/purge_app_keys.py` to strip unauthorized GCP/AI credentials from the database for Bifrost Payment Bot and Random Project.
 
 ## [0.13.0] - 2026-06-15
 
