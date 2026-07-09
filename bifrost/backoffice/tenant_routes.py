@@ -220,3 +220,111 @@ def api_notify_new_payment(app_id):
         return {"status": "success", "alert_sent": sent}, 200
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
+
+@backoffice_bp.route('/app/<app_id>/cms')
+@login_required
+def view_cms_grid(app_id):
+    db = get_db()
+    if not check_permission(app_id, "read:config"):
+        flash("Unauthorized.", "danger")
+        return redirect(url_for('backoffice.dashboard'))
+        
+    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
+    if not app:
+        flash("Application not found.", "danger")
+        return redirect(url_for('backoffice.dashboard'))
+        
+    db_conn_str = get_tenant_db_conn_str(app)
+    if not db_conn_str:
+        flash("Tenant DB connection not configured.", "warning")
+        return redirect(url_for('backoffice.view_app', app_id=app_id))
+        
+    try:
+        tables = db.get_tenant_tables(db_conn_str)
+        selected_table = request.args.get('table', 'questions')
+        if selected_table not in tables and tables:
+            selected_table = tables[0]
+            
+        columns = []
+        rows = []
+        if selected_table in tables:
+            columns, rows = db.get_tenant_table_data(db_conn_str, selected_table)
+    except Exception as e:
+        flash(f"Error loading tenant schema: {e}", "danger")
+        tables = []
+        selected_table = None
+        columns = []
+        rows = []
+        
+    current_role = get_current_role_in_app(app_id)
+    return render_template(
+        'backoffice/content_grid.html',
+        app=app,
+        tables=tables,
+        selected_table=selected_table,
+        columns=columns,
+        rows=rows,
+        current_role=current_role
+    )
+
+@backoffice_bp.route('/app/<app_id>/cms/<table_name>/save/<row_id>', methods=['POST'])
+@login_required
+def save_cms_row(app_id, table_name, row_id):
+    db = get_db()
+    if not check_permission(app_id, "write:config"):
+        flash("Unauthorized.", "danger")
+        return redirect(url_for('backoffice.view_app', app_id=app_id))
+        
+    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
+    db_conn_str = get_tenant_db_conn_str(app)
+    
+    # Exclude internal form variables
+    data = {k: v for k, v in request.form.items() if k not in ('csrf_token', '_method')}
+    
+    try:
+        db.save_tenant_table_row(db_conn_str, table_name, int(row_id), data)
+        flash("Row updated successfully.", "success")
+    except Exception as e:
+        flash(f"Update failed: {e}", "danger")
+        
+    return redirect(url_for('backoffice.view_cms_grid', app_id=app_id, table=table_name))
+
+@backoffice_bp.route('/app/<app_id>/cms/<table_name>/create', methods=['POST'])
+@login_required
+def create_cms_row(app_id, table_name):
+    db = get_db()
+    if not check_permission(app_id, "write:config"):
+        flash("Unauthorized.", "danger")
+        return redirect(url_for('backoffice.view_app', app_id=app_id))
+        
+    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
+    db_conn_str = get_tenant_db_conn_str(app)
+    
+    data = {k: v for k, v in request.form.items() if k not in ('csrf_token', '_method')}
+    
+    try:
+        db.insert_tenant_table_row(db_conn_str, table_name, data)
+        flash("Row inserted successfully.", "success")
+    except Exception as e:
+        flash(f"Insertion failed: {e}", "danger")
+        
+    return redirect(url_for('backoffice.view_cms_grid', app_id=app_id, table=table_name))
+
+@backoffice_bp.route('/app/<app_id>/cms/<table_name>/delete/<row_id>', methods=['POST'])
+@login_required
+def delete_cms_row(app_id, table_name, row_id):
+    db = get_db()
+    if not check_permission(app_id, "write:config"):
+        flash("Unauthorized.", "danger")
+        return redirect(url_for('backoffice.view_app', app_id=app_id))
+        
+    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
+    db_conn_str = get_tenant_db_conn_str(app)
+    
+    try:
+        db.delete_tenant_table_row(db_conn_str, table_name, int(row_id))
+        flash("Row deleted.", "warning")
+    except Exception as e:
+        flash(f"Deletion failed: {e}", "danger")
+        
+    return redirect(url_for('backoffice.view_cms_grid', app_id=app_id, table=table_name))

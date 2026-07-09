@@ -394,3 +394,93 @@ class PaymentMixin:
                     cur.execute("UPDATE users SET status = 'active' WHERE id = %s", [user_id])
                 conn.commit()
         return True
+
+    def get_tenant_tables(self, db_conn_str):
+        """Fetches the list of tables in the tenant's PostgreSQL database public schema."""
+        from bifrost.utils.tenant_db import get_tenant_db
+        sql = "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'"
+        with get_tenant_db(db_conn_str) as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql)
+                return [row[0] for row in cur.fetchall()]
+
+    def get_tenant_table_data(self, db_conn_str, table_name):
+        """Fetches all rows and columns for a target table."""
+        from bifrost.utils.tenant_db import get_tenant_db
+        from decimal import Decimal
+        # Defensive check on table_name to avoid SQL injection
+        assert table_name.isalnum() or '_' in table_name
+        
+        sql = f"SELECT * FROM {table_name} ORDER BY id ASC"
+        with get_tenant_db(db_conn_str) as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql)
+                columns = [desc[0] for desc in cur.description]
+                results = []
+                for row in cur.fetchall():
+                    d = dict(zip(columns, row))
+                    for k, v in d.items():
+                        if isinstance(v, Decimal):
+                            d[k] = float(v)
+                        elif isinstance(v, datetime):
+                            d[k] = v.isoformat()
+                    results.append(d)
+                return columns, results
+
+    def save_tenant_table_row(self, db_conn_str, table_name, row_id, data):
+        """Updates a row in the tenant database public schema."""
+        from bifrost.utils.tenant_db import get_tenant_db
+        assert table_name.isalnum() or '_' in table_name
+        
+        # Build dynamic query safely
+        fields = []
+        params = []
+        for k, v in data.items():
+            if k == 'id':
+                continue
+            fields.append(f"{k} = %s")
+            params.append(v)
+            
+        params.append(row_id)
+        sql = f"UPDATE {table_name} SET {', '.join(fields)} WHERE id = %s"
+        
+        with get_tenant_db(db_conn_str) as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                conn.commit()
+        return True
+
+    def insert_tenant_table_row(self, db_conn_str, table_name, data):
+        """Inserts a new row in the tenant database public schema."""
+        from bifrost.utils.tenant_db import get_tenant_db
+        assert table_name.isalnum() or '_' in table_name
+        
+        cols = []
+        placeholders = []
+        params = []
+        for k, v in data.items():
+            if k == 'id':
+                continue
+            cols.append(k)
+            placeholders.append("%s")
+            params.append(v)
+            
+        sql = f"INSERT INTO {table_name} ({', '.join(cols)}) VALUES ({', '.join(placeholders)})"
+        
+        with get_tenant_db(db_conn_str) as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                conn.commit()
+        return True
+
+    def delete_tenant_table_row(self, db_conn_str, table_name, row_id):
+        """Deletes a row from the tenant database public schema."""
+        from bifrost.utils.tenant_db import get_tenant_db
+        assert table_name.isalnum() or '_' in table_name
+        
+        sql = f"DELETE FROM {table_name} WHERE id = %s"
+        with get_tenant_db(db_conn_str) as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, [row_id])
+                conn.commit()
+        return True
