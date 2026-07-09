@@ -156,8 +156,33 @@ def create_app(config_class):
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         start_scheduler(app)
 
+    @app.before_request
+    def resolve_custom_domain():
+        host = request.headers.get("Host")
+        if not host:
+            return
+        
+        host_clean = host.split(':')[0]
+        main_domain = os.getenv("BIFROST_MAIN_DOMAIN", "localhost")
+        if host_clean in ("localhost", "127.0.0.1", main_domain):
+            return
+            
+        try:
+            db_name = current_app.config.get('DB_NAME', 'bifrost_db')
+            db = mongo.cx[db_name]
+            tenant_app = db.applications.find_one({"custom_domain": host_clean})
+            if tenant_app:
+                from flask import g
+                g.tenant_app_id = str(tenant_app["_id"])
+                g.tenant_app = tenant_app
+        except Exception as e:
+            logging.error(f"Error resolving custom domain: {e}")
+
     @app.route('/')
     def index():
+        from flask import g, redirect, url_for
+        if hasattr(g, 'tenant_app_id'):
+            return redirect(url_for('backoffice.view_app', app_id=g.tenant_app_id))
         try:
             db_name = current_app.config.get('DB_NAME', 'bifrost_db')
             db = mongo.cx[db_name]

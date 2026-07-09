@@ -17,3 +17,4 @@ redis
 cryptography
 google-cloud-monitoring
 google-cloud-bigquery
+psycopg2-binary~=2.9.9

@@ -91,4 +91,4 @@ def heimdall_required(f):
             return redirect(url_for('backoffice.dashboard'))
         return f(*args, **kwargs)
     return decorated_function
-from . import auth_routes, app_routes, heimdall_routes, user_routes
+from . import auth_routes, app_routes, heimdall_routes, user_routes, tenant_routes
