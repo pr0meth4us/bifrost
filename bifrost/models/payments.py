@@ -227,6 +227,7 @@ class PaymentMixin:
     def get_manual_payments(self, db_conn_str, status_filter=None):
         """Fetches manual payments from the tenant's PostgreSQL database."""
         from bifrost.utils.tenant_db import get_tenant_db
+        from decimal import Decimal
         sql = """
         SELECT p.id, p.user_id, p.amount, p.txn_ref, p.receipt_url, p.status, p.reviewed_at, u.email
         FROM payments p
@@ -242,11 +243,19 @@ class PaymentMixin:
             with conn.cursor() as cur:
                 cur.execute(sql, params)
                 columns = [desc[0] for desc in cur.description]
-                return [dict(zip(columns, row)) for row in cur.fetchall()]
+                results = []
+                for row in cur.fetchall():
+                    d = dict(zip(columns, row))
+                    for k, v in d.items():
+                        if isinstance(v, Decimal):
+                            d[k] = float(v)
+                    results.append(d)
+                return results
 
     def get_manual_payment_by_id(self, db_conn_str, payment_id):
         """Fetches a single manual payment from the tenant's PostgreSQL database."""
         from bifrost.utils.tenant_db import get_tenant_db
+        from decimal import Decimal
         sql = """
         SELECT p.id, p.user_id, p.amount, p.txn_ref, p.receipt_url, p.status, p.reviewed_at, u.email
         FROM payments p
@@ -259,7 +268,11 @@ class PaymentMixin:
                 row = cur.fetchone()
                 if row:
                     columns = [desc[0] for desc in cur.description]
-                    return dict(zip(columns, row))
+                    d = dict(zip(columns, row))
+                    for k, v in d.items():
+                        if isinstance(v, Decimal):
+                            d[k] = float(v)
+                    return d
                 return None
 
     def approve_manual_payment(self, db_conn_str, payment_id, track_id, reviewer_id):

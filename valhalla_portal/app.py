@@ -17,7 +17,7 @@ app = Flask(__name__)
 app.secret_key = bifrost_client.get_config("SECRET_KEY", "valhalla_portal_fallback_secret_key_123")
 
 BIFROST_URL = bifrost_client.get_config("BIFROST_URL", "http://localhost:5001")
-CLIENT_ID = bifrost_client.get_config("BIFROST_CLIENT_ID", "edcore_1d1887d2")
+CLIENT_ID = bifrost_client.get_config("BIFROST_CLIENT_ID", "valhalla_portal")
 JWT_SECRET_KEY = bifrost_client.get_config("JWT_SECRET_KEY", "f5a6e2c570d9fd7864d0d6631c363da230232adb87fa1f057f560894038cbed7")
 
 @app.route('/')
