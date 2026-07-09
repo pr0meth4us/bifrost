@@ -1,211 +1,754 @@
-<!-- bifrost/templates/backoffice/content_grid.html -->
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CMS Grid Editor | {{ app.app_name }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Kantumruy+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0b0f19; }
-        .glass { background: rgba(17, 24, 39, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
-        .khmer-font { font-family: 'Kantumruy Pro', 'Noto Sans Khmer', sans-serif; line-height: 1.8; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Content Editor · {{ app.app_name }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ─── Tokens ─────────────────────────────────────────────── */
+  :root {
+    --ink:    #1d1d1f;
+    --sub:    #6e6e73;
+    --hair:   #d2d2d7;
+    --bg:     #ffffff;
+    --bg2:    #f5f5f7;
+    --accent: #0071e3;
+    --good:   #1d7a3c;
+    --warn:   #b25000;
+    --bad:    #c22222;
+    --sidebar-w: 220px;
+    --nav-h: 48px;
+  }
+  [data-theme="dark"] {
+    --ink:    #f5f5f7;
+    --sub:    #98989d;
+    --hair:   #3a3a3c;
+    --bg:     #1c1c1e;
+    --bg2:    #2c2c2e;
+    --accent: #2997ff;
+    --good:   #30d158;
+    --warn:   #ff9f0a;
+    --bad:    #ff453a;
+  }
+
+  /* ─── Reset / Base ───────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body {
+    font-family: -apple-system, "Helvetica Neue", "Kantumruy Pro", Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    background: var(--bg2);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ─── Top Nav ────────────────────────────────────────────── */
+  .topnav {
+    position: sticky; top: 0; z-index: 100;
+    height: var(--nav-h);
+    background: rgba(255,255,255,.82);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid var(--hair);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px;
+  }
+  [data-theme="dark"] .topnav {
+    background: rgba(28,28,30,.88);
+  }
+  .topnav-left { display: flex; align-items: center; gap: 14px; }
+  .topnav-brand { font-weight: 700; font-size: 14px; letter-spacing: -.01em; }
+  .topnav-sep { width: 1px; height: 18px; background: var(--hair); }
+  .topnav-app { font-size: 13px; color: var(--sub); }
+  .topnav-right { display: flex; align-items: center; gap: 10px; }
+
+  .btn-back {
+    font-size: 12px; font-weight: 600; color: var(--sub);
+    text-decoration: none; letter-spacing: -.005em;
+    transition: color .15s;
+  }
+  .btn-back:hover { color: var(--ink); }
+
+  /* Theme toggle */
+  .theme-btn {
+    width: 32px; height: 32px; border-radius: 8px;
+    border: 1px solid var(--hair);
+    background: var(--bg); color: var(--sub);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 14px; transition: background .15s, border-color .15s;
+  }
+  .theme-btn:hover { background: var(--bg2); }
+
+  .settings-link {
+    font-size: 11px; font-weight: 600; color: var(--sub);
+    text-decoration: none; text-transform: uppercase; letter-spacing: .06em;
+    padding: 5px 10px; border: 1px solid var(--hair);
+    border-radius: 6px; transition: all .15s;
+  }
+  .settings-link:hover { color: var(--accent); border-color: var(--accent); }
+
+  .role-badge {
+    font-size: 11px; font-weight: 600; color: var(--sub);
+    background: var(--bg2); border: 1px solid var(--hair);
+    border-radius: 99px; padding: 3px 10px;
+    text-transform: uppercase; letter-spacing: .06em;
+  }
+
+  /* ─── Shell ──────────────────────────────────────────────── */
+  .shell { display: flex; flex: 1; height: calc(100vh - var(--nav-h)); overflow: hidden; }
+
+  /* ─── Sidebar ────────────────────────────────────────────── */
+  .sidebar {
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+    background: var(--bg);
+    border-right: 1px solid var(--hair);
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+  }
+  .sidebar-header {
+    padding: 18px 16px 10px;
+    font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--sub);
+    border-bottom: 1px solid var(--hair);
+  }
+  .sidebar-group-label {
+    padding: 12px 16px 4px;
+    font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--sub);
+  }
+  .sidebar-nav { padding: 6px 8px; flex: 1; }
+  .table-link {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 10px; border-radius: 7px;
+    text-decoration: none; color: var(--ink);
+    font-size: 13px; font-weight: 500; letter-spacing: -.005em;
+    transition: background .12s;
+    margin-bottom: 1px;
+  }
+  .table-link:hover { background: var(--bg2); }
+  .table-link.active { background: var(--accent); color: #fff; }
+  .table-link.active .tl-badge { background: rgba(255,255,255,.25); color: #fff; }
+  .tl-name { display: flex; align-items: center; gap: 7px; }
+  .tl-icon { font-size: 13px; opacity: .7; }
+  .tl-badge {
+    font-size: 10px; font-weight: 600; background: var(--bg2);
+    color: var(--sub); border-radius: 99px; padding: 1px 7px;
+    letter-spacing: .02em;
+  }
+
+  /* ─── Main Content ───────────────────────────────────────── */
+  .main {
+    flex: 1; overflow: auto;
+    display: flex; flex-direction: column;
+    background: var(--bg2);
+  }
+
+  /* ─── Table Header ───────────────────────────────────────── */
+  .table-header {
+    background: var(--bg);
+    border-bottom: 1px solid var(--hair);
+    padding: 16px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px;
+  }
+  .table-title { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
+  .table-subtitle { font-size: 12px; color: var(--sub); margin-top: 2px; }
+  .table-actions { display: flex; align-items: center; gap: 8px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 8px;
+    font-size: 13px; font-weight: 600;
+    cursor: pointer; border: none; text-decoration: none;
+    transition: opacity .15s, transform .1s;
+    letter-spacing: -.01em;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { opacity: .88; }
+  .btn-secondary {
+    background: var(--bg2); color: var(--ink);
+    border: 1px solid var(--hair);
+  }
+  .btn-secondary:hover { background: var(--bg); }
+  .btn-danger { background: var(--bad); color: #fff; }
+  .btn-danger:hover { opacity: .88; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+
+  /* ─── Alerts ─────────────────────────────────────────────── */
+  .alerts { padding: 12px 24px 0; }
+  .alert {
+    padding: 10px 14px; border-radius: 8px;
+    font-size: 13px; font-weight: 500; margin-bottom: 8px;
+  }
+  .alert-success { background: #e6f4ea; color: var(--good); border: 1px solid #b7dfbf; }
+  .alert-danger  { background: #fdecea; color: var(--bad);  border: 1px solid #f5c6c6; }
+  .alert-warning { background: #fff3e0; color: var(--warn); border: 1px solid #ffe0b2; }
+  [data-theme="dark"] .alert-success { background: #0a2e12; border-color: #1a5c27; }
+  [data-theme="dark"] .alert-danger  { background: #2e0a0a; border-color: #5c1a1a; }
+  [data-theme="dark"] .alert-warning { background: #2e1e00; border-color: #5c3a00; }
+
+  /* ─── Table Container ────────────────────────────────────── */
+  .table-wrap {
+    margin: 16px 24px;
+    background: var(--bg);
+    border: 1px solid var(--hair);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .table-scroll { overflow-x: auto; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead tr { border-bottom: 1px solid var(--hair); background: var(--bg2); }
+  th {
+    text-align: left;
+    font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--sub);
+    padding: 10px 14px;
+    white-space: nowrap;
+  }
+  td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--hair);
+    color: var(--ink);
+    vertical-align: middle;
+    max-width: 300px;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr { transition: background .1s; }
+  tbody tr:hover { background: var(--bg2); }
+
+  /* Cell value rendering */
+  .cell-text   { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cell-mono   { font-family: "SF Mono", "Fira Code", monospace; font-size: 12px; color: var(--sub); }
+  .cell-num    { font-variant-numeric: tabular-nums; }
+  .cell-bool   { display: inline-flex; align-items: center; gap: 5px; }
+  .bool-dot    { width: 8px; height: 8px; border-radius: 50%; }
+  .bool-true   { background: var(--good); }
+  .bool-false  { background: var(--bad); }
+  .cell-null   { color: var(--sub); font-style: italic; font-size: 12px; }
+  .cell-json   { font-family: "SF Mono", "Fira Code", monospace; font-size: 11px; color: var(--sub);
+                 max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Action column */
+  .td-actions { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center; padding: 64px 24px; color: var(--sub);
+  }
+  .empty-state .es-icon { font-size: 32px; margin-bottom: 12px; opacity: .4; }
+  .empty-state .es-title { font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+  .empty-state .es-sub   { font-size: 13px; }
+
+  /* ─── Modal / Drawer ─────────────────────────────────────── */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,.35);
+    backdrop-filter: blur(4px);
+    align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--bg); border: 1px solid var(--hair);
+    border-radius: 16px; width: 100%; max-width: 540px;
+    max-height: 90vh; display: flex; flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,.15);
+  }
+  .modal-head {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--hair);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-title { font-size: 16px; font-weight: 700; letter-spacing: -.02em; }
+  .modal-close {
+    width: 28px; height: 28px; border-radius: 6px;
+    border: 1px solid var(--hair); background: var(--bg2);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 16px; color: var(--sub); transition: all .15s;
+  }
+  .modal-close:hover { background: var(--hair); color: var(--ink); }
+
+  .modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+  .modal-foot {
+    padding: 16px 24px;
+    border-top: 1px solid var(--hair);
+    display: flex; justify-content: flex-end; gap: 8px;
+  }
+
+  /* ─── Form Fields ────────────────────────────────────────── */
+  .field { margin-bottom: 14px; }
+  .field-label {
+    display: block; font-size: 10px; font-weight: 700;
+    letter-spacing: .08em; text-transform: uppercase;
+    color: var(--sub); margin-bottom: 5px;
+  }
+  .field-label .fk-hint {
+    font-weight: 400; text-transform: none; letter-spacing: 0;
+    color: var(--accent); font-size: 10px;
+  }
+
+  input[type=text], input[type=number], input[type=email],
+  input[type=datetime-local], input[type=date], input[type=url],
+  textarea, select {
+    width: 100%; padding: 8px 10px;
+    background: var(--bg2); border: 1px solid var(--hair);
+    border-radius: 8px; color: var(--ink);
+    font-family: inherit; font-size: 13px;
+    outline: none; transition: border-color .15s;
+    appearance: none; -webkit-appearance: none;
+  }
+  input:focus, textarea:focus, select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,113,227,.12);
+  }
+  textarea { resize: vertical; min-height: 72px; font-size: 13px; line-height: 1.5; }
+  textarea.khmer { font-family: "Kantumruy Pro", "Noto Sans Khmer", sans-serif; line-height: 1.9; font-size: 14px; }
+  textarea.mono  { font-family: "SF Mono", "Fira Code", monospace; font-size: 12px; }
+
+  /* Toggle */
+  .toggle-wrap { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
+  .toggle {
+    position: relative; width: 44px; height: 26px;
+    flex-shrink: 0;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-track {
+    position: absolute; inset: 0; border-radius: 99px;
+    background: var(--hair); cursor: pointer; transition: background .2s;
+  }
+  .toggle input:checked ~ .toggle-track { background: var(--good); }
+  .toggle-thumb {
+    position: absolute; left: 3px; top: 3px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; transition: transform .2s;
+    pointer-events: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  }
+  .toggle input:checked ~ .toggle-track .toggle-thumb { transform: translateX(18px); }
+  .toggle-label { font-size: 13px; color: var(--sub); }
+
+  /* ─── Footer ─────────────────────────────────────────────── */
+  .page-footer {
+    padding: 20px 24px;
+    font-size: 11px; color: var(--sub);
+    border-top: 1px solid var(--hair);
+    display: flex; align-items: center; gap: 16px;
+  }
+  .row-count { font-weight: 600; color: var(--ink); }
+</style>
 </head>
-<body class="min-h-screen text-slate-100 flex flex-col" x-data="{ editingRow: null, showCreateModal: false }">
+<body>
 
-    <!-- Top Navbar -->
-    <header class="border-b border-slate-800 bg-slate-900/50 py-4 px-8 flex justify-between items-center">
-        <div class="flex items-center gap-4">
-            <div class="h-10 w-10 bg-gradient-to-tr from-indigo-500 to-fuchsia-500 rounded-xl flex items-center justify-center text-white text-xl font-bold">🗃️</div>
-            <div>
-                <h1 class="text-lg font-extrabold tracking-tight text-white">{{ app.app_name }} Content Editor</h1>
-                <span class="text-xs text-slate-500 font-medium">Bifrost Multi-Tenant CMS Gateway</span>
-            </div>
-        </div>
-        
-        <div class="flex items-center gap-4">
-            <a href="/backoffice/app/{{ app._id }}" class="text-xs font-bold text-slate-400 hover:text-white transition-all uppercase tracking-wider">
-                ← Back to App
+<!-- ── Top Nav ─────────────────────────────────────────────── -->
+<nav class="topnav">
+  <div class="topnav-left">
+    <a class="btn-back" href="/backoffice/app/{{ app._id }}">← {{ app.app_name }}</a>
+    <div class="topnav-sep"></div>
+    <span class="topnav-app" style="font-weight:600;">Content Editor</span>
+  </div>
+  <div class="topnav-right">
+    {% if current_role in ('owner','super_admin','admin','heimdall') %}
+    <a class="settings-link" href="/backoffice/app/{{ app._id }}/cms/settings">⚙ Schema Config</a>
+    {% endif %}
+    <span class="role-badge">{{ current_role }}</span>
+    <button class="theme-btn" id="themeBtn" title="Toggle theme">🌙</button>
+  </div>
+</nav>
+
+<div class="shell">
+
+  <!-- ── Sidebar ────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-header">Tables</div>
+    <nav class="sidebar-nav">
+      {% set grouped = namespace(done=[]) %}
+
+      {# Render grouped tables first #}
+      {% for group_name, group_tables in table_groups.items() %}
+        {% set visible_in_group = [] %}
+        {% for t in group_tables %}{% if t in tables %}{% set _ = visible_in_group.append(t) %}{% endif %}{% endfor %}
+        {% if visible_in_group %}
+          <div class="sidebar-group-label">{{ group_name }}</div>
+          {% for t in visible_in_group %}
+            {% set _ = grouped.done.append(t) %}
+            <a href="?table={{ t }}"
+               class="table-link {% if t == selected_table %}active{% endif %}">
+              <span class="tl-name">
+                <span class="tl-icon">📋</span>
+                {{ cms_config.get('tables',{}).get(t,{}).get('label', t) }}
+              </span>
             </a>
-            <div class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-            <span class="text-xs font-semibold text-slate-400 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
-                Role: {{ current_role|upper }}
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+
+      {# Ungrouped tables #}
+      {% for t in tables %}
+        {% if t not in grouped.done %}
+          <a href="?table={{ t }}"
+             class="table-link {% if t == selected_table %}active{% endif %}">
+            <span class="tl-name">
+              <span class="tl-icon">📋</span>
+              {{ cms_config.get('tables',{}).get(t,{}).get('label', t) }}
             </span>
-        </div>
-    </header>
+          </a>
+        {% endif %}
+      {% endfor %}
 
-    <!-- Main Workspace -->
-    <div class="flex-grow flex">
-        
-        <!-- Left Sidebar (Tables Selector) -->
-        <aside class="w-64 border-r border-slate-800 bg-slate-950/40 p-6 space-y-6">
-            <div>
-                <h3 class="text-[10px] font-extrabold text-indigo-400 uppercase tracking-widest mb-4">Schema Tables</h3>
-                <nav class="space-y-2">
-                    {% for tbl in tables %}
-                    <a href="?table={{ tbl }}" 
-                       class="flex items-center justify-between px-4 py-3 rounded-xl text-xs font-bold transition-all border 
-                       {% if tbl == selected_table %}bg-indigo-600/10 border-indigo-500/30 text-indigo-300{% else %}border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-white{% endif %}">
-                       <span>📁 {{ tbl }}</span>
-                       <span class="text-[10px] opacity-50 font-normal">public</span>
-                    </a>
-                    {% endfor %}
-                </nav>
-            </div>
-        </aside>
+      {% if not tables %}
+        <p style="padding:12px 10px;font-size:12px;color:var(--sub);">No tables visible. Check schema config.</p>
+      {% endif %}
+    </nav>
+  </aside>
 
-        <!-- Right Content Section -->
-        <main class="flex-grow p-8 space-y-6 overflow-x-hidden">
-            
-            <!-- Messages / Flash Alerts -->
-            {% with messages = get_flashed_messages(with_categories=true) %}
-              {% if messages %}
-                {% for category, msg in messages %}
-                  <div class="p-4 rounded-xl text-xs font-bold border 
-                      {% if category == 'success' %}bg-emerald-950/20 text-emerald-400 border-emerald-900/50
-                      {% elif category == 'danger' %}bg-red-950/20 text-red-400 border-red-900/50
-                      {% else %}bg-amber-950/20 text-amber-300 border-amber-900/50{% endif %}">
-                      {{ msg }}
-                  </div>
-                {% endfor %}
-              {% endif %}
-            {% endwith %}
+  <!-- ── Main ───────────────────────────────────────────────── -->
+  <main class="main">
 
-            <!-- Table Header Operations -->
-            <div class="flex justify-between items-center">
-                <div>
-                    <h2 class="text-xl font-extrabold text-white capitalize">Table: {{ selected_table }}</h2>
-                    <p class="text-xs text-slate-500 mt-1">Direct read/write access to public schema row data.</p>
-                </div>
-                
-                <button @click="showCreateModal = true" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-lg transition-all transform active:scale-95">
-                    + Add New Row
-                </button>
-            </div>
-
-            <!-- Spreadsheet Grid Container -->
-            <div class="glass rounded-2xl border border-slate-800/80 overflow-hidden shadow-2xl">
-                <div class="overflow-x-auto w-full">
-                    <table class="w-full text-left border-collapse min-w-[800px]">
-                        <thead>
-                            <tr class="border-b border-slate-800 bg-slate-900/30">
-                                {% for col in columns %}
-                                <th class="py-4 px-6 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">{{ col }}</th>
-                                {% endfor %}
-                                <th class="py-4 px-6 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-900 bg-slate-950/10">
-                            {% for row in rows %}
-                            <tr class="hover:bg-slate-900/20 transition-all">
-                                {% for col in columns %}
-                                <td class="py-4 px-6 text-xs text-slate-300 font-medium max-w-xs truncate khmer-font">
-                                    {{ row[col] }}
-                                </td>
-                                {% endfor %}
-                                <td class="py-4 px-6 text-right space-x-2">
-                                    <button @click="editingRow = {{ row|tojson|safe }}" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg border border-slate-700 text-[10px] font-bold transition-all">
-                                        Edit
-                                    </button>
-                                    <form action="/backoffice/app/{{ app._id }}/cms/{{ selected_table }}/delete/{{ row.id }}" method="POST" class="inline">
-                                        <button type="submit" onclick="return confirm('Are you sure you want to delete this row?')" class="px-3 py-1.5 bg-red-950/20 hover:bg-red-900/30 text-red-400 rounded-lg border border-red-900/30 text-[10px] font-bold transition-all">
-                                            Delete
-                                        </button>
-                                    </form>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                            
-                            {% if not rows %}
-                            <tr>
-                                <td colspan="{{ columns|length + 1 }}" class="py-12 text-center text-slate-500 text-xs font-semibold">
-                                    No data records found in table '{{ selected_table }}'.
-                                </td>
-                            </tr>
-                            {% endif %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </main>
+    <!-- Flash alerts -->
+    <div class="alerts">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+          <div class="alert alert-{{ 'success' if cat=='success' else ('warning' if cat=='warning' else 'danger') }}">{{ msg }}</div>
+        {% endfor %}
+      {% endwith %}
     </div>
 
-    <!-- Edit Row Modal -->
-    <template x-if="editingRow">
-        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-            <div class="glass w-full max-w-xl rounded-3xl p-8 shadow-2xl border border-slate-800 space-y-6" @click.away="editingRow = null">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-base font-extrabold text-white">Edit Table Row (ID: <span x-text="editingRow.id"></span>)</h3>
-                    <button @click="editingRow = null" class="text-slate-500 hover:text-white text-sm">✕</button>
-                </div>
-                
-                <form :action="'/backoffice/app/{{ app._id }}/cms/{{ selected_table }}/save/' + editingRow.id" method="POST" class="space-y-4">
-                    <div class="max-h-[400px] overflow-y-auto space-y-4 pr-2">
-                        {% for col in columns %}
-                        {% if col != 'id' %}
-                        <div class="space-y-1.5">
-                            <label class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">{{ col }}</label>
-                            <input type="text" 
-                                   name="{{ col }}" 
-                                   :value="editingRow.{{ col }}" 
-                                   class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 khmer-font">
-                        </div>
-                        {% endif %}
-                        {% endfor %}
-                    </div>
-                    
-                    <div class="pt-4 flex justify-end gap-3 border-t border-slate-800">
-                        <button type="button" @click="editingRow = null" class="px-5 py-2.5 bg-slate-900 border border-slate-800 hover:bg-slate-850 rounded-xl text-xs font-bold text-slate-400 hover:text-white">
-                            Cancel
-                        </button>
-                        <button type="submit" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 rounded-xl text-xs font-bold text-white shadow-lg shadow-indigo-950/20">
-                            Save Changes
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </template>
+    {% if selected_table %}
 
-    <!-- Create Row Modal -->
-    <template x-if="showCreateModal">
-        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-            <div class="glass w-full max-w-xl rounded-3xl p-8 shadow-2xl border border-slate-800 space-y-6" @click.away="showCreateModal = false">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-base font-extrabold text-white">Create New Row</h3>
-                    <button @click="showCreateModal = false" class="text-slate-500 hover:text-white text-sm">✕</button>
-                </div>
-                
-                <form action="/backoffice/app/{{ app._id }}/cms/{{ selected_table }}/create" method="POST" class="space-y-4">
-                    <div class="max-h-[400px] overflow-y-auto space-y-4 pr-2">
-                        {% for col in columns %}
-                        {% if col != 'id' %}
-                        <div class="space-y-1.5">
-                            <label class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">{{ col }}</label>
-                            <input type="text" 
-                                   name="{{ col }}" 
-                                   class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 khmer-font"
-                                   placeholder="Enter {{ col }}">
-                        </div>
-                        {% endif %}
-                        {% endfor %}
-                    </div>
-                    
-                    <div class="pt-4 flex justify-end gap-3 border-t border-slate-800">
-                        <button type="button" @click="showCreateModal = false" class="px-5 py-2.5 bg-slate-900 border border-slate-800 hover:bg-slate-850 rounded-xl text-xs font-bold text-slate-400 hover:text-white">
-                            Cancel
-                        </button>
-                        <button type="submit" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 rounded-xl text-xs font-bold text-white shadow-lg shadow-indigo-950/20">
-                            Create Row
-                        </button>
-                    </div>
-                </form>
-            </div>
+    <!-- Table action bar -->
+    <div class="table-header">
+      <div>
+        <div class="table-title">
+          {{ cms_config.get('tables',{}).get(selected_table,{}).get('label', selected_table) }}
+          {% if readonly_table %}<span style="font-size:11px;font-weight:500;color:var(--warn);margin-left:8px;">read-only</span>{% endif %}
         </div>
-    </template>
+        <div class="table-subtitle">
+          {{ rows|length }} row{{ 's' if rows|length != 1 else '' }} · {{ visible_columns|length }} column{{ 's' if visible_columns|length != 1 else '' }}
+          · public.{{ selected_table }}
+        </div>
+      </div>
+      <div class="table-actions">
+        {% if can_write %}
+        <button class="btn btn-primary btn-sm" onclick="openCreate()">+ New row</button>
+        {% endif %}
+      </div>
+    </div>
 
+    <!-- Grid -->
+    <div class="table-wrap">
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              {% for col in visible_columns %}
+              <th>
+                {{ table_col_config.get(col,{}).get('label', col) }}
+                {% set sm = schema_by_col.get(col, {}) %}
+                {% if sm.get('foreign_table') %}
+                  <span style="color:var(--accent);font-size:9px;font-weight:400;">→ {{ sm.foreign_table }}</span>
+                {% endif %}
+              </th>
+              {% endfor %}
+              {% if can_write %}<th style="text-align:right;">Actions</th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+            <tr>
+              {% for col in visible_columns %}
+              {% set val = row[col] %}
+              {% set sm  = schema_by_col.get(col, {}) %}
+              {% set pg  = sm.get('data_type','') %}
+              {% set ov  = table_col_config.get(col,{}).get('type','') %}
+              <td>
+                {% if val is none or val == '' %}
+                  <span class="cell-null">—</span>
+                {% elif ov == 'boolean' or pg == 'boolean' %}
+                  <span class="cell-bool">
+                    <span class="bool-dot {{ 'bool-true' if val else 'bool-false' }}"></span>
+                    {{ 'Yes' if val else 'No' }}
+                  </span>
+                {% elif pg in ('integer','bigint','smallint','numeric','real','double precision') %}
+                  {% if 'price' in col or 'amount' in col or 'balance' in col %}
+                    <span class="cell-num" style="font-weight:600;color:var(--good);">${{ val }}</span>
+                  {% else %}
+                    <span class="cell-num">{{ val }}</span>
+                  {% endif %}
+                {% elif pg == 'jsonb' or pg == 'json' or ov == 'json' %}
+                  <span class="cell-json" title="{{ val }}">{{ val }}</span>
+                {% elif ov == 'mono' or pg.startswith('uuid') %}
+                  <span class="cell-mono">{{ val }}</span>
+                {% elif pg in ('timestamp without time zone','timestamp with time zone','date') %}
+                  <span class="cell-mono" style="font-size:12px;">{{ val }}</span>
+                {% elif col in ('photo_url', 'avatar', 'profile_image', 'image_url') and val %}
+                  <img src="{{ val }}" alt="Avatar" style="width:32px; height:32px; border-radius:50%; object-fit:cover; border:1px solid var(--hair);">
+                {% elif col.endswith('status') or col.endswith('state') %}
+                  {% set status_color = 'var(--bad)' %}
+                  {% if val in ('active', 'completed', 'success', 'paid') %}
+                    {% set status_color = 'var(--good)' %}
+                  {% elif val in ('pending', 'processing', 'waiting') %}
+                    {% set status_color = 'var(--warn)' %}
+                  {% endif %}
+                  <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; color:#fff; background-color:{{ status_color }};">{{ val|upper }}</span>
+                {% elif col in ('name', 'title', 'email', 'username') %}
+                  <strong class="cell-text" style="color:var(--ink);">{{ val }}</strong>
+                {% else %}
+                  <span class="cell-text">{{ val }}</span>
+                {% endif %}
+              </td>
+              {% endfor %}
+
+              {% if can_write %}
+              <td>
+                <div class="td-actions" style="justify-content:flex-end;">
+                  <button class="btn btn-secondary btn-sm"
+                    onclick='openEdit({{ row | tojson | safe }})'>Edit</button>
+                  <form method="POST"
+                    action="/backoffice/app/{{ app._id }}/cms/{{ selected_table }}/delete/{{ row.id }}"
+                    onsubmit="return confirm('Delete this row permanently?')">
+                    <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                  </form>
+                </div>
+              </td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+
+            {% if not rows %}
+            <tr><td colspan="{{ visible_columns|length + (1 if can_write else 0) }}">
+              <div class="empty-state">
+                <div class="es-icon">📭</div>
+                <div class="es-title">No records</div>
+                <div class="es-sub">{{ selected_table }} has no rows yet.</div>
+              </div>
+            </td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Footer row count -->
+    <div class="page-footer">
+      <span>Showing <span class="row-count">{{ rows|length }}</span> rows (max 500)</span>
+      <span>·</span>
+      <span>{{ app.app_name }} · {{ selected_table }}</span>
+    </div>
+
+    {% else %}
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;">
+      <div class="empty-state">
+        <div class="es-icon">🗄️</div>
+        <div class="es-title">No tables available</div>
+        <div class="es-sub">Connect a tenant database or adjust schema visibility in config.</div>
+      </div>
+    </div>
+    {% endif %}
+
+  </main>
+</div>
+
+
+<!-- ── Edit Modal ──────────────────────────────────────────── -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title" id="editModalTitle">Edit row</span>
+      <button class="modal-close" onclick="closeEdit()">×</button>
+    </div>
+    <form id="editForm" method="POST">
+      <div class="modal-body" id="editFields"></div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-secondary" onclick="closeEdit()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Create Modal ────────────────────────────────────────── -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">New row — {{ selected_table }}</span>
+      <button class="modal-close" onclick="closeCreate()">×</button>
+    </div>
+    <form method="POST"
+      action="/backoffice/app/{{ app._id }}/cms/{{ selected_table }}/create">
+      <div class="modal-body">
+        {% for col in visible_columns %}
+        {% if col != 'id' %}
+        {% set sm = schema_by_col.get(col, {}) %}
+        {% set pg = sm.get('data_type','') %}
+        {% set ov = table_col_config.get(col,{}).get('type','') %}
+        {% set label = table_col_config.get(col,{}).get('label', col) %}
+        <div class="field">
+          <label class="field-label">
+            {{ label }}
+            {% if sm.get('foreign_table') %}<span class="fk-hint">→ {{ sm.foreign_table }}</span>{% endif %}
+            {% if col in role_readonly_cols %}<span class="fk-hint" style="color:var(--sub);margin-left:8px;">🔒 Read Only</span>{% endif %}
+          </label>
+          
+          {% set disabled_attr = 'disabled' if col in role_readonly_cols else '' %}
+          {% set readonly_attr = 'readonly' if col in role_readonly_cols else '' %}
+
+          {% if ov == 'boolean' or pg == 'boolean' %}
+            <div class="toggle-wrap">
+              <label class="toggle">
+                <input type="checkbox" name="{{ col }}" value="true" {{ disabled_attr }}>
+                <div class="toggle-track"><div class="toggle-thumb"></div></div>
+              </label>
+              <span class="toggle-label">{{ label }}</span>
+            </div>
+          {% elif pg == 'jsonb' or pg == 'json' or ov == 'json' %}
+            <textarea name="{{ col }}" class="mono" rows="3" placeholder='{"key": "value"}' {{ readonly_attr }}></textarea>
+          {% elif sm.get('character_maximum_length') and sm.character_maximum_length > 255 %}
+            {% set is_khmer = 'kh' in col or 'khmer' in col %}
+            <textarea name="{{ col }}" class="{{ 'khmer' if is_khmer else '' }}" rows="3" {{ readonly_attr }}></textarea>
+          {% elif pg in ('text',) and not sm.get('character_maximum_length') %}
+            {% set is_khmer = 'kh' in col or 'khmer' in col %}
+            <textarea name="{{ col }}" class="{{ 'khmer' if is_khmer else '' }}" rows="3" {{ readonly_attr }}></textarea>
+          {% elif pg in ('integer','bigint','smallint','numeric','real','double precision') %}
+            <input type="number" name="{{ col }}" step="any" {{ readonly_attr }}>
+          {% elif pg in ('timestamp without time zone','timestamp with time zone') %}
+            <input type="datetime-local" name="{{ col }}" {{ readonly_attr }}>
+          {% elif pg == 'date' %}
+            <input type="date" name="{{ col }}" {{ readonly_attr }}>
+          {% else %}
+            <input type="text" name="{{ col }}" {{ readonly_attr }}>
+          {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-secondary" onclick="closeCreate()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create row</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<script>
+  // ── Theme switcher ──────────────────────────────────────────
+  const html = document.documentElement;
+  const themeBtn = document.getElementById('themeBtn');
+  let theme = localStorage.getItem('bifrost-theme') || 'light';
+
+  function applyTheme(t) {
+    html.setAttribute('data-theme', t);
+    themeBtn.textContent = t === 'dark' ? '☀️' : '🌙';
+    localStorage.setItem('bifrost-theme', t);
+  }
+  applyTheme(theme);
+  themeBtn.addEventListener('click', () => {
+    theme = theme === 'dark' ? 'light' : 'dark';
+    applyTheme(theme);
+  });
+
+  // Close modal on overlay click
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) { overlay.classList.remove('open'); }
+    });
+  });
+
+  // ── Schema metadata passed from Flask ──────────────────────
+  const schemaByCol  = {{ schema_by_col  | tojson | safe }};
+  const tableColConf = {{ table_col_config | tojson | safe }};
+  const appId        = "{{ app._id }}";
+  const tableName    = "{{ selected_table }}";
+  const visibleCols  = {{ visible_columns | tojson | safe }};
+  const roleReadonlyCols = {{ (role_readonly_cols or []) | tojson | safe }};
+
+  // ── Edit Modal ──────────────────────────────────────────────
+  function openEdit(row) {
+    const modal = document.getElementById('editModal');
+    const form  = document.getElementById('editForm');
+    form.action = `/backoffice/app/${appId}/cms/${tableName}/save/${row.id}`;
+    document.getElementById('editModalTitle').textContent = `Edit row #${row.id}`;
+
+    const body = document.getElementById('editFields');
+    body.innerHTML = '';
+
+    visibleCols.forEach(col => {
+      if (col === 'id') return;
+
+      const sm    = schemaByCol[col] || {};
+      const pg    = sm.data_type || '';
+      const ov    = (tableColConf[col] || {}).type || '';
+      const label = (tableColConf[col] || {}).label || col;
+      const val   = row[col];
+      const isReadonly = roleReadonlyCols.includes(col);
+      const readonlyAttr = isReadonly ? 'readonly' : '';
+      const disabledAttr = isReadonly ? 'disabled' : '';
+
+      const div = document.createElement('div');
+      div.className = 'field';
+
+      const fkHint = sm.foreign_table
+        ? `<span class="fk-hint"> → ${sm.foreign_table}</span>` : '';
+      
+      const lockHint = isReadonly ? `<span class="fk-hint" style="color:var(--sub);margin-left:8px;">🔒 Read Only</span>` : '';
+      div.innerHTML = `<label class="field-label">${label}${fkHint}${lockHint}</label>`;
+
+      let input;
+
+      if (ov === 'boolean' || pg === 'boolean') {
+        const checked = val === true || val === 't' || val === 'true' ? 'checked' : '';
+        div.innerHTML += `
+          <div class="toggle-wrap">
+            <label class="toggle">
+              <input type="checkbox" name="${col}" value="true" ${checked}>
+              <div class="toggle-track"><div class="toggle-thumb"></div></div>
+            </label>
+            <span class="toggle-label">${label}</span>
+          </div>`;
+      } else if (pg === 'jsonb' || pg === 'json' || ov === 'json') {
+        const pretty = val ? JSON.stringify(typeof val === 'string' ? JSON.parse(val) : val, null, 2) : '';
+        div.innerHTML += `<textarea name="${col}" class="mono" rows="4">${pretty}</textarea>`;
+      } else if (pg === 'text' || (sm.character_maximum_length && sm.character_maximum_length > 255)) {
+        const isKhmer = col.includes('kh') || col.includes('khmer');
+        div.innerHTML += `<textarea name="${col}" class="${isKhmer ? 'khmer' : ''}" rows="3">${val ?? ''}</textarea>`;
+      } else if (['integer','bigint','smallint','numeric','real','double precision'].includes(pg)) {
+        div.innerHTML += `<input type="number" name="${col}" step="any" value="${val ?? ''}">`;
+      } else if (pg.startsWith('timestamp')) {
+        const dt = val ? val.slice(0,16) : '';
+        div.innerHTML += `<input type="datetime-local" name="${col}" value="${dt}">`;
+      } else if (pg === 'date') {
+        div.innerHTML += `<input type="date" name="${col}" value="${val ?? ''}">`;
+      } else {
+        div.innerHTML += `<input type="text" name="${col}" value="${(val ?? '').toString().replace(/"/g,'&quot;')}">`;
+      }
+
+      body.appendChild(div);
+    });
+
+    modal.classList.add('open');
+  }
+
+  function closeEdit() {
+    document.getElementById('editModal').classList.remove('open');
+  }
+
+  // ── Create Modal ────────────────────────────────────────────
+  function openCreate() {
+    document.getElementById('createModal').classList.add('open');
+  }
+  function closeCreate() {
+    document.getElementById('createModal').classList.remove('open');
+  }
+</script>
 </body>
 </html>

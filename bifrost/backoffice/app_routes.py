@@ -92,6 +92,7 @@ def update_app_settings(app_id):
         'app_logo_url': request.form.get('logo_url'),
         'app_qr_url': request.form.get('qr_url'),
         'telegram_bot_token': request.form.get('telegram_bot_token'),
+        'db_connection': request.form.get('db_connection'),
         'enabled_services': enabled_services
     }
 

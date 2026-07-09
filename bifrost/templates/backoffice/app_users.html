@@ -181,6 +181,11 @@
                         <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Bot Token</label>
                         <input {{ 'disabled' if is_disabled else ':disabled="!editConfig"' }} type="text" name="telegram_bot_token" value="{{ app.telegram_bot_token or '' }}" class="w-full text-sm p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 disabled:opacity-50 font-mono">
                     </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Tenant Database Connection (PostgreSQL/Supabase)</label>
+                        <input {{ 'disabled' if is_disabled else ':disabled="!editConfig"' }} type="text" name="db_connection" value="{{ app.db_connection or '' }}" placeholder="postgresql://user:password@host:5432/db" class="w-full text-sm p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 disabled:opacity-50 font-mono">
+                        <p class="mt-1 text-[10px] text-slate-400">Bifrost acts as a proxy for this database. Provide a connection string with restricted privileges.</p>
+                    </div>
                                      <div>
                         <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Payment QR URL</label>
                         <input {{ 'disabled' if is_disabled else ':disabled="!editConfig"' }} type="url" name="qr_url" value="{{ app.app_qr_url }}" class="w-full text-sm p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 disabled:opacity-50">

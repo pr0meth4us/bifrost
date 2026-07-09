@@ -54,24 +54,35 @@ def create_bifrost_bot(bot_token=None):
 
     return app
 
-async def process_webhook_update(update_json, bot_token=None):
-    """PRODUCTION ENTRY POINT (Flask)"""
+_ptb_apps = {}  # Cache of bot_token -> Application
+
+async def get_or_create_app(bot_token, client_id):
+    if bot_token in _ptb_apps:
+        return _ptb_apps[bot_token]
+
     app = create_bifrost_bot(bot_token=bot_token)
     if not app:
-        return
+        return None
+
+    # Inject client_id into bot data so handlers know which tenant context to use
+    app.bot_data['client_id'] = client_id
 
     await app.initialize()
     await app.start()
+    _ptb_apps[bot_token] = app
+    return app
+
+async def process_webhook_update(update_json, bot_token=None, client_id=None):
+    """PRODUCTION ENTRY POINT (Flask)"""
+    app = await get_or_create_app(bot_token, client_id)
+    if not app:
+        return
 
     try:
         update = Update.de_json(update_json, app.bot)
         await app.process_update(update)
     except Exception as e:
         logger.error(f"Error processing update: {e}")
-    finally:
-        await app.stop()
-        await app.shutdown()
-
 def run_polling():
     """LOCAL DEV ENTRY POINT"""
     app = create_bifrost_bot()

@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Schema Config · {{ app.app_name }}</title>
+<style>
+  :root {
+    --ink:#1d1d1f; --sub:#6e6e73; --hair:#d2d2d7;
+    --bg:#ffffff; --bg2:#f5f5f7;
+    --accent:#0071e3; --good:#1d7a3c; --warn:#b25000; --bad:#c22222;
+    --nav-h:48px; --sidebar-w:220px;
+  }
+  [data-theme="dark"] {
+    --ink:#f5f5f7; --sub:#98989d; --hair:#3a3a3c;
+    --bg:#1c1c1e; --bg2:#2c2c2e;
+    --accent:#2997ff; --good:#30d158; --warn:#ff9f0a; --bad:#ff453a;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html{-webkit-font-smoothing:antialiased;}
+  body{
+    font-family:-apple-system,"Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-size:14px; background:var(--bg2); color:var(--ink);
+    min-height:100vh; display:flex; flex-direction:column;
+  }
+
+  /* Nav */
+  .topnav{
+    position:sticky; top:0; z-index:100; height:var(--nav-h);
+    background:rgba(255,255,255,.82);
+    backdrop-filter:saturate(180%) blur(20px);
+    border-bottom:1px solid var(--hair);
+    display:flex; align-items:center; justify-content:space-between; padding:0 20px;
+  }
+  [data-theme="dark"] .topnav{background:rgba(28,28,30,.88);}
+  .topnav-left{display:flex;align-items:center;gap:14px;}
+  .topnav-sep{width:1px;height:18px;background:var(--hair);}
+  .btn-back{font-size:12px;font-weight:600;color:var(--sub);text-decoration:none;transition:color .15s;}
+  .btn-back:hover{color:var(--ink);}
+  .topnav-right{display:flex;align-items:center;gap:10px;}
+  .theme-btn{
+    width:32px;height:32px;border-radius:8px;border:1px solid var(--hair);
+    background:var(--bg);color:var(--sub);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;font-size:14px;
+    transition:background .15s;
+  }
+
+  /* Shell */
+  .shell{display:flex;flex:1;height:calc(100vh - var(--nav-h));overflow:hidden;}
+
+  /* Sidebar */
+  .sidebar{
+    width:var(--sidebar-w);flex-shrink:0;
+    background:var(--bg);border-right:1px solid var(--hair);
+    display:flex;flex-direction:column;overflow-y:auto;
+  }
+  .sidebar-header{
+    padding:18px 16px 10px;
+    font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--sub);border-bottom:1px solid var(--hair);
+  }
+  .sidebar-nav{padding:6px 8px;}
+  .table-link{
+    display:block;padding:7px 10px;border-radius:7px;
+    text-decoration:none;color:var(--ink);
+    font-size:13px;font-weight:500;transition:background .12s;margin-bottom:1px;
+  }
+  .table-link:hover{background:var(--bg2);}
+  .table-link.active{background:var(--accent);color:#fff;}
+
+  /* Main */
+  .main{flex:1;overflow:auto;background:var(--bg2);}
+
+  /* Page header */
+  .page-header{
+    background:var(--bg);border-bottom:1px solid var(--hair);
+    padding:20px 28px;
+  }
+  .page-title{font-size:20px;font-weight:700;letter-spacing:-.02em;margin-bottom:3px;}
+  .page-sub{font-size:13px;color:var(--sub);}
+
+  /* Alerts */
+  .alerts{padding:12px 28px 0;}
+  .alert{padding:10px 14px;border-radius:8px;font-size:13px;font-weight:500;margin-bottom:8px;}
+  .alert-success{background:#e6f4ea;color:var(--good);border:1px solid #b7dfbf;}
+  .alert-danger{background:#fdecea;color:var(--bad);border:1px solid #f5c6c6;}
+  [data-theme="dark"] .alert-success{background:#0a2e12;border-color:#1a5c27;}
+  [data-theme="dark"] .alert-danger{background:#2e0a0a;border-color:#5c1a1a;}
+
+  /* Content area */
+  .content{padding:24px 28px;}
+
+  /* Cards */
+  .card{
+    background:var(--bg);border:1px solid var(--hair);
+    border-radius:12px;overflow:hidden;margin-bottom:20px;
+  }
+  .card-head{
+    padding:14px 18px;border-bottom:1px solid var(--hair);
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .card-title{font-size:14px;font-weight:700;letter-spacing:-.01em;}
+  .card-sub{font-size:12px;color:var(--sub);margin-top:1px;}
+  .card-body{padding:18px;}
+
+  /* Section heading */
+  .section-kicker{
+    font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--sub);margin-bottom:14px;
+  }
+
+  /* Columns config table */
+  .config-table{width:100%;border-collapse:collapse;font-size:13px;}
+  .config-table th{
+    text-align:left;font-size:10px;font-weight:700;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--sub);
+    padding:8px 12px;border-bottom:1px solid var(--hair);
+  }
+  .config-table td{
+    padding:10px 12px;border-bottom:1px solid var(--hair);vertical-align:middle;
+  }
+  .config-table tbody tr:last-child td{border-bottom:none;}
+
+  /* Pill badges for PG types */
+  .type-pill{
+    display:inline-block;font-size:10px;font-weight:600;
+    border-radius:99px;padding:2px 8px;
+    background:var(--bg2);color:var(--sub);
+    border:1px solid var(--hair);
+  }
+  .type-pill.int{background:#eaf3fd;color:#0050a0;border-color:#b3d4f5;}
+  .type-pill.text{background:#f0faf2;color:#1a5c2a;border-color:#b3dfbf;}
+  .type-pill.bool{background:#fff5e0;color:#7a4500;border-color:#f5d6a0;}
+  .type-pill.ts{background:#f5eafd;color:#5a0090;border-color:#d4a0f5;}
+  .type-pill.json{background:#fdecea;color:#9a1010;border-color:#f5b0b0;}
+  .type-pill.uuid{background:#f5f5f7;color:#6e6e73;border-color:#d2d2d7;}
+  [data-theme="dark"] .type-pill.int{background:#001a3a;color:#5ab0ff;border-color:#003a7a;}
+  [data-theme="dark"] .type-pill.text{background:#001a05;color:#30d158;border-color:#003a10;}
+  [data-theme="dark"] .type-pill.bool{background:#2e1e00;color:#ff9f0a;border-color:#5c3a00;}
+  [data-theme="dark"] .type-pill.ts{background:#1a003a;color:#bf5aff;border-color:#3a007a;}
+  [data-theme="dark"] .type-pill.json{background:#2e0a0a;color:#ff6060;border-color:#5c1a1a;}
+
+  /* Form inputs */
+  input[type=text],input[type=email],select,textarea{
+    padding:6px 9px;border:1px solid var(--hair);border-radius:7px;
+    background:var(--bg2);color:var(--ink);
+    font-family:inherit;font-size:13px;outline:none;
+    transition:border-color .15s; width:100%;
+  }
+  input:focus,select:focus,textarea:focus{
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(0,113,227,.12);
+  }
+  .input-sm{width:160px;}
+  .select-sm{width:130px;}
+
+  /* Toggle */
+  .toggle{position:relative;width:36px;height:22px;flex-shrink:0;}
+  .toggle input{opacity:0;width:0;height:0;}
+  .toggle-track{
+    position:absolute;inset:0;border-radius:99px;
+    background:var(--hair);cursor:pointer;transition:background .2s;
+  }
+  .toggle input:checked ~ .toggle-track{background:var(--good);}
+  .toggle-thumb{
+    position:absolute;left:3px;top:3px;width:16px;height:16px;
+    border-radius:50%;background:#fff;
+    transition:transform .2s;pointer-events:none;
+    box-shadow:0 1px 3px rgba(0,0,0,.2);
+  }
+  .toggle input:checked ~ .toggle-track .toggle-thumb{transform:translateX(14px);}
+
+  /* JSON editor */
+  .json-area{
+    font-family:"SF Mono","Fira Code",monospace;font-size:12px;
+    min-height:200px;resize:vertical;line-height:1.6;
+  }
+
+  /* Buttons */
+  .btn{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;
+    cursor:pointer;border:none;text-decoration:none;
+    transition:opacity .15s,transform .1s;letter-spacing:-.01em;
+  }
+  .btn:active{transform:scale(.97);}
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-primary:hover{opacity:.88;}
+  .btn-secondary{background:var(--bg2);color:var(--ink);border:1px solid var(--hair);}
+  .btn-secondary:hover{background:var(--bg);}
+
+  /* Hidden tables section */
+  .hidden-tag{
+    display:inline-flex;align-items:center;gap:5px;
+    font-size:12px;font-weight:500;
+    background:var(--bg2);border:1px solid var(--hair);
+    border-radius:6px;padding:3px 8px;color:var(--ink);
+    cursor:pointer;transition:background .12s;
+  }
+  .hidden-tag:hover{background:var(--hair);}
+  .hidden-tag .x{color:var(--bad);font-weight:700;}
+  .tags-wrap{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;}
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-left">
+    <a class="btn-back" href="/backoffice/app/{{ app._id }}/cms">← Content Editor</a>
+    <div class="topnav-sep"></div>
+    <span style="font-size:14px;font-weight:600;">Schema Config</span>
+    <span style="font-size:12px;color:var(--sub);">{{ app.app_name }}</span>
+  </div>
+  <div class="topnav-right">
+    <button class="theme-btn" id="themeBtn" title="Toggle theme">🌙</button>
+  </div>
+</nav>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sidebar-header">Tables</div>
+    <nav class="sidebar-nav">
+      {% for t in all_tables %}
+      <a href="#table-{{ t }}" class="table-link">{{ t }}</a>
+      {% endfor %}
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="page-header">
+      <div class="page-title">Schema Configuration</div>
+      <div class="page-sub">
+        Rename columns, hide tables, mark tables as read-only, group tables — per-app, stored in MongoDB.
+        Changes take effect immediately without a server restart.
+      </div>
+    </div>
+
+    <div class="alerts">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+          <div class="alert alert-{{ 'success' if cat=='success' else 'danger' }}">{{ msg }}</div>
+        {% endfor %}
+      {% endwith %}
+    </div>
+
+    <div class="content">
+
+      <!-- ── Visual Config Builder ───────────────────────────── -->
+      <form method="POST" action="/backoffice/app/{{ app._id }}/cms/settings" id="configForm">
+        <input type="hidden" name="cms_config_json" id="configJsonInput">
+
+        <!-- Hidden Tables -->
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Hidden Tables</div>
+              <div class="card-sub">These tables won't appear in the Content Editor sidebar.</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="tags-wrap" id="hiddenTagsWrap">
+              {% for t in cms_config.get('hidden_tables', []) %}
+              <span class="hidden-tag" data-table="{{ t }}">
+                {{ t }} <span class="x" onclick="removeHiddenTable('{{ t }}')">×</span>
+              </span>
+              {% endfor %}
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px;">
+              <select id="addHiddenSelect" class="select-sm" style="width:auto;">
+                <option value="">Add table…</option>
+                {% for t in all_tables %}
+                <option value="{{ t }}">{{ t }}</option>
+                {% endfor %}
+              </select>
+              <button type="button" class="btn btn-secondary" onclick="addHiddenTable()" style="padding:5px 12px;font-size:12px;">Hide</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table Groups -->
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Table Groups</div>
+              <div class="card-sub">Organise tables into named sections in the sidebar.</div>
+            </div>
+            <button type="button" class="btn btn-secondary" style="font-size:12px;padding:5px 12px;"
+              onclick="addGroup()">+ Group</button>
+          </div>
+          <div class="card-body" id="groupsContainer">
+            {% set groups = cms_config.get('table_groups', {}) %}
+            {% for gname, gtables in groups.items() %}
+            <div class="group-row" style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;"
+              data-group="{{ gname }}">
+              <input type="text" class="input-sm group-name" value="{{ gname }}" placeholder="Group name"
+                style="width:140px;flex-shrink:0;" onchange="updateGroupName(this)">
+              <div style="flex:1;">
+                <select multiple class="group-tables" size="4"
+                  style="width:100%;font-size:12px;min-height:80px;">
+                  {% for t in all_tables %}
+                  <option value="{{ t }}" {{ 'selected' if t in gtables }}>{{ t }}</option>
+                  {% endfor %}
+                </select>
+                <div style="font-size:11px;color:var(--sub);margin-top:3px;">Hold ⌘/Ctrl to select multiple</div>
+              </div>
+              <button type="button" onclick="removeGroup(this)"
+                style="margin-top:4px;background:none;border:none;color:var(--bad);cursor:pointer;font-size:18px;line-height:1;">×</button>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Per-table config -->
+        {% for t in all_tables %}
+        {% set tcfg = cms_config.get('tables', {}).get(t, {}) %}
+        {% set cols = table_schemas.get(t, []) %}
+        <div class="card" id="table-{{ t }}">
+          <div class="card-head">
+            <div>
+              <div class="card-title">{{ t }}</div>
+              <div class="card-sub">
+                {{ cols|length }} columns · public schema
+                {% if t in locked_tables %}
+                <span style="color:var(--sub); font-weight:600; margin-left:12px;">🔒 Protected by Bifrost data policy</span>
+                {% endif %}
+              </div>
+            </div>
+            {% if t not in locked_tables %}
+            <div style="display:flex;align-items:center;gap:14px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <label style="font-size:12px;color:var(--sub);font-weight:600;">Label</label>
+                <input type="text" class="input-sm table-label" data-table="{{ t }}"
+                  value="{{ tcfg.get('label', '') }}" placeholder="{{ t }}"
+                  style="width:160px;">
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <label style="font-size:12px;color:var(--sub);font-weight:600;">Read-only</label>
+                <label class="toggle">
+                  <input type="checkbox" class="table-readonly" data-table="{{ t }}"
+                    {{ 'checked' if tcfg.get('readonly') }}>
+                  <div class="toggle-track"><div class="toggle-thumb"></div></div>
+                </label>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+          {% if cols and t not in locked_tables %}
+          <div style="overflow-x:auto;">
+            <table class="config-table">
+              <thead>
+                <tr>
+                  <th>Column</th>
+                  <th>PG Type</th>
+                  <th>Label</th>
+                  <th>Field Type Override</th>
+                  <th style="text-align:center;">Hidden</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for col in cols %}
+                {% set ccfg = tcfg.get('columns', {}).get(col.column_name, {}) %}
+                {% set pg = col.data_type %}
+                {% set pill_class = 'int' if 'int' in pg or 'numeric' in pg or 'real' in pg or 'double' in pg
+                                    else 'bool' if 'bool' in pg
+                                    else 'ts' if 'timestamp' in pg or pg == 'date'
+                                    else 'json' if 'json' in pg
+                                    else 'uuid' if 'uuid' in pg
+                                    else 'text' %}
+                <tr>
+                  <td>
+                    <code style="font-size:12px;color:var(--sub);">{{ col.column_name }}</code>
+                    {% if col.foreign_table %}
+                    <span style="font-size:10px;color:var(--accent);margin-left:4px;">→ {{ col.foreign_table }}</span>
+                    {% endif %}
+                  </td>
+                  <td><span class="type-pill {{ pill_class }}">{{ pg }}</span></td>
+                  <td>
+                    <input type="text" class="col-label"
+                      data-table="{{ t }}" data-col="{{ col.column_name }}"
+                      value="{{ ccfg.get('label','') }}"
+                      placeholder="{{ col.column_name }}"
+                      style="width:160px;">
+                  </td>
+                  <td>
+                    <select class="col-type select-sm"
+                      data-table="{{ t }}" data-col="{{ col.column_name }}">
+                      <option value="" {{ 'selected' if not ccfg.get('type') }}>auto ({{ pg }})</option>
+                      <option value="text"     {{ 'selected' if ccfg.get('type')=='text' }}>text input</option>
+                      <option value="textarea" {{ 'selected' if ccfg.get('type')=='textarea' }}>textarea</option>
+                      <option value="boolean"  {{ 'selected' if ccfg.get('type')=='boolean' }}>toggle</option>
+                      <option value="number"   {{ 'selected' if ccfg.get('type')=='number' }}>number</option>
+                      <option value="json"     {{ 'selected' if ccfg.get('type')=='json' }}>JSON editor</option>
+                      <option value="mono"     {{ 'selected' if ccfg.get('type')=='mono' }}>monospace</option>
+                    </select>
+                  </td>
+                  <td style="text-align:center;">
+                    <label class="toggle" style="margin:0 auto;">
+                      <input type="checkbox" class="col-hidden"
+                        data-table="{{ t }}" data-col="{{ col.column_name }}"
+                        {{ 'checked' if ccfg.get('hidden') }}>
+                      <div class="toggle-track"><div class="toggle-thumb"></div></div>
+                    </label>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+
+        <div style="display:flex;justify-content:flex-end;gap:10px;padding:8px 0 32px;">
+          <a href="/backoffice/app/{{ app._id }}/cms" class="btn btn-secondary">Discard</a>
+          <button type="submit" class="btn btn-primary" onclick="buildAndSubmit(event)">Save configuration</button>
+        </div>
+      </form>
+    </div>
+  </main>
+</div>
+
+<script>
+  // ── Theme ───────────────────────────────────────────────────
+  const html = document.documentElement;
+  const themeBtn = document.getElementById('themeBtn');
+  let theme = localStorage.getItem('bifrost-theme') || 'light';
+  function applyTheme(t) {
+    html.setAttribute('data-theme', t);
+    themeBtn.textContent = t === 'dark' ? '☀️' : '🌙';
+    localStorage.setItem('bifrost-theme', t);
+  }
+  applyTheme(theme);
+  themeBtn.addEventListener('click', () => { theme = theme === 'dark' ? 'light' : 'dark'; applyTheme(theme); });
+
+  // ── Hidden tables ───────────────────────────────────────────
+  let hiddenTables = new Set({{ cms_config.get('hidden_tables', []) | tojson | safe }});
+
+  function renderHiddenTags() {
+    const wrap = document.getElementById('hiddenTagsWrap');
+    wrap.innerHTML = '';
+    hiddenTables.forEach(t => {
+      const s = document.createElement('span');
+      s.className = 'hidden-tag';
+      s.dataset.table = t;
+      s.innerHTML = `${t} <span class="x" onclick="removeHiddenTable('${t}')">×</span>`;
+      wrap.appendChild(s);
+    });
+  }
+  function addHiddenTable() {
+    const sel = document.getElementById('addHiddenSelect');
+    if (sel.value) { hiddenTables.add(sel.value); sel.value = ''; renderHiddenTags(); }
+  }
+  function removeHiddenTable(t) { hiddenTables.delete(t); renderHiddenTags(); }
+
+  // ── Table groups ────────────────────────────────────────────
+  let groupCounter = {{ cms_config.get('table_groups', {})|length }};
+  const allTables  = {{ all_tables | tojson | safe }};
+
+  function addGroup() {
+    const c = document.getElementById('groupsContainer');
+    const div = document.createElement('div');
+    div.className = 'group-row';
+    div.style.cssText = 'display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;';
+    div.dataset.group = `Group ${++groupCounter}`;
+    const opts = allTables.map(t => `<option value="${t}">${t}</option>`).join('');
+    div.innerHTML = `
+      <input type="text" class="input-sm group-name" value="Group ${groupCounter}"
+        placeholder="Group name" style="width:140px;flex-shrink:0;" onchange="updateGroupName(this)">
+      <div style="flex:1;">
+        <select multiple class="group-tables" size="4" style="width:100%;font-size:12px;min-height:80px;">
+          ${opts}
+        </select>
+        <div style="font-size:11px;color:var(--sub);margin-top:3px;">Hold ⌘/Ctrl to select multiple</div>
+      </div>
+      <button type="button" onclick="removeGroup(this)"
+        style="margin-top:4px;background:none;border:none;color:var(--bad);cursor:pointer;font-size:18px;line-height:1;">×</button>`;
+    c.appendChild(div);
+  }
+  function updateGroupName(input) {
+    input.closest('.group-row').dataset.group = input.value;
+  }
+  function removeGroup(btn) { btn.closest('.group-row').remove(); }
+
+  // ── Build config JSON and submit ────────────────────────────
+  function buildAndSubmit(e) {
+    e.preventDefault();
+    const config = {
+      hidden_tables: Array.from(hiddenTables),
+      table_groups:  {},
+      tables:        {}
+    };
+
+    // Groups
+    document.querySelectorAll('.group-row').forEach(row => {
+      const name = row.querySelector('.group-name').value.trim();
+      if (!name) return;
+      const selected = Array.from(row.querySelector('.group-tables').selectedOptions).map(o => o.value);
+      if (selected.length) config.table_groups[name] = selected;
+    });
+
+    // Per-table settings
+    document.querySelectorAll('.table-label').forEach(el => {
+      const t = el.dataset.table;
+      if (!config.tables[t]) config.tables[t] = { columns: {} };
+      if (el.value) config.tables[t].label = el.value;
+    });
+    document.querySelectorAll('.table-readonly').forEach(el => {
+      const t = el.dataset.table;
+      if (!config.tables[t]) config.tables[t] = { columns: {} };
+      config.tables[t].readonly = el.checked;
+    });
+
+    // Per-column settings
+    document.querySelectorAll('.col-label,.col-type,.col-hidden').forEach(el => {
+      const t = el.dataset.table;
+      const c = el.dataset.col;
+      if (!config.tables[t]) config.tables[t] = { columns: {} };
+      if (!config.tables[t].columns[c]) config.tables[t].columns[c] = {};
+      if (el.classList.contains('col-label') && el.value)
+        config.tables[t].columns[c].label = el.value;
+      if (el.classList.contains('col-type') && el.value)
+        config.tables[t].columns[c].type = el.value;
+      if (el.classList.contains('col-hidden'))
+        config.tables[t].columns[c].hidden = el.checked;
+    });
+
+    document.getElementById('configJsonInput').value = JSON.stringify(config);
+    document.getElementById('configForm').submit();
+  }
+</script>
+</body>
+</html>
