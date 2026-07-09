@@ -33,6 +33,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     custom_qr_url = None
 
     try:
+        # Priority 1: Webhook Injected Tenant Identity
+        injected_client_id = context.bot_data.get('client_id')
+
         # --- MODE 1: SECURE DATABASE LOOKUP (Enterprise) ---
         if payload.startswith("tx-"):
             tx = get_transaction(payload)
@@ -45,17 +48,15 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("✅ This transaction is already completed.")
                 return ConversationHandler.END
 
-            # --- FIX: ALWAYS FETCH APP DOC ---
             app_doc = get_app_by_id(tx['app_id'])
-
+            
             if not app_doc:
                 await update.message.reply_text("❌ Error: App associated with this transaction not found.")
                 return ConversationHandler.END
 
+            client_id = injected_client_id or app_doc.get('client_id', 'unknown')
             app_name = app_doc.get('app_name', 'Unknown App')
-            client_id = app_doc.get('client_id', 'unknown')
-            custom_qr_url = app_doc.get('app_qr_url')  # <--- GET CUSTOM QR
-            # ---------------------------------
+            custom_qr_url = app_doc.get('app_qr_url')
 
             ctx_data = {
                 "client_id": client_id,
@@ -76,7 +77,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("❌ Invalid format.")
                 return ConversationHandler.END
 
-            client_id = parts[0]
+            client_id = injected_client_id or parts[0]
             price = parts[1]
             duration = parts[2] if len(parts) > 2 else "1m"
             target_role = parts[3] if len(parts) > 3 else "premium_user"
@@ -85,7 +86,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             app_doc = get_app_details(client_id)
             app_name = app_doc.get('app_name', 'Unknown App') if app_doc else 'Unknown'
             if app_doc:
-                custom_qr_url = app_doc.get('app_qr_url') # <--- GET CUSTOM QR
+                custom_qr_url = app_doc.get('app_qr_url')
 
             ctx_data = {
                 "client_id": client_id,

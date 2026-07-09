@@ -1,4 +1,5 @@
 # bifrost/models/payments.py
+import re
 import secrets
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -398,25 +399,95 @@ class PaymentMixin:
     def get_tenant_tables(self, db_conn_str):
         """Fetches the list of tables in the tenant's PostgreSQL database public schema."""
         from bifrost.utils.tenant_db import get_tenant_db
-        sql = "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'"
+        sql = """
+            SELECT table_name FROM information_schema.tables
+            WHERE table_schema='public' AND table_type='BASE TABLE'
+            ORDER BY table_name
+        """
         with get_tenant_db(db_conn_str) as conn:
             with conn.cursor() as cur:
                 cur.execute(sql)
                 return [row[0] for row in cur.fetchall()]
 
-    def get_tenant_table_data(self, db_conn_str, table_name):
-        """Fetches all rows and columns for a target table."""
+    def get_tenant_table_schema(self, db_conn_str, table_name):
+        """Returns column metadata: name, data_type, nullable, char_max_length, fk info."""
         from bifrost.utils.tenant_db import get_tenant_db
-        from decimal import Decimal
-        # Defensive check on table_name to avoid SQL injection
-        assert table_name.isalnum() or '_' in table_name
-        
-        sql = f"SELECT * FROM {table_name} ORDER BY id ASC"
+        sql = """
+            SELECT
+                c.column_name,
+                c.data_type,
+                c.udt_name,
+                c.is_nullable,
+                c.character_maximum_length,
+                c.numeric_precision,
+                fk.foreign_table,
+                fk.foreign_column
+            FROM information_schema.columns c
+            LEFT JOIN (
+                SELECT
+                    kcu.column_name,
+                    ccu.table_name AS foreign_table,
+                    ccu.column_name AS foreign_column
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.key_column_usage kcu 
+                    ON tc.constraint_name = kcu.constraint_name
+                JOIN information_schema.constraint_column_usage ccu 
+                    ON ccu.constraint_name = tc.constraint_name
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                  AND tc.table_name = %s
+            ) fk ON c.column_name = fk.column_name
+            WHERE c.table_schema = 'public' AND c.table_name = %s
+            ORDER BY c.ordinal_position
+        """
         with get_tenant_db(db_conn_str) as conn:
             with conn.cursor() as cur:
-                cur.execute(sql)
+                cur.execute(sql, [table_name, table_name])
+                keys = [d[0] for d in cur.description]
+                return [dict(zip(keys, r)) for r in cur.fetchall()]
+
+    def get_tenant_table_data(self, db_conn_str, table_name, limit=50, offset=0, sort_by='id', sort_dir='desc', search_query=None):
+        """Fetches rows for a target table with pagination, sorting, and optional search."""
+        from bifrost.utils.tenant_db import get_tenant_db
+        from decimal import Decimal
+        # Defensive check on table_name and sort_dir to avoid SQL injection
+        assert re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', table_name), "Invalid table name"
+        sort_dir = 'ASC' if sort_dir.lower() == 'asc' else 'DESC'
+
+        # Also validate sort_by against valid columns (fetch schema first)
+        schema = self.get_tenant_table_schema(db_conn_str, table_name)
+        valid_columns = [col['column_name'] for col in schema]
+        if sort_by not in valid_columns:
+            sort_by = valid_columns[0] if valid_columns else 'id'
+
+        params = []
+        where_clause = ""
+        
+        # If searching, we cast all text-like columns to text and check ILIKE
+        if search_query:
+            text_columns = [col['column_name'] for col in schema if col['data_type'] in ('character varying', 'text', 'character')]
+            if text_columns:
+                search_conditions = []
+                for col in text_columns:
+                    search_conditions.append(f'"{col}" ILIKE %s')
+                    params.append(f'%{search_query}%')
+                where_clause = "WHERE " + " OR ".join(search_conditions)
+
+        sql = f'SELECT * FROM "{table_name}" {where_clause} ORDER BY "{sort_by}" {sort_dir} LIMIT %s OFFSET %s'
+        params.extend([limit, offset])
+
+        # We also want to get the total count for pagination
+        count_sql = f'SELECT COUNT(*) FROM "{table_name}" {where_clause}'
+        count_params = params[:-2]
+
+        with get_tenant_db(db_conn_str) as conn:
+            with conn.cursor() as cur:
+                cur.execute(count_sql, count_params)
+                total_count = cur.fetchone()[0]
+
+                cur.execute(sql, params)
                 columns = [desc[0] for desc in cur.description]
                 results = []
+                import json
                 for row in cur.fetchall():
                     d = dict(zip(columns, row))
                     for k, v in d.items():
@@ -424,63 +495,160 @@ class PaymentMixin:
                             d[k] = float(v)
                         elif isinstance(v, datetime):
                             d[k] = v.isoformat()
+                        elif isinstance(v, (dict, list)):
+                            d[k] = json.dumps(v)
                     results.append(d)
-                return columns, results
+                return columns, results, total_count
 
-    def save_tenant_table_row(self, db_conn_str, table_name, row_id, data):
+    def get_distinct_column_values(self, db_conn_str, table_name, column_name):
+        """Returns distinct values for a column — used to build enum selects."""
+        from bifrost.utils.tenant_db import get_tenant_db
+        assert re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', table_name)
+        assert re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', column_name)
+        sql = f'SELECT DISTINCT "{column_name}" FROM "{table_name}" WHERE "{column_name}" IS NOT NULL LIMIT 50'
+        with get_tenant_db(db_conn_str) as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql)
+                return [row[0] for row in cur.fetchall()]
+
+    # ------------------------------------------------------------------
+    # CMS CONFIG — per-app schema annotations stored in MongoDB
+    # ------------------------------------------------------------------
+
+    def get_cms_config(self, app_id):
+        """Returns the CMS config for an app. Creates default if missing."""
+        doc = self.db.applications.find_one(
+            {"_id": ObjectId(app_id)},
+            {"cms_config": 1}
+        )
+        return (doc or {}).get("cms_config", {})
+
+    def save_cms_config(self, app_id, config):
+        """Persists CMS config dict to MongoDB applications document."""
+        self.db.applications.update_one(
+            {"_id": ObjectId(app_id)},
+            {"$set": {"cms_config": config}}
+        )
+        return True
+
+    def log_cms_mutation(self, app_id, table_name, action, row_id, acting_user, before=None, after=None):
+        """Mandatory server-side logging for CMS edits (PRD Sec 8.5)."""
+        from datetime import datetime, timezone
+        self.db.cms_audit_log.insert_one({
+            "app_id": str(app_id),
+            "table": table_name,
+            "action": action,
+            "row_id": row_id,
+            "acting_user": acting_user,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "before": before,
+            "after": after
+        })
+
+    def save_tenant_table_row(self, db_conn_str, table_name, row_id, data, app_id=None, acting_user=None):
         """Updates a row in the tenant database public schema."""
         from bifrost.utils.tenant_db import get_tenant_db
-        assert table_name.isalnum() or '_' in table_name
-        
-        # Build dynamic query safely
+        assert re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', table_name)
+
         fields = []
         params = []
         for k, v in data.items():
             if k == 'id':
                 continue
-            fields.append(f"{k} = %s")
-            params.append(v)
-            
+            fields.append(f'"{k}" = %s')
+            params.append(v if v != '' else None)
+
         params.append(row_id)
-        sql = f"UPDATE {table_name} SET {', '.join(fields)} WHERE id = %s"
-        
+        sql = f'UPDATE "{table_name}" SET {", ".join(fields)} WHERE id = %s RETURNING *'
+
         with get_tenant_db(db_conn_str) as conn:
             with conn.cursor() as cur:
+                # Fetch BEFORE state for logging
+                cur.execute(f'SELECT * FROM "{table_name}" WHERE id = %s', [row_id])
+                before_row = cur.fetchone()
+                before_dict = dict(zip([desc[0] for desc in cur.description], before_row)) if before_row else None
+
                 cur.execute(sql, params)
+                after_row = cur.fetchone()
+                after_dict = dict(zip([desc[0] for desc in cur.description], after_row)) if after_row else None
                 conn.commit()
+
+        # Decimal and datetime are not JSON serializable out of the box for MongoDB
+        def sanitize_dict(d):
+            if not d: return d
+            from decimal import Decimal
+            out = {}
+            for k,v in d.items():
+                if isinstance(v, Decimal): out[k] = float(v)
+                elif isinstance(v, datetime): out[k] = v.isoformat()
+                else: out[k] = v
+            return out
+
+        if app_id and acting_user:
+            self.log_cms_mutation(app_id, table_name, "UPDATE", row_id, acting_user, sanitize_dict(before_dict), sanitize_dict(after_dict))
         return True
 
-    def insert_tenant_table_row(self, db_conn_str, table_name, data):
+    def insert_tenant_table_row(self, db_conn_str, table_name, data, app_id=None, acting_user=None):
         """Inserts a new row in the tenant database public schema."""
         from bifrost.utils.tenant_db import get_tenant_db
-        assert table_name.isalnum() or '_' in table_name
-        
-        cols = []
-        placeholders = []
-        params = []
+        assert re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', table_name)
+
+        cols, placeholders, params = [], [], []
         for k, v in data.items():
             if k == 'id':
                 continue
-            cols.append(k)
-            placeholders.append("%s")
-            params.append(v)
-            
-        sql = f"INSERT INTO {table_name} ({', '.join(cols)}) VALUES ({', '.join(placeholders)})"
-        
+            cols.append(f'"{k}"')
+            placeholders.append('%s')
+            params.append(v if v != '' else None)
+
+        sql = f'INSERT INTO "{table_name}" ({", ".join(cols)}) VALUES ({", ".join(placeholders)}) RETURNING *'
+
         with get_tenant_db(db_conn_str) as conn:
             with conn.cursor() as cur:
                 cur.execute(sql, params)
+                after_row = cur.fetchone()
+                after_dict = dict(zip([desc[0] for desc in cur.description], after_row)) if after_row else None
                 conn.commit()
+
+        def sanitize_dict(d):
+            if not d: return d
+            from decimal import Decimal
+            out = {}
+            for k,v in d.items():
+                if isinstance(v, Decimal): out[k] = float(v)
+                elif isinstance(v, datetime): out[k] = v.isoformat()
+                else: out[k] = v
+            return out
+
+        if app_id and acting_user:
+            self.log_cms_mutation(app_id, table_name, "CREATE", after_dict.get('id') if after_dict else None, acting_user, None, sanitize_dict(after_dict))
         return True
 
-    def delete_tenant_table_row(self, db_conn_str, table_name, row_id):
+    def delete_tenant_table_row(self, db_conn_str, table_name, row_id, app_id=None, acting_user=None):
         """Deletes a row from the tenant database public schema."""
         from bifrost.utils.tenant_db import get_tenant_db
-        assert table_name.isalnum() or '_' in table_name
-        
-        sql = f"DELETE FROM {table_name} WHERE id = %s"
+        assert re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', table_name)
+
         with get_tenant_db(db_conn_str) as conn:
             with conn.cursor() as cur:
+                cur.execute(f'SELECT * FROM "{table_name}" WHERE id = %s', [row_id])
+                before_row = cur.fetchone()
+                before_dict = dict(zip([desc[0] for desc in cur.description], before_row)) if before_row else None
+                
+                sql = f'DELETE FROM "{table_name}" WHERE id = %s'
                 cur.execute(sql, [row_id])
                 conn.commit()
+
+        def sanitize_dict(d):
+            if not d: return d
+            from decimal import Decimal
+            out = {}
+            for k,v in d.items():
+                if isinstance(v, Decimal): out[k] = float(v)
+                elif isinstance(v, datetime): out[k] = v.isoformat()
+                else: out[k] = v
+            return out
+
+        if app_id and acting_user:
+            self.log_cms_mutation(app_id, table_name, "DELETE", row_id, acting_user, sanitize_dict(before_dict), None)
         return True

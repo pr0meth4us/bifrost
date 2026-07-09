@@ -49,5 +49,11 @@ class Config:
     TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN')
     TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER')
 
+    # --- PLATFORM DATA LOCKS (CMS) ---
+    PLATFORM_LOCKED_TABLES = {
+        'finance-bot': ['transactions', 'user_balances', 'ledger', 'bank_accounts'],
+        'savvify': ['transactions', 'user_balances', 'ledger', 'bank_accounts']
+    }
+
     if not SECRET_KEY or not MONGO_URI or not JWT_SECRET_KEY or not EMAIL_PASSWORD:
         raise RuntimeError("CRITICAL: Missing .env keys (EMAIL_PASSWORD, SECRET_KEY, etc.)")

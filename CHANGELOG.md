@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-07-09]
+### Added
+- Multi-Tenant UI Configuration: App Owners can now input and update their `db_connection` (PostgreSQL/Supabase) string directly from the Configuration tab in the Bifrost Backoffice.
+- Inference Engine: Automatically detects and renders monetary columns, avatar columns, and status pills (active/pending) in the Content Editor grid.
+- Platform Lock Badges: Locked tables (like 'transactions' or 'payments') now display a "Protected by Bifrost data policy" badge to indicate they are read-only for tenant operators.
+
+### Security
+- UI input elements are correctly disabled when the user lacks the required `write` permissions for specific tables or columns, reinforcing the Layer B RBAC on the frontend.
+
 All notable changes to the `bifrost` project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
