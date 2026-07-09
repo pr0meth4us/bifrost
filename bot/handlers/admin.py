@@ -32,9 +32,13 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data_part = query.data.replace("pay_approve_", "")
 
-    try:
-        user_id, target_app_client_id = data_part.split('|', 1)
-    except ValueError:
+    payment_id = None
+    parts = data_part.split('|')
+    if len(parts) == 3:
+        user_id, target_app_client_id, payment_id = parts
+    elif len(parts) == 2:
+        user_id, target_app_client_id = parts
+    else:
         await query.answer("❌ Error: Invalid Data")
         return
 
@@ -44,7 +48,7 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer("Approving...")
 
     # 1. Grant the Role in DB (Handles both ObjectId and Telegram ID)
-    success = call_grant_premium(user_id, target_app_client_id)
+    success = call_grant_premium(user_id, target_app_client_id, payment_id=payment_id)
 
     if success:
         # 2. Fetch Friendly Name for Display
@@ -101,13 +105,33 @@ async def admin_reject_confirm(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     data_part = query.data.replace("pay_reject_confirm_", "")
 
-    try:
-        user_id, target_app, reason = data_part.split('|')
-    except ValueError:
+    payment_id = None
+    parts = data_part.split('|')
+    if len(parts) == 4:
+        user_id, target_app, payment_id, reason = parts
+    elif len(parts) == 3:
+        user_id, target_app, reason = parts
+    else:
         await query.answer("❌ Data Error")
         return
 
     if not await _verify_admin(update, target_client_id=target_app): return
+
+    # If SQL payment, update status to rejected in Postgres
+    if payment_id:
+        try:
+            from bot.database import get_db
+            from bifrost.models import BifrostDB
+            db_instance = get_db()
+            logic = BifrostDB(db_instance.client, db_instance.name)
+            app_doc = logic.get_app_by_client_id(target_app)
+            db_connection = app_doc.get("db_connection")
+            if db_connection:
+                db_conn_str = db_connection.get("url") if isinstance(db_connection, dict) else str(db_connection)
+                logic.reject_manual_payment(db_conn_str, int(payment_id), reviewer_id="telegram_bot", reason=reason)
+        except Exception as e:
+            import logging
+            logging.getLogger("bifrost-bot").error(f"SQL rejection failed: {e}")
 
     await query.edit_message_caption(
         caption=f"{query.message.caption}\n\n❌ <b>REJECTED ({reason})</b> by {update.effective_user.first_name}",

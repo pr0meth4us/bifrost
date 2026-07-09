@@ -44,9 +44,14 @@
     {% endif %}
     {% endwith %}
 
-    <div class="flex space-x-1 mb-8 bg-slate-200 p-1 rounded-xl w-fit">
-        <button @click="activeTab = 'users'" :class="activeTab === 'users' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="px-6 py-2 rounded-lg text-sm font-bold transition-all">Users</button>
-        <button @click="activeTab = 'settings'" :class="activeTab === 'settings' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="px-6 py-2 rounded-lg text-sm font-bold transition-all">Configuration</button>
+    <div class="flex justify-between items-center mb-8">
+        <div class="flex space-x-1 bg-slate-200 p-1 rounded-xl w-fit">
+            <button @click="activeTab = 'users'" :class="activeTab === 'users' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="px-6 py-2 rounded-lg text-sm font-bold transition-all">Users</button>
+            <button @click="activeTab = 'settings'" :class="activeTab === 'settings' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="px-6 py-2 rounded-lg text-sm font-bold transition-all">Configuration</button>
+        </div>
+        <a href="{{ url_for('backoffice.view_manual_payments', app_id=app._id) }}" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-md">
+            💳 Payment Queue
+        </a>
     </div>
 
     <div x-show="activeTab === 'users'" class="space-y-6">

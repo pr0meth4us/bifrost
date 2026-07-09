@@ -54,7 +54,7 @@ class AppMixin:
 
     def update_app_details(self, app_id, data):
         """Updates non-sensitive app details."""
-        allowed_fields = ['app_name', 'app_callback_url', 'app_web_url', 'app_api_url', 'app_logo_url', 'app_qr_url', 'telegram_bot_token', 'enabled_services']
+        allowed_fields = ['app_name', 'app_callback_url', 'app_web_url', 'app_api_url', 'app_logo_url', 'app_qr_url', 'telegram_bot_token', 'enabled_services', 'custom_domain', 'db_connection', 'notification_configs']
         updates = {k: v for k, v in data.items() if k in allowed_fields}
 
         if updates:
