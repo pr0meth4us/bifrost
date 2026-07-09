@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Valhalla Portal | Bifrost Bridge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #030712;
+            background-image: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #030712 70%);
+        }
+        .rune-glow {
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.15);
+        }
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(245, 158, 11, 0.1);
+        }
+    </style>
+</head>
+<body class="min-h-screen py-16 px-6 flex flex-col items-center justify-center text-slate-100">
+
+    <div class="w-full max-w-4xl space-y-12">
+        
+        <!-- Norse Header -->
+        <div class="text-center space-y-4">
+            <div class="h-20 w-20 bg-gradient-to-br from-amber-400 to-amber-700 rounded-3xl flex items-center justify-center text-slate-950 text-4xl font-extrabold mx-auto shadow-2xl rune-glow">
+                ⚡
+            </div>
+            <h1 class="text-4xl font-extrabold tracking-wide uppercase bg-clip-text text-transparent bg-gradient-to-r from-amber-300 via-amber-100 to-indigo-300">
+                Valhalla Portal
+            </h1>
+            <p class="text-slate-400 text-sm max-w-lg mx-auto leading-relaxed">
+                A mock client application situated in Midgard, testing credentials and RBAC sessions received from the Bifrost bridge.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-8">
+            
+            <!-- Warrior Identity Card -->
+            <div class="md:col-span-4 flex flex-col">
+                <div class="glass-panel rounded-3xl p-8 flex-grow flex flex-col justify-between relative overflow-hidden">
+                    <div class="absolute -top-10 -right-10 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl"></div>
+                    
+                    <div>
+                        <h2 class="text-xs font-extrabold text-amber-400 uppercase tracking-widest mb-6">Warrior Identity</h2>
+                        
+                        {% if user %}
+                        <div class="space-y-6">
+                            <div class="flex items-center gap-4">
+                                <div class="h-14 w-14 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-2xl flex items-center justify-center text-2xl font-bold">
+                                    {{ user.name[0]|upper }}
+                                </div>
+                                <div>
+                                    <h3 class="font-extrabold text-white text-lg">{{ user.name }}</h3>
+                                    <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold uppercase tracking-widest border border-amber-500/30">
+                                        {{ user.role }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="border-t border-slate-800 pt-5 space-y-1.5">
+                                <p class="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider">Midgard Contact</p>
+                                <p class="text-sm font-semibold text-slate-300 break-all">{{ user.email }}</p>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-10 space-y-4">
+                            <p class="text-slate-500 text-sm leading-relaxed">
+                                No session token resolved. Request access from Heimdall at the Bifrost gates.
+                            </p>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mt-8">
+                        {% if user %}
+                        <a href="{{ url_for('logout') }}" class="block w-full py-4 text-center bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white font-bold rounded-2xl transition-all text-xs tracking-wider uppercase">
+                            Depart Valhalla
+                        </a>
+                        {% else %}
+                        <a href="{{ url_for('login') }}" class="block w-full py-4 text-center bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-extrabold rounded-2xl shadow-lg shadow-amber-950/20 transition-all text-xs tracking-wider uppercase">
+                            Enter the Bifrost Bridge
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vault Configuration -->
+            <div class="md:col-span-8 space-y-8">
+                
+                <!-- SDK Monitor -->
+                <div class="glass-panel rounded-3xl p-8 shadow-2xl">
+                    <h2 class="text-xs font-extrabold text-amber-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                        <span class="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></span>
+                        Asgard Vault Diagnostics
+                    </h2>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-800">
+                                    <th class="py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Config Param</th>
+                                    <th class="py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Injected Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-900">
+                                {% for key, val in diagnostics.items() %}
+                                <tr>
+                                    <td class="py-4 font-mono text-xs font-bold text-slate-400">{{ key }}</td>
+                                    <td class="py-4">
+                                        <span class="text-xs font-semibold px-2.5 py-1 rounded-lg border 
+                                            {% if 'Missing' in val or 'Fallback' in val %}bg-red-950/20 text-red-400 border-red-900/50
+                                            {% elif 'Injected' in val or 'Present' in val %}bg-amber-950/30 text-amber-400 border-amber-900/40
+                                            {% else %}bg-indigo-950/20 text-indigo-300 border-indigo-900/30{% endif %}">
+                                            {{ val }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Runes Reference -->
+                <div class="glass-panel rounded-3xl p-8">
+                    <h2 class="text-xs font-extrabold text-amber-400 uppercase tracking-widest mb-3">Verification Script</h2>
+                    <p class="text-slate-400 text-xs mb-4">Validate JWT claims forwarded across the rainbow bridge:</p>
+                    
+                    <pre class="bg-slate-950/80 rounded-xl p-5 border border-slate-900 font-mono text-[11px] text-slate-300 overflow-x-auto leading-relaxed">
+<span class="text-amber-500">import</span> jwt
+
+<span class="text-slate-500"># Verify signature locally using shared secret key</span>
+payload = jwt.decode(
+    token,
+    JWT_SECRET_KEY,
+    algorithms=[<span class="text-indigo-400">"HS256"</span>],
+    audience=CLIENT_ID
+)</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
