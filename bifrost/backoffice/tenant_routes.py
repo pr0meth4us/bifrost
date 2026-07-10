@@ -445,6 +445,42 @@ def delete_cms_row(app_id, table_name, row_id):
 # CMS CONFIG — schema annotations (rename, hide, group, readonly)
 # -----------------------------------------------------------------------
 
+@backoffice_bp.route('/api/app/<app_id>/cms/<table_name>/lookup', methods=['GET'])
+@login_required
+def lookup_cms_table(app_id, table_name):
+    from flask import jsonify
+    db = get_db()
+    
+    # We do a basic read permission check (any role can read for lookup if they have access to CMS)
+    # But for strict security, we just ensure they are logged in and part of the app
+    current_role = get_current_role_in_app(app_id)
+    if not current_role:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
+    if not app:
+        return jsonify({"error": "App not found"}), 404
+
+    db_conn_str = get_tenant_db_conn_str(app)
+    if not db_conn_str:
+        return jsonify({"error": "DB not configured"}), 400
+
+    try:
+        rows, _ = db.get_tenant_table_data(db_conn_str, table_name, limit=200, offset=0)
+        results = []
+        for r in rows:
+            # Synthesize label
+            label = str(r.get('id', ''))
+            for key in ['name', 'title', 'email', 'display_name', 'username']:
+                if key in r and r[key]:
+                    label = str(r[key])
+                    break
+            results.append({"id": r.get('id'), "label": label})
+        return jsonify(results)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @backoffice_bp.route('/app/<app_id>/cms/settings', methods=['GET', 'POST'])
 @login_required
 def cms_settings(app_id):
