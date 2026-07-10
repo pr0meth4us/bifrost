@@ -256,6 +256,18 @@ def update_user_profile(account_id):
     else:
         return jsonify({"error": msg}), 409
 
+@internal_bp.route('/auth/users/<account_id>', methods=['DELETE'])
+@require_service_auth
+def delete_user_account(account_id):
+    """Deletes a core identity in Bifrost."""
+    db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
+    success = db.delete_account(account_id)
+    if success:
+        return jsonify({"success": True}), 200
+    else:
+        return jsonify({"error": "Account not found or delete failed"}), 404
+
+
 
 @internal_bp.route('/users/<user_id>', methods=['GET'])
 @require_service_auth

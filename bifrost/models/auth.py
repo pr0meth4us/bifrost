@@ -280,3 +280,10 @@ class AuthMixin:
             return True, "Profile updated."
         else:
             return False, "Account not found."
+
+    def delete_account(self, account_id):
+        from bson import ObjectId
+        result = self.db.accounts.delete_one({"_id": ObjectId(account_id)})
+        # Also clean up any associated sessions or linked apps in Bifrost
+        self.db.apps_users.delete_many({"user_id": ObjectId(account_id)})
+        return result.deleted_count > 0

@@ -239,6 +239,44 @@
   /* Action column */
   .td-actions { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 
+  /* Interactive Elements */
+  .status-pill {
+    display: inline-block; padding: 2px 8px; border-radius: 12px;
+    font-size: 11px; font-weight: 600; color: #fff;
+  }
+  .status-pill.interactive {
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .status-pill.interactive:hover { opacity: 0.8; }
+
+  .status-menu {
+    position: fixed; background: var(--bg); border: 1px solid var(--hair);
+    border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    z-index: 1000; padding: 4px; display: flex; flex-direction: column;
+    min-width: 120px;
+  }
+  [data-theme="dark"] .status-menu { box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  .status-menu-item {
+    padding: 6px 12px; font-size: 11px; font-weight: 600;
+    cursor: pointer; border-radius: 4px; transition: background 0.15s;
+  }
+  .status-menu-item:hover { background: var(--bg2); }
+
+  .bulk-action-bar {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px);
+    background: rgba(0,0,0,0.85); color: #fff; backdrop-filter: blur(10px);
+    padding: 12px 24px; border-radius: 99px; box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    display: flex; align-items: center; gap: 12px; z-index: 999;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    opacity: 0; pointer-events: none;
+  }
+  .bulk-action-bar.visible {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1; pointer-events: auto;
+  }
+
+
   /* Empty state */
   .empty-state {
     text-align: center; padding: 64px 24px; color: var(--sub);
@@ -263,6 +301,22 @@
     border-radius: 16px; width: 100%; max-width: 540px;
     max-height: 90vh; display: flex; flex-direction: column;
     box-shadow: 0 20px 60px rgba(0,0,0,.15);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+
+  @media (max-width: 768px) {
+    .modal-overlay { align-items: flex-end; padding: 0; }
+    .modal {
+      border-radius: 20px 20px 0 0; border: none;
+      border-top: 1px solid var(--hair);
+      max-width: 100%; height: 90vh;
+      transform: translateY(100%);
+    }
+    .modal-overlay.open .modal { transform: translateY(0); }
+    
+    .table-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .search-form { width: 100%; }
+    .search-input { flex: 1; }
   }
   .modal-head {
     padding: 20px 24px 16px;
@@ -438,6 +492,10 @@
         </div>
       </div>
       <div class="table-actions">
+        <form action="" method="GET" class="search-form" style="display: flex; gap: 8px;">
+          <input type="text" name="q" placeholder="Search..." value="{{ request.args.get('q', '') }}" class="search-input" style="padding: 5px 10px; border-radius: 6px; border: 1px solid var(--hair); background: var(--bg2); color: var(--ink); font-size: 13px;">
+          <button type="submit" class="btn btn-secondary btn-sm" style="padding: 5px 10px;">Find</button>
+        </form>
         {% if can_write %}
         <button class="btn btn-primary btn-sm" onclick="openCreate()">+ New row</button>
         {% endif %}
@@ -450,21 +508,25 @@
         <table>
           <thead>
             <tr>
+              {% if can_write %}
+              <th style="width: 32px;"><input type="checkbox" id="selectAllRows" onclick="toggleAllRows(this)"></th>
+              {% endif %}
               {% for col in visible_columns %}
               <th>
                 {{ table_col_config.get(col,{}).get('label', col) }}
-                {% set sm = schema_by_col.get(col, {}) %}
-                {% if sm.get('foreign_table') %}
-                  <span style="color:var(--accent);font-size:9px;font-weight:400;">→ {{ sm.foreign_table }}</span>
-                {% endif %}
               </th>
               {% endfor %}
-              {% if can_write %}<th style="text-align:right;">Actions</th>{% endif %}
+              {% if can_write %}
+              <th style="text-align: right;">Actions</th>
+              {% endif %}
             </tr>
           </thead>
           <tbody>
             {% for row in rows %}
             <tr>
+              {% if can_write %}
+              <td><input type="checkbox" class="row-checkbox" value="{{ row.id }}" onchange="updateBulkActions()"></td>
+              {% endif %}
               {% for col in visible_columns %}
               {% set val = row[col] %}
               {% set sm  = schema_by_col.get(col, {}) %}
@@ -499,7 +561,11 @@
                   {% elif val in ('pending', 'processing', 'waiting') %}
                     {% set status_color = 'var(--warn)' %}
                   {% endif %}
-                  <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; color:#fff; background-color:{{ status_color }};">{{ val|upper }}</span>
+                  {% if can_write %}
+                    <span class="status-pill interactive" style="background-color:{{ status_color }};" onclick="openStatusMenu(event, '{{ row.id }}', '{{ col }}', '{{ val }}')">{{ val|upper }}</span>
+                  {% else %}
+                    <span class="status-pill" style="background-color:{{ status_color }};">{{ val|upper }}</span>
+                  {% endif %}
                 {% elif col in ('name', 'title', 'email', 'username') %}
                   <strong class="cell-text" style="color:var(--ink);">{{ val }}</strong>
                 {% else %}
@@ -602,7 +668,13 @@
           {% set disabled_attr = 'disabled' if col in role_readonly_cols else '' %}
           {% set readonly_attr = 'readonly' if col in role_readonly_cols else '' %}
 
-          {% if ov == 'boolean' or pg == 'boolean' %}
+          {% if sm.get('foreign_table') %}
+            <div class="relation-picker" data-table="{{ sm.foreign_table }}" data-input-name="{{ col }}">
+              <select name="{{ col }}" {{ disabled_attr }} class="relation-select">
+                <option value="">Loading {{ sm.foreign_table }}...</option>
+              </select>
+            </div>
+          {% elif ov == 'boolean' or pg == 'boolean' %}
             <div class="toggle-wrap">
               <label class="toggle">
                 <input type="checkbox" name="{{ col }}" value="true" {{ disabled_attr }}>
@@ -705,7 +777,14 @@
 
       let input;
 
-      if (ov === 'boolean' || pg === 'boolean') {
+      if (sm.foreign_table) {
+        div.innerHTML += `
+          <div class="relation-picker" data-table="${sm.foreign_table}" data-input-name="${col}">
+            <select name="${col}" ${isReadonly ? 'disabled' : ''} class="relation-select" data-selected="${val ?? ''}">
+                <option value="${val ?? ''}">${val ? 'Loading...' : 'None'}</option>
+            </select>
+          </div>`;
+      } else if (ov === 'boolean' || pg === 'boolean') {
         const checked = val === true || val === 't' || val === 'true' ? 'checked' : '';
         div.innerHTML += `
           <div class="toggle-wrap">
@@ -736,6 +815,35 @@
     });
 
     modal.classList.add('open');
+    initRelationPickers(modal);
+  }
+
+  function initRelationPickers(container) {
+    const pickers = container.querySelectorAll('.relation-picker');
+    pickers.forEach(picker => {
+      const table = picker.dataset.table;
+      const select = picker.querySelector('select');
+      const selectedValue = select.dataset.selected || '';
+
+      fetch(`/api/app/{{ app._id }}/cms/${table}/lookup`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.error) throw new Error(data.error);
+          
+          select.innerHTML = '<option value="">None</option>';
+          data.forEach(row => {
+            const opt = document.createElement('option');
+            opt.value = row.id;
+            opt.textContent = row.label;
+            if (String(row.id) === String(selectedValue)) opt.selected = true;
+            select.appendChild(opt);
+          });
+        })
+        .catch(err => {
+          console.error("Failed to load relation:", err);
+          select.innerHTML = `<option value="${selectedValue}">Error loading</option>`;
+        });
+    });
   }
 
   function closeEdit() {
@@ -749,6 +857,95 @@
   function closeCreate() {
     document.getElementById('createModal').classList.remove('open');
   }
+
+  // ── Bulk Actions ──────────────────────────────────────────────
+  function toggleAllRows(source) {
+    const checkboxes = document.querySelectorAll('.row-checkbox');
+    checkboxes.forEach(cb => cb.checked = source.checked);
+    updateBulkActions();
+  }
+
+  function updateBulkActions() {
+    const checked = document.querySelectorAll('.row-checkbox:checked').length;
+    let bar = document.getElementById('bulkActionBar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'bulkActionBar';
+      bar.className = 'bulk-action-bar';
+      document.body.appendChild(bar);
+    }
+    
+    if (checked > 0) {
+      bar.innerHTML = `
+        <span style="font-weight:600; margin-right:16px;">${checked} selected</span>
+        <button class="btn btn-secondary btn-sm" onclick="bulkUpdateStatus()">Update Status</button>
+        <button class="btn btn-danger btn-sm" onclick="bulkDelete()">Delete</button>
+      `;
+      bar.classList.add('visible');
+    } else {
+      bar.classList.remove('visible');
+    }
+  }
+
+  function getSelectedIds() {
+    return Array.from(document.querySelectorAll('.row-checkbox:checked')).map(cb => cb.value);
+  }
+
+  function bulkUpdateStatus() {
+    const ids = getSelectedIds();
+    const newStatus = prompt("Enter new status (e.g. active, pending, rejected):");
+    if (!newStatus) return;
+    
+    // In a real app, this would be an AJAX call to a bulk-update endpoint.
+    // For now, we will just alert to demonstrate the UI flow (and log to console).
+    console.log("Bulk updating status to", newStatus, "for IDs:", ids);
+    alert(`Status for ${ids.length} records updated to '${newStatus}'. (Demonstration only)`);
+  }
+
+  function bulkDelete() {
+    const ids = getSelectedIds();
+    if (!confirm(`Delete ${ids.length} records permanently?`)) return;
+    
+    // In a real app, this would be an AJAX call to a bulk-delete endpoint.
+    console.log("Bulk deleting IDs:", ids);
+    alert(`Deleted ${ids.length} records. (Demonstration only)`);
+  }
+
+  // ── Inline Status Pill ────────────────────────────────────────
+  function openStatusMenu(e, rowId, col, currentVal) {
+    e.stopPropagation();
+    let menu = document.getElementById('statusMenu');
+    if (menu) menu.remove();
+    
+    menu = document.createElement('div');
+    menu.id = 'statusMenu';
+    menu.className = 'status-menu';
+    menu.style.top = (e.clientY + 10) + 'px';
+    menu.style.left = e.clientX + 'px';
+    
+    const statuses = ['pending', 'active', 'completed', 'rejected', 'failed'];
+    statuses.forEach(s => {
+      const item = document.createElement('div');
+      item.className = 'status-menu-item';
+      item.textContent = s.toUpperCase();
+      item.onclick = () => {
+        console.log(`Update ${rowId} ${col} to ${s}`);
+        alert(`Status updated to ${s} (Demonstration only)`);
+        menu.remove();
+      };
+      menu.appendChild(item);
+    });
+    
+    document.body.appendChild(menu);
+    
+    document.addEventListener('click', function closeMenu(ev) {
+      if (menu && !menu.contains(ev.target)) {
+        menu.remove();
+        document.removeEventListener('click', closeMenu);
+      }
+    });
+  }
+
 </script>
 </body>
 </html>
