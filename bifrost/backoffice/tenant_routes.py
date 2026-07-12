@@ -241,6 +241,17 @@ def view_cms_grid(app_id):
 
     # Load per-app CMS config from MongoDB
     cms_config = db.get_cms_config(str(app['_id']))
+    
+    # Check if onboarded
+    is_onboarded = cms_config.get('is_onboarded', False)
+    if not is_onboarded:
+        current_role = get_current_role_in_app(app_id)
+        if current_role in ('owner', 'super_admin', 'admin', 'heimdall', 'pr0meth4us'):
+            return redirect(url_for('backoffice.cms_onboarding', app_id=app_id))
+        else:
+            flash("CMS has not been configured by an admin yet.", "warning")
+            return redirect(url_for('backoffice.dashboard'))
+
     table_groups = cms_config.get('table_groups', {})
 
     try:
@@ -530,3 +541,147 @@ def cms_settings(app_id):
         current_role=current_role,
         locked_tables=locked_tables
     )
+
+def _generate_smart_cms_config(all_tables):
+    """
+    Auto-detect backend tables to hide, and suggest friendly labels for the rest.
+    """
+    config = {
+        "is_onboarded": False,
+        "hidden_tables": [],
+        "table_groups": {},
+        "tables": {},
+        "roles": {}
+    }
+    
+    backend_keywords = ['migration', 'schema', 'auth', 'token', 'session', 'spatial_ref_sys', 'logs', 'audit']
+    
+    for t in all_tables:
+        t_lower = t.lower()
+        # Hide backend/system tables
+        if any(k in t_lower for k in backend_keywords):
+            config["hidden_tables"].append(t)
+            continue
+            
+        # Suggest friendly labels
+        label = t.replace('_', ' ').title()
+        if t_lower == 'users': label = 'Customers'
+        
+        config["tables"][t] = {
+            "label": label,
+            "columns": {}
+        }
+    
+    return config
+
+@backoffice_bp.route('/app/<app_id>/cms/onboarding', methods=['GET', 'POST'])
+@login_required
+def cms_onboarding(app_id):
+    db = get_db()
+    if not check_permission(app_id, "write:config"):
+        flash("Unauthorized.", "danger")
+        return redirect(url_for('backoffice.dashboard'))
+
+    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
+    if not app:
+        flash("Application not found.", "danger")
+        return redirect(url_for('backoffice.dashboard'))
+
+    db_conn_str = get_tenant_db_conn_str(app)
+    if not db_conn_str:
+        flash("Tenant DB connection not configured.", "warning")
+        return redirect(url_for('backoffice.view_app', app_id=app_id))
+        
+    cms_config = db.get_cms_config(str(app['_id']))
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        # Regardless of action, we mark as onboarded if they save or continue
+        raw_config = request.form.get('cms_config_json')
+        if raw_config:
+            import json
+            try:
+                new_config = json.loads(raw_config)
+                new_config['is_onboarded'] = True
+                db.save_cms_config(str(app['_id']), new_config)
+            except Exception as e:
+                flash(f"Error parsing config: {e}", "danger")
+                
+        if action == 'customize':
+            return redirect(url_for('backoffice.cms_settings', app_id=app_id))
+        else:
+            flash("Welcome to your CMS!", "success")
+            return redirect(url_for('backoffice.view_cms_grid', app_id=app_id))
+            
+    try:
+        all_tables = db.get_tenant_tables(db_conn_str)
+        table_schemas = {}
+        for t in all_tables:
+            table_schemas[t] = db.get_tenant_table_schema(db_conn_str, t)
+    except Exception as e:
+        flash(f"DB error: {e}", "danger")
+        all_tables, table_schemas = [], {}
+
+    # If it's empty, generate smart config
+    if not cms_config.get('tables') and not cms_config.get('hidden_tables'):
+        smart_config = _generate_smart_cms_config(all_tables)
+    else:
+        smart_config = cms_config
+        
+    current_role = get_current_role_in_app(app_id)
+    return render_template(
+        'backoffice/cms_onboarding.html',
+        app=app,
+        all_tables=all_tables,
+        table_schemas=table_schemas,
+        smart_config=smart_config,
+        current_role=current_role
+    )
+
+@backoffice_bp.route('/app/<app_id>/cms/rbac', methods=['GET', 'POST'])
+@login_required
+def cms_rbac(app_id):
+    db = get_db()
+    if not check_permission(app_id, "write:config"):
+        flash("Unauthorized.", "danger")
+        return redirect(url_for('backoffice.dashboard'))
+
+    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
+    if not app:
+        flash("Application not found.", "danger")
+        return redirect(url_for('backoffice.dashboard'))
+
+    db_conn_str = get_tenant_db_conn_str(app)
+    cms_config = db.get_cms_config(str(app['_id']))
+    
+    if request.method == 'POST':
+        import json
+        raw = request.form.get('cms_rbac_json', '{}')
+        try:
+            new_roles = json.loads(raw)
+            cms_config['roles'] = new_roles
+            db.save_cms_config(str(app['_id']), cms_config)
+            flash("RBAC configuration saved.", "success")
+        except Exception as e:
+            flash(f"Invalid config JSON: {e}", "danger")
+        return redirect(url_for('backoffice.cms_rbac', app_id=app_id))
+        
+    try:
+        all_tables = db.get_tenant_tables(db_conn_str)
+        table_schemas = {}
+        for t in all_tables:
+            table_schemas[t] = db.get_tenant_table_schema(db_conn_str, t)
+    except Exception as e:
+        flash(f"DB error: {e}", "danger")
+        all_tables, table_schemas = [], {}
+
+    current_role = get_current_role_in_app(app_id)
+    return render_template(
+        'backoffice/cms_rbac.html',
+        app=app,
+        all_tables=all_tables,
+        table_schemas=table_schemas,
+        cms_config=cms_config,
+        current_role=current_role
+    )
+
