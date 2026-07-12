@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RBAC Config · {{ app.app_name }}</title>
+<style>
+  :root {
+    --ink:#1d1d1f; --sub:#6e6e73; --hair:#d2d2d7;
+    --bg:#ffffff; --bg2:#f5f5f7;
+    --accent:#0071e3; --good:#1d7a3c; --warn:#b25000; --bad:#c22222;
+    --nav-h:48px; --sidebar-w:240px;
+  }
+  [data-theme="dark"] {
+    --ink:#f5f5f7; --sub:#98989d; --hair:#3a3a3c;
+    --bg:#1c1c1e; --bg2:#2c2c2e;
+    --accent:#2997ff; --good:#30d158; --warn:#ff9f0a; --bad:#ff453a;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body {
+    font-family:-apple-system,"Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-size:14px; background:var(--bg2); color:var(--ink);
+    min-height:100vh; display:flex; flex-direction:column;
+  }
+  
+  /* Nav */
+  .topnav{
+    position:sticky; top:0; z-index:100; height:var(--nav-h);
+    background:rgba(255,255,255,.82);
+    backdrop-filter:saturate(180%) blur(20px);
+    border-bottom:1px solid var(--hair);
+    display:flex; align-items:center; justify-content:space-between; padding:0 20px;
+  }
+  [data-theme="dark"] .topnav{background:rgba(28,28,30,.88);}
+  .topnav-left{display:flex;align-items:center;gap:14px;}
+  .topnav-sep{width:1px;height:18px;background:var(--hair);}
+  .btn-back{font-size:12px;font-weight:600;color:var(--sub);text-decoration:none;transition:color .15s;}
+  .btn-back:hover{color:var(--ink);}
+  
+  /* Layout */
+  .shell{display:flex;flex:1;height:calc(100vh - var(--nav-h));overflow:hidden;}
+  
+  /* Sidebar */
+  .sidebar{
+    width:var(--sidebar-w);flex-shrink:0;
+    background:var(--bg);border-right:1px solid var(--hair);
+    display:flex;flex-direction:column;
+  }
+  .sidebar-header{
+    padding:18px 16px 10px;
+    font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--sub);border-bottom:1px solid var(--hair);
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .sidebar-nav{padding:6px 8px; flex:1; overflow-y:auto;}
+  .role-link{
+    display:block;padding:7px 10px;border-radius:7px;
+    text-decoration:none;color:var(--ink);
+    font-size:13px;font-weight:500;transition:background .12s;margin-bottom:1px;
+    cursor:pointer;
+  }
+  .role-link:hover{background:var(--bg2);}
+  .role-link.active{background:var(--accent);color:#fff;}
+  
+  /* Main */
+  .main{flex:1;overflow:auto;background:var(--bg2); padding: 24px 32px;}
+  .page-title { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 8px; }
+  .page-sub { font-size: 14px; color: var(--sub); margin-bottom: 24px; }
+  
+  .card {
+    background: var(--bg); border: 1px solid var(--hair); border-radius: 12px; margin-bottom: 24px; overflow:hidden;
+  }
+  .card-head {
+    padding: 16px 20px; border-bottom: 1px solid var(--hair); display: flex; justify-content: space-between; align-items: center;
+  }
+  .card-title { font-size: 15px; font-weight: 700; }
+  .card-body { padding: 0; }
+  
+  /* Table styling */
+  .perm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .perm-table th {
+    text-align: left; padding: 10px 20px; border-bottom: 1px solid var(--hair); color: var(--sub); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .perm-table td {
+    padding: 12px 20px; border-bottom: 1px solid var(--hair); vertical-align: top;
+  }
+  .perm-table tr:last-child td { border-bottom: none; }
+  
+  /* Toggle */
+  .toggle{position:relative;width:36px;height:22px;flex-shrink:0; display:inline-block; vertical-align:middle;}
+  .toggle input{opacity:0;width:0;height:0;position:absolute;}
+  .toggle-track{
+    position:absolute;inset:0;border-radius:99px;
+    background:var(--hair);cursor:pointer;transition:background .2s;
+  }
+  .toggle input:checked ~ .toggle-track{background:var(--good);}
+  .toggle-thumb{
+    position:absolute;left:3px;top:3px;width:16px;height:16px;
+    border-radius:50%;background:#fff;
+    transition:transform .2s;pointer-events:none;
+    box-shadow:0 1px 3px rgba(0,0,0,.2);
+  }
+  .toggle input:checked ~ .toggle-track .toggle-thumb{transform:translateX(14px);}
+  
+  .btn {
+    padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-secondary { background: var(--bg); border: 1px solid var(--hair); color: var(--ink); }
+  
+  .hidden { display: none; }
+  
+  select.multi-select { width: 100%; height: 80px; font-size: 13px; border: 1px solid var(--hair); border-radius: 6px; padding: 4px; background:var(--bg2); color:var(--ink); }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-left">
+    <a class="btn-back" href="/backoffice/app/{{ app._id }}/cms">← Content Editor</a>
+    <div class="topnav-sep"></div>
+    <span style="font-size:14px;font-weight:600;">Roles & Permissions</span>
+    <span style="font-size:12px;color:var(--sub);">{{ app.app_name }}</span>
+  </div>
+  <div class="topnav-left" style="gap:10px;">
+    <button class="btn btn-primary" onclick="saveRBAC()">Save Permissions</button>
+  </div>
+</nav>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <span>Custom Roles</span>
+      <button class="btn btn-secondary" style="padding: 2px 6px; font-size:16px; line-height:1;" onclick="addRole()">+</button>
+    </div>
+    <nav class="sidebar-nav" id="roleList">
+      <!-- Roles injected by JS -->
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div id="noRoleState" style="text-align:center; padding: 100px 0; color: var(--sub);">
+      Select or create a role on the left to configure its permissions.
+    </div>
+    
+    <div id="roleConfigState" class="hidden">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+        <div>
+          <h1 class="page-title" id="currentRoleTitle">Role Name</h1>
+          <div class="page-sub">Configure which tables and columns this role can access.</div>
+        </div>
+        <button class="btn btn-secondary" style="color:var(--bad);" onclick="deleteCurrentRole()">Delete Role</button>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">Table Access & Field-Level Security</div>
+        </div>
+        <div class="card-body">
+          <table class="perm-table">
+            <thead>
+              <tr>
+                <th style="width:20%;">Table</th>
+                <th style="width:15%; text-align:center;">Read</th>
+                <th style="width:15%; text-align:center;">Write</th>
+                <th style="width:25%;">Hidden Columns</th>
+                <th style="width:25%;">Read-Only Columns</th>
+              </tr>
+            </thead>
+            <tbody id="tablePermsBody">
+              <!-- Permissions injected by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<form id="saveForm" method="POST" action="{{ url_for('backoffice.cms_rbac', app_id=app._id) }}" style="display:none;">
+  <input type="hidden" name="cms_rbac_json" id="rbacJsonInput">
+</form>
+
+<script>
+  let theme = localStorage.getItem('bifrost-theme') || 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+
+  let rolesConfig = {{ cms_config.get('roles', {}) | tojson | forceescape }};
+  const allTables = {{ all_tables | tojson | forceescape }};
+  const tableSchemas = {{ table_schemas | tojson | forceescape }};
+  
+  let currentSelectedRole = null;
+
+  function renderRoleList() {
+    const list = document.getElementById('roleList');
+    list.innerHTML = '';
+    const roles = Object.keys(rolesConfig);
+    
+    if(roles.length === 0) {
+      list.innerHTML = '<div style="padding:10px; color:var(--sub); font-size:12px;">No custom roles defined.</div>';
+      return;
+    }
+    
+    roles.forEach(r => {
+      const a = document.createElement('a');
+      a.className = 'role-link' + (r === currentSelectedRole ? ' active' : '');
+      a.textContent = r;
+      a.onclick = () => selectRole(r);
+      list.appendChild(a);
+    });
+  }
+
+  function selectRole(r) {
+    // Save current role state before switching
+    saveCurrentRoleState();
+    currentSelectedRole = r;
+    renderRoleList();
+    renderRoleConfig();
+  }
+  
+  function addRole() {
+    const r = prompt("Enter new role name (e.g. content_editor):");
+    if(!r) return;
+    const cleanRole = r.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    if(!cleanRole || rolesConfig[cleanRole]) return;
+    
+    rolesConfig[cleanRole] = { tables: {} };
+    selectRole(cleanRole);
+  }
+  
+  function deleteCurrentRole() {
+    if(!currentSelectedRole || !confirm(`Delete role ${currentSelectedRole}?`)) return;
+    delete rolesConfig[currentSelectedRole];
+    currentSelectedRole = null;
+    renderRoleList();
+    renderRoleConfig();
+  }
+
+  function renderRoleConfig() {
+    if(!currentSelectedRole) {
+      document.getElementById('noRoleState').classList.remove('hidden');
+      document.getElementById('roleConfigState').classList.add('hidden');
+      return;
+    }
+    
+    document.getElementById('noRoleState').classList.add('hidden');
+    document.getElementById('roleConfigState').classList.remove('hidden');
+    document.getElementById('currentRoleTitle').textContent = currentSelectedRole;
+    
+    const tbody = document.getElementById('tablePermsBody');
+    tbody.innerHTML = '';
+    
+    const rConf = rolesConfig[currentSelectedRole].tables || {};
+    
+    allTables.forEach(t => {
+      const tConf = rConf[t] || {};
+      const perms = Array.isArray(tConf) ? tConf : (tConf.permissions || []);
+      const hCols = tConf.hidden_columns || [];
+      const rCols = tConf.readonly_columns || [];
+      const canRead = perms.includes('read');
+      const canWrite = perms.includes('write');
+      
+      const tr = document.createElement('tr');
+      tr.dataset.table = t;
+      
+      // Select options for columns
+      const cols = tableSchemas[t] || [];
+      const colOptionsH = cols.map(c => `<option value="${c.column_name}" ${hCols.includes(c.column_name)?'selected':''}>${c.column_name}</option>`).join('');
+      const colOptionsR = cols.map(c => `<option value="${c.column_name}" ${rCols.includes(c.column_name)?'selected':''}>${c.column_name}</option>`).join('');
+      
+      tr.innerHTML = `
+        <td style="font-weight:600;">${t}</td>
+        <td style="text-align:center;">
+          <label class="toggle">
+            <input type="checkbox" class="cb-read" ${canRead ? 'checked' : ''}>
+            <div class="toggle-track"><div class="toggle-thumb"></div></div>
+          </label>
+        </td>
+        <td style="text-align:center;">
+          <label class="toggle">
+            <input type="checkbox" class="cb-write" ${canWrite ? 'checked' : ''}>
+            <div class="toggle-track"><div class="toggle-thumb"></div></div>
+          </label>
+        </td>
+        <td><select multiple class="multi-select sel-hidden">${colOptionsH}</select></td>
+        <td><select multiple class="multi-select sel-readonly">${colOptionsR}</select></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function saveCurrentRoleState() {
+    if(!currentSelectedRole) return;
+    
+    const tbody = document.getElementById('tablePermsBody');
+    if(!tbody.children.length) return;
+    
+    const newConf = { tables: {} };
+    Array.from(tbody.children).forEach(tr => {
+      const t = tr.dataset.table;
+      const canRead = tr.querySelector('.cb-read').checked;
+      const canWrite = tr.querySelector('.cb-write').checked;
+      
+      const hidden = Array.from(tr.querySelector('.sel-hidden').selectedOptions).map(o => o.value);
+      const readonly = Array.from(tr.querySelector('.sel-readonly').selectedOptions).map(o => o.value);
+      
+      if(canRead || canWrite || hidden.length || readonly.length) {
+        let perms = [];
+        if(canRead) perms.push('read');
+        if(canWrite) perms.push('write');
+        
+        newConf.tables[t] = {
+          permissions: perms,
+          hidden_columns: hidden,
+          readonly_columns: readonly
+        };
+      }
+    });
+    
+    rolesConfig[currentSelectedRole] = newConf;
+  }
+
+  function saveRBAC() {
+    saveCurrentRoleState();
+    document.getElementById('rbacJsonInput').value = JSON.stringify(rolesConfig);
+    document.getElementById('saveForm').submit();
+  }
+
+  // Init
+  renderRoleList();
+</script>
+</body>
+</html>

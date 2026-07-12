@@ -12,8 +12,16 @@
 <body class="bg-slate-900 flex items-center justify-center min-h-screen p-6">
     <div class="w-full max-w-md bg-white rounded-3xl p-10 shadow-2xl">
         <div class="text-center mb-8">
-            <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Bifrost</h1>
-            <p class="text-slate-500 font-medium">Backoffice Login</p>
+            {% if tenant_app %}
+                {% if tenant_app.app_logo_url %}
+                    <img src="{{ tenant_app.app_logo_url }}" alt="Logo" class="h-16 mx-auto mb-4 rounded-xl object-contain">
+                {% endif %}
+                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">{{ tenant_app.app_name }}</h1>
+                <p class="text-slate-500 font-medium">Content Management System</p>
+            {% else %}
+                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Bifrost</h1>
+                <p class="text-slate-500 font-medium">Backoffice Login</p>
+            {% endif %}
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}

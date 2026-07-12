@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Onboarding · {{ app.app_name }}</title>
+<style>
+  :root {
+    --ink:#1d1d1f; --sub:#6e6e73; --hair:#d2d2d7;
+    --bg:#ffffff; --bg2:#f5f5f7;
+    --accent:#0071e3; --good:#1d7a3c; --warn:#b25000; --bad:#c22222;
+  }
+  [data-theme="dark"] {
+    --ink:#f5f5f7; --sub:#98989d; --hair:#3a3a3c;
+    --bg:#1c1c1e; --bg2:#2c2c2e;
+    --accent:#2997ff; --good:#30d158; --warn:#ff9f0a; --bad:#ff453a;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body {
+    font-family:-apple-system,"Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-size:14px; background:var(--bg2); color:var(--ink);
+    min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    padding-top:60px;
+  }
+  .container { width: 100%; max-width: 760px; padding: 20px; }
+  .title { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 8px; }
+  .subtitle { font-size: 15px; color: var(--sub); margin-bottom: 24px; line-height: 1.5; }
+  .alert-info {
+    background: rgba(0,113,227,0.1); border: 1px solid rgba(0,113,227,0.2); color: var(--accent);
+    padding: 16px 20px; border-radius: 12px; margin-bottom: 24px; font-weight: 500; font-size: 14px;
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .list-container {
+    background: var(--bg); border: 1px solid var(--hair); border-radius: 12px; overflow: hidden;
+  }
+  .list-item {
+    padding: 16px 20px; border-bottom: 1px solid var(--hair); display: flex; justify-content: space-between; align-items: center;
+  }
+  .list-item:last-child { border-bottom: none; }
+  .item-title { font-size: 15px; font-weight: 600; }
+  .item-sub { font-size: 13px; color: var(--sub); margin-top: 4px; }
+  .badge {
+    padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .badge.ready { background: #e6f4ea; color: var(--good); }
+  .badge.review { background: #fff5e0; color: var(--warn); }
+  .badge.hidden { background: var(--bg2); color: var(--sub); border: 1px solid var(--hair); }
+  [data-theme="dark"] .badge.ready { background: #0a2e12; }
+  [data-theme="dark"] .badge.review { background: #2e1e00; }
+  
+  .actions {
+    display: flex; justify-content: flex-end; gap: 12px; margin-top: 32px;
+  }
+  .btn {
+    padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s;
+  }
+  .btn-primary { background: var(--ink); color: var(--bg); }
+  .btn-secondary { background: var(--bg); border: 1px solid var(--hair); color: var(--ink); }
+  .btn:hover { opacity: 0.88; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="title">{{ all_tables|length }} tables found in your database</div>
+  <div class="subtitle">Here's what we detected, plus a few suggestions. Review and adjust anything before you start.</div>
+  
+  <div class="alert-info">
+    <span>💡</span>
+    <span>We hid {{ smart_config.hidden_tables|length }} tables that look like backend or system tables, and suggested friendlier names for the rest. Nothing is final yet.</span>
+  </div>
+
+  <form method="POST" action="{{ url_for('backoffice.cms_onboarding', app_id=app._id) }}">
+    <input type="hidden" name="cms_config_json" value="{{ smart_config | tojson | forceescape }}">
+    
+    <div class="list-container">
+      {% for t in all_tables %}
+      <div class="list-item">
+        <div>
+          {% if t in smart_config.hidden_tables %}
+          <div class="item-title" style="color:var(--sub);"><del>{{ t }}</del></div>
+          <div class="item-sub">hidden from sidebar</div>
+          {% else %}
+          <div class="item-title">
+            <span style="color:var(--sub);">{{ t }}</span> &rarr; {{ smart_config.tables[t].label }}
+          </div>
+          <div class="item-sub">{{ table_schemas[t]|length }} columns</div>
+          {% endif %}
+        </div>
+        <div>
+          {% if t in smart_config.hidden_tables %}
+          <span class="badge hidden">Hidden</span>
+          {% else %}
+          <span class="badge ready">Ready</span>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="actions">
+      <button type="submit" name="action" value="customize" class="btn btn-secondary">Customize everything</button>
+      <button type="submit" name="action" value="continue" class="btn btn-primary">Looks good, continue</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  let theme = localStorage.getItem('bifrost-theme') || 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+</script>
+</body>
+</html>
