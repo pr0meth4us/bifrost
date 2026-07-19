@@ -28,13 +28,19 @@ def get_current_role_in_app(app_id):
 
 ROLE_PERMISSIONS = {
     "owner": {
-        "read:config", "write:config", "manage:users", "view:secrets", "manage:secrets", "transfer:ownership", "view:metrics"
+        "read:config", "write:config", "manage:users", "view:secrets", "manage:secrets", "transfer:ownership", "view:metrics", "payments:approve"
     },
     "super_admin": {
-        "read:config", "write:config", "manage:users", "view:secrets", "manage:secrets", "view:metrics"
+        "read:config", "write:config", "manage:users", "view:secrets", "manage:secrets", "view:metrics", "payments:approve"
     },
     "admin": {
-        "read:config", "manage:users", "view:metrics"
+        "read:config", "manage:users", "view:metrics", "payments:approve"
+    },
+    "billing_agent": {
+        "read:config", "payments:approve"
+    },
+    "operations": {
+        "read:config", "payments:approve"
     },
     "member": {
         "read:config", "view:metrics"

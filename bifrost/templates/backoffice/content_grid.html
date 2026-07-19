@@ -1,742 +1,349 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html class="dark" lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Content Editor · {{ app.app_name }}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  /* ─── Tokens ─────────────────────────────────────────────── */
-  :root {
-    --ink:    #1d1d1f;
-    --sub:    #6e6e73;
-    --hair:   #d2d2d7;
-    --bg:     #ffffff;
-    --bg2:    #f5f5f7;
-    --accent: #0071e3;
-    --good:   #1d7a3c;
-    --warn:   #b25000;
-    --bad:    #c22222;
-    --sidebar-w: 220px;
-    --nav-h: 48px;
-  }
-  [data-theme="dark"] {
-    --ink:    #f5f5f7;
-    --sub:    #98989d;
-    --hair:   #3a3a3c;
-    --bg:     #1c1c1e;
-    --bg2:    #2c2c2e;
-    --accent: #2997ff;
-    --good:   #30d158;
-    --warn:   #ff9f0a;
-    --bad:    #ff453a;
-  }
-
-  /* ─── Reset / Base ───────────────────────────────────────── */
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
-  body {
-    font-family: -apple-system, "Helvetica Neue", "Kantumruy Pro", Helvetica, Arial, sans-serif;
-    font-size: 14px;
-    background: var(--bg2);
-    color: var(--ink);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* ─── Top Nav ────────────────────────────────────────────── */
-  .topnav {
-    position: sticky; top: 0; z-index: 100;
-    height: var(--nav-h);
-    background: rgba(255,255,255,.82);
-    backdrop-filter: saturate(180%) blur(20px);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
-    border-bottom: 1px solid var(--hair);
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0 20px;
-  }
-  [data-theme="dark"] .topnav {
-    background: rgba(28,28,30,.88);
-  }
-  .topnav-left { display: flex; align-items: center; gap: 14px; }
-  .topnav-brand { font-weight: 700; font-size: 14px; letter-spacing: -.01em; }
-  .topnav-sep { width: 1px; height: 18px; background: var(--hair); }
-  .topnav-app { font-size: 13px; color: var(--sub); }
-  .topnav-right { display: flex; align-items: center; gap: 10px; }
-
-  .btn-back {
-    font-size: 12px; font-weight: 600; color: var(--sub);
-    text-decoration: none; letter-spacing: -.005em;
-    transition: color .15s;
-  }
-  .btn-back:hover { color: var(--ink); }
-
-  /* Theme toggle */
-  .theme-btn {
-    width: 32px; height: 32px; border-radius: 8px;
-    border: 1px solid var(--hair);
-    background: var(--bg); color: var(--sub);
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-    font-size: 14px; transition: background .15s, border-color .15s;
-  }
-  .theme-btn:hover { background: var(--bg2); }
-
-  .settings-link {
-    font-size: 11px; font-weight: 600; color: var(--sub);
-    text-decoration: none; text-transform: uppercase; letter-spacing: .06em;
-    padding: 5px 10px; border: 1px solid var(--hair);
-    border-radius: 6px; transition: all .15s;
-  }
-  .settings-link:hover { color: var(--accent); border-color: var(--accent); }
-
-  .role-badge {
-    font-size: 11px; font-weight: 600; color: var(--sub);
-    background: var(--bg2); border: 1px solid var(--hair);
-    border-radius: 99px; padding: 3px 10px;
-    text-transform: uppercase; letter-spacing: .06em;
-  }
-
-  /* ─── Shell ──────────────────────────────────────────────── */
-  .shell { display: flex; flex: 1; height: calc(100vh - var(--nav-h)); overflow: hidden; }
-
-  /* ─── Sidebar ────────────────────────────────────────────── */
-  .sidebar {
-    width: var(--sidebar-w);
-    flex-shrink: 0;
-    background: var(--bg);
-    border-right: 1px solid var(--hair);
-    display: flex; flex-direction: column;
-    overflow-y: auto;
-  }
-  .sidebar-header {
-    padding: 18px 16px 10px;
-    font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
-    color: var(--sub);
-    border-bottom: 1px solid var(--hair);
-  }
-  .sidebar-group-label {
-    padding: 12px 16px 4px;
-    font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
-    color: var(--sub);
-  }
-  .sidebar-nav { padding: 6px 8px; flex: 1; }
-  .table-link {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 7px 10px; border-radius: 7px;
-    text-decoration: none; color: var(--ink);
-    font-size: 13px; font-weight: 500; letter-spacing: -.005em;
-    transition: background .12s;
-    margin-bottom: 1px;
-  }
-  .table-link:hover { background: var(--bg2); }
-  .table-link.active { background: var(--accent); color: #fff; }
-  .table-link.active .tl-badge { background: rgba(255,255,255,.25); color: #fff; }
-  .tl-name { display: flex; align-items: center; gap: 7px; }
-  .tl-icon { font-size: 13px; opacity: .7; }
-  .tl-badge {
-    font-size: 10px; font-weight: 600; background: var(--bg2);
-    color: var(--sub); border-radius: 99px; padding: 1px 7px;
-    letter-spacing: .02em;
-  }
-
-  /* ─── Main Content ───────────────────────────────────────── */
-  .main {
-    flex: 1; overflow: auto;
-    display: flex; flex-direction: column;
-    background: var(--bg2);
-  }
-
-  /* ─── Table Header ───────────────────────────────────────── */
-  .table-header {
-    background: var(--bg);
-    border-bottom: 1px solid var(--hair);
-    padding: 16px 24px;
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 16px;
-  }
-  .table-title { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
-  .table-subtitle { font-size: 12px; color: var(--sub); margin-top: 2px; }
-  .table-actions { display: flex; align-items: center; gap: 8px; }
-
-  .btn {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 7px 14px; border-radius: 8px;
-    font-size: 13px; font-weight: 600;
-    cursor: pointer; border: none; text-decoration: none;
-    transition: opacity .15s, transform .1s;
-    letter-spacing: -.01em;
-  }
-  .btn:active { transform: scale(.97); }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-primary:hover { opacity: .88; }
-  .btn-secondary {
-    background: var(--bg2); color: var(--ink);
-    border: 1px solid var(--hair);
-  }
-  .btn-secondary:hover { background: var(--bg); }
-  .btn-danger { background: var(--bad); color: #fff; }
-  .btn-danger:hover { opacity: .88; }
-  .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
-
-  /* ─── Alerts ─────────────────────────────────────────────── */
-  .alerts { padding: 12px 24px 0; }
-  .alert {
-    padding: 10px 14px; border-radius: 8px;
-    font-size: 13px; font-weight: 500; margin-bottom: 8px;
-  }
-  .alert-success { background: #e6f4ea; color: var(--good); border: 1px solid #b7dfbf; }
-  .alert-danger  { background: #fdecea; color: var(--bad);  border: 1px solid #f5c6c6; }
-  .alert-warning { background: #fff3e0; color: var(--warn); border: 1px solid #ffe0b2; }
-  [data-theme="dark"] .alert-success { background: #0a2e12; border-color: #1a5c27; }
-  [data-theme="dark"] .alert-danger  { background: #2e0a0a; border-color: #5c1a1a; }
-  [data-theme="dark"] .alert-warning { background: #2e1e00; border-color: #5c3a00; }
-
-  /* ─── Table Container ────────────────────────────────────── */
-  .table-wrap {
-    margin: 16px 24px;
-    background: var(--bg);
-    border: 1px solid var(--hair);
-    border-radius: 12px;
-    overflow: hidden;
-  }
-  .table-scroll { overflow-x: auto; }
-
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  thead tr { border-bottom: 1px solid var(--hair); background: var(--bg2); }
-  th {
-    text-align: left;
-    font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
-    color: var(--sub);
-    padding: 10px 14px;
-    white-space: nowrap;
-  }
-  td {
-    padding: 11px 14px;
-    border-bottom: 1px solid var(--hair);
-    color: var(--ink);
-    vertical-align: middle;
-    max-width: 300px;
-  }
-  tbody tr:last-child td { border-bottom: none; }
-  tbody tr { transition: background .1s; }
-  tbody tr:hover { background: var(--bg2); }
-
-  /* Cell value rendering */
-  .cell-text   { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .cell-mono   { font-family: "SF Mono", "Fira Code", monospace; font-size: 12px; color: var(--sub); }
-  .cell-num    { font-variant-numeric: tabular-nums; }
-  .cell-bool   { display: inline-flex; align-items: center; gap: 5px; }
-  .bool-dot    { width: 8px; height: 8px; border-radius: 50%; }
-  .bool-true   { background: var(--good); }
-  .bool-false  { background: var(--bad); }
-  .cell-null   { color: var(--sub); font-style: italic; font-size: 12px; }
-  .cell-json   { font-family: "SF Mono", "Fira Code", monospace; font-size: 11px; color: var(--sub);
-                 max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-  /* Action column */
-  .td-actions { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-
-  /* Interactive Elements */
-  .status-pill {
-    display: inline-block; padding: 2px 8px; border-radius: 12px;
-    font-size: 11px; font-weight: 600; color: #fff;
-  }
-  .status-pill.interactive {
-    cursor: pointer;
-    transition: opacity 0.15s;
-  }
-  .status-pill.interactive:hover { opacity: 0.8; }
-
-  .status-menu {
-    position: fixed; background: var(--bg); border: 1px solid var(--hair);
-    border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    z-index: 1000; padding: 4px; display: flex; flex-direction: column;
-    min-width: 120px;
-  }
-  [data-theme="dark"] .status-menu { box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-  .status-menu-item {
-    padding: 6px 12px; font-size: 11px; font-weight: 600;
-    cursor: pointer; border-radius: 4px; transition: background 0.15s;
-  }
-  .status-menu-item:hover { background: var(--bg2); }
-
-  .bulk-action-bar {
-    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px);
-    background: rgba(0,0,0,0.85); color: #fff; backdrop-filter: blur(10px);
-    padding: 12px 24px; border-radius: 99px; box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-    display: flex; align-items: center; gap: 12px; z-index: 999;
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    opacity: 0; pointer-events: none;
-  }
-  .bulk-action-bar.visible {
-    transform: translateX(-50%) translateY(0);
-    opacity: 1; pointer-events: auto;
-  }
-
-
-  /* Empty state */
-  .empty-state {
-    text-align: center; padding: 64px 24px; color: var(--sub);
-  }
-  .empty-state .es-icon { font-size: 32px; margin-bottom: 12px; opacity: .4; }
-  .empty-state .es-title { font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
-  .empty-state .es-sub   { font-size: 13px; }
-
-  /* ─── Modal / Drawer ─────────────────────────────────────── */
-  .modal-overlay {
-    display: none;
-    position: fixed; inset: 0; z-index: 200;
-    background: rgba(0,0,0,.35);
-    backdrop-filter: blur(4px);
-    align-items: center; justify-content: center;
-    padding: 24px;
-  }
-  .modal-overlay.open { display: flex; }
-
-  .modal {
-    background: var(--bg); border: 1px solid var(--hair);
-    border-radius: 16px; width: 100%; max-width: 540px;
-    max-height: 90vh; display: flex; flex-direction: column;
-    box-shadow: 0 20px 60px rgba(0,0,0,.15);
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  }
-
-  @media (max-width: 768px) {
-    .modal-overlay { align-items: flex-end; padding: 0; }
-    .modal {
-      border-radius: 20px 20px 0 0; border: none;
-      border-top: 1px solid var(--hair);
-      max-width: 100%; height: 90vh;
-      transform: translateY(100%);
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Valhalla Console - {{ app.app_name }}</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      "colors": {
+              "secondary-fixed": "#d4e4fa", "primary": "#c0c1ff", "secondary": "#b9c8de", "surface-bright": "#37393f",
+              "inverse-on-surface": "#2e3036", "background": "#111318", "inverse-surface": "#e2e2e9",
+              "on-primary": "#1000a9", "on-tertiary-fixed-variant": "#703700", "surface-variant": "#33353a",
+              "on-error": "#690005", "on-background": "#e2e2e9", "on-surface": "#e2e2e9",
+              "on-primary-container": "#0d0096", "inverse-primary": "#494bd6", "surface-dim": "#111318",
+              "on-secondary-container": "#a7b6cc", "on-tertiary-container": "#452000", "primary-fixed-dim": "#c0c1ff",
+              "error": "#ffb4ab", "tertiary-fixed-dim": "#ffb783", "on-primary-fixed-variant": "#2f2ebe",
+              "surface-container-highest": "#33353a", "secondary-container": "#39485a", "on-primary-fixed": "#07006c",
+              "surface-tint": "#c0c1ff", "surface-container": "#1e1f25", "surface-container-lowest": "#0c0e13",
+              "on-tertiary-fixed": "#301400", "on-secondary": "#233143", "outline": "#908fa0",
+              "secondary-fixed-dim": "#b9c8de", "error-container": "#93000a", "tertiary-fixed": "#ffdcc5",
+              "outline-variant": "#464554", "surface": "#111318", "surface-container-low": "#1a1b21",
+              "surface-container-high": "#282a2f", "tertiary-container": "#d97721", "on-error-container": "#ffdad6",
+              "tertiary": "#ffb783", "on-tertiary": "#4f2500", "primary-fixed": "#e1e0ff",
+              "primary-container": "#8083ff", "on-secondary-fixed-variant": "#39485a", "on-surface-variant": "#c7c4d7",
+              "on-secondary-fixed": "#0d1c2d"
+      },
+      "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+      "spacing": { "margin-desktop": "32px", "topbar-height": "64px", "margin-mobile": "16px", "unit": "4px", "gutter": "16px", "sidebar-width": "260px" },
+      "fontFamily": {
+              "headline-sm": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "headline-md": ["Plus Jakarta Sans"],
+              "display-lg": ["Plus Jakarta Sans"], "body-sm": ["Plus Jakarta Sans"], "tabular-nums": ["Plus Jakarta Sans"],
+              "label-caps": ["Plus Jakarta Sans"]
+      },
+      "fontSize": {
+              "headline-sm": ["18px", {"lineHeight": "1.4", "fontWeight": "600"}],
+              "body-md": ["14px", {"lineHeight": "1.6", "fontWeight": "400"}],
+              "headline-md": ["24px", {"lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+              "display-lg": ["36px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+              "body-sm": ["13px", {"lineHeight": "1.5", "fontWeight": "400"}],
+              "tabular-nums": ["14px", {"fontWeight": "500"}],
+              "label-caps": ["11px", {"lineHeight": "1.0", "letterSpacing": "0.1em", "fontWeight": "600"}]
+      }
     }
-    .modal-overlay.open .modal { transform: translateY(0); }
-    
-    .table-header { flex-direction: column; align-items: flex-start; gap: 12px; }
-    .search-form { width: 100%; }
-    .search-input { flex: 1; }
   }
-  .modal-head {
-    padding: 20px 24px 16px;
-    border-bottom: 1px solid var(--hair);
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .modal-title { font-size: 16px; font-weight: 700; letter-spacing: -.02em; }
-  .modal-close {
-    width: 28px; height: 28px; border-radius: 6px;
-    border: 1px solid var(--hair); background: var(--bg2);
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-    font-size: 16px; color: var(--sub); transition: all .15s;
-  }
-  .modal-close:hover { background: var(--hair); color: var(--ink); }
-
-  .modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
-  .modal-foot {
-    padding: 16px 24px;
-    border-top: 1px solid var(--hair);
-    display: flex; justify-content: flex-end; gap: 8px;
-  }
-
-  /* ─── Form Fields ────────────────────────────────────────── */
-  .field { margin-bottom: 14px; }
-  .field-label {
-    display: block; font-size: 10px; font-weight: 700;
-    letter-spacing: .08em; text-transform: uppercase;
-    color: var(--sub); margin-bottom: 5px;
-  }
-  .field-label .fk-hint {
-    font-weight: 400; text-transform: none; letter-spacing: 0;
-    color: var(--accent); font-size: 10px;
-  }
-
-  input[type=text], input[type=number], input[type=email],
-  input[type=datetime-local], input[type=date], input[type=url],
-  textarea, select {
-    width: 100%; padding: 8px 10px;
-    background: var(--bg2); border: 1px solid var(--hair);
-    border-radius: 8px; color: var(--ink);
-    font-family: inherit; font-size: 13px;
-    outline: none; transition: border-color .15s;
-    appearance: none; -webkit-appearance: none;
-  }
-  input:focus, textarea:focus, select:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(0,113,227,.12);
-  }
-  textarea { resize: vertical; min-height: 72px; font-size: 13px; line-height: 1.5; }
-  textarea.khmer { font-family: "Kantumruy Pro", "Noto Sans Khmer", sans-serif; line-height: 1.9; font-size: 14px; }
-  textarea.mono  { font-family: "SF Mono", "Fira Code", monospace; font-size: 12px; }
-
-  /* Toggle */
-  .toggle-wrap { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
-  .toggle {
-    position: relative; width: 44px; height: 26px;
-    flex-shrink: 0;
-  }
-  .toggle input { opacity: 0; width: 0; height: 0; }
-  .toggle-track {
-    position: absolute; inset: 0; border-radius: 99px;
-    background: var(--hair); cursor: pointer; transition: background .2s;
-  }
-  .toggle input:checked ~ .toggle-track { background: var(--good); }
-  .toggle-thumb {
-    position: absolute; left: 3px; top: 3px;
-    width: 20px; height: 20px; border-radius: 50%;
-    background: #fff; transition: transform .2s;
-    pointer-events: none;
-    box-shadow: 0 1px 3px rgba(0,0,0,.2);
-  }
-  .toggle input:checked ~ .toggle-track .toggle-thumb { transform: translateX(18px); }
-  .toggle-label { font-size: 13px; color: var(--sub); }
-
-  /* ─── Footer ─────────────────────────────────────────────── */
-  .page-footer {
-    padding: 20px 24px;
-    font-size: 11px; color: var(--sub);
-    border-top: 1px solid var(--hair);
-    display: flex; align-items: center; gap: 16px;
-  }
-  .row-count { font-weight: 600; color: var(--ink); }
+}
+</script>
+<style>
+  body { background-color: #111318; color: #e2e2e9; }
+  .glass-panel { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.10); }
+  .glass-drawer { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(40px); border-left: 1px solid rgba(255, 255, 255, 0.15); box-shadow: -10px 0 30px rgba(0,0,0,0.5); }
+  .table-row-hover:hover { background-color: rgba(255, 255, 255, 0.05); }
+  input[type="checkbox"] { appearance: none; background-color: #050505; margin: 0; font: inherit; color: currentColor; width: 1.15em; height: 1.15em; border: 1px solid #464554; border-radius: 0.125rem; display: grid; place-content: center; }
+  input[type="checkbox"]::before { content: ""; width: 0.65em; height: 0.65em; transform: scale(0); transition: 120ms transform ease-in-out; box-shadow: inset 1em 1em #c0c1ff; background-color: transform-origin: bottom left; clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%); }
+  input[type="checkbox"]:checked::before { transform: scale(1); }
+  .toggle-checkbox:checked { right: 0; border-color: #c0c1ff; }
+  .toggle-checkbox:checked + .toggle-label { background-color: #494bd6; }
+  .toggle-checkbox:checked + .toggle-label:after { transform: translateX(100%); border-color: white; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #33353a; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #464554; }
+  .status-menu { position: fixed; background: #1e1f25; border: 1px solid #33353a; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 1000; padding: 4px; display: flex; flex-direction: column; min-width: 120px; }
+  .status-menu-item { padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; border-radius: 4px; transition: background 0.15s; color: #e2e2e9; }
+  .status-menu-item:hover { background: #282a2f; }
 </style>
 </head>
-<body>
+<body class="font-body-md text-body-md antialiased overflow-hidden flex h-screen w-screen">
 
-<!-- ── Top Nav ─────────────────────────────────────────────── -->
-<nav class="topnav">
-  <div class="topnav-left">
-    <a class="btn-back" href="/backoffice/app/{{ app._id }}">← {{ app.app_name }}</a>
-    <div class="topnav-sep"></div>
-    <span class="topnav-app" style="font-weight:600;">Content Editor</span>
+<!-- Alerts -->
+<div class="fixed top-20 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="px-4 py-2 rounded shadow-lg {% if cat == 'success' %}bg-[#0a2e12] border border-[#1a5c27] text-[#30d158]{% elif cat == 'warning' %}bg-[#2e1e00] border border-[#5c3a00] text-[#ff9f0a]{% else %}bg-[#2e0a0a] border border-[#5c1a1a] text-[#ff453a]{% endif %} flex items-center gap-2">
+        <span class="material-symbols-outlined text-[18px]">info</span>
+        {{ msg }}
+      </div>
+    {% endfor %}
+  {% endwith %}
+</div>
+
+<!-- SideNavBar -->
+<nav class="bg-background/80 dark:bg-background/80 backdrop-blur-xl font-body-md text-body-md fixed left-0 top-0 h-full w-[260px] border-r border-outline-variant/10 flex flex-col h-full py-margin-desktop z-40 hidden md:flex">
+<div class="px-6 mb-8 flex items-center gap-3">
+  <div class="w-8 h-8 rounded bg-primary-container flex items-center justify-center text-on-primary-container">
+    <span class="material-symbols-outlined font-headline-sm" style="font-variation-settings: 'FILL' 1;">terminal</span>
   </div>
-  <div class="topnav-right">
-    {% if current_role in ('owner','super_admin','admin','heimdall') %}
-    <a class="settings-link" href="/backoffice/app/{{ app._id }}/cms/settings">⚙ Schema Config</a>
+  <div>
+    <div class="font-headline-md text-headline-md font-bold text-on-background dark:text-on-background leading-tight">Valhalla</div>
+    <div class="font-label-caps text-label-caps text-on-surface-variant">Admin Console</div>
+  </div>
+</div>
+<div class="px-4 mb-6">
+  <a href="/backoffice/app/{{ app._id }}" class="w-full bg-surface-variant hover:bg-surface-bright text-on-surface font-body-md py-2 px-4 rounded transition-colors flex items-center justify-center gap-2">
+    <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+    Back to Dashboard
+  </a>
+</div>
+<div class="flex-1 overflow-y-auto space-y-1">
+  {% set grouped = namespace(done=[]) %}
+  {% for group_name, group_tables in table_groups.items() %}
+    {% set visible_in_group = [] %}
+    {% for t in group_tables %}{% if t in tables %}{% set _ = visible_in_group.append(t) %}{% endif %}{% endfor %}
+    {% if visible_in_group %}
+      <div class="px-4 mt-6 mb-2 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">{{ group_name }}</div>
+      {% for t in visible_in_group %}
+        {% set _ = grouped.done.append(t) %}
+        <a href="?table={{ t }}" class="flex items-center gap-3 px-4 py-2 transition-colors duration-200 {% if t == selected_table %}border-l-2 border-primary bg-primary/10 text-primary font-bold{% else %}text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/50{% endif %}">
+          <span class="material-symbols-outlined" {% if t == selected_table %}style="font-variation-settings: 'FILL' 1;"{% endif %}>table_chart</span>
+          {{ cms_config.get('tables',{}).get(t,{}).get('label', t) }}
+        </a>
+      {% endfor %}
     {% endif %}
-    <span class="role-badge">{{ current_role }}</span>
-    <button class="theme-btn" id="themeBtn" title="Toggle theme">🌙</button>
-  </div>
+  {% endfor %}
+
+  {% for t in tables %}
+    {% if t not in grouped.done %}
+      <a href="?table={{ t }}" class="flex items-center gap-3 px-4 py-2 transition-colors duration-200 {% if t == selected_table %}border-l-2 border-primary bg-primary/10 text-primary font-bold{% else %}text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/50{% endif %}">
+        <span class="material-symbols-outlined" {% if t == selected_table %}style="font-variation-settings: 'FILL' 1;"{% endif %}>table_chart</span>
+        {{ cms_config.get('tables',{}).get(t,{}).get('label', t) }}
+      </a>
+    {% endif %}
+  {% endfor %}
+</div>
+<div class="mt-auto px-4 space-y-1 border-t border-outline-variant/10 pt-4">
+  {% if current_role in ('owner','super_admin','admin','heimdall') %}
+  <a href="/backoffice/app/{{ app._id }}/cms/settings" class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:text-on-surface transition-colors hover:bg-surface-variant/50 transition-all duration-200">
+    <span class="material-symbols-outlined">settings</span>
+    Schema Config
+  </a>
+  {% endif %}
+</div>
 </nav>
 
-<div class="shell">
+<!-- TopNavBar -->
+<header class="bg-surface/50 dark:bg-surface/50 backdrop-blur-md text-primary dark:text-primary-fixed-dim font-label-caps text-label-caps fixed top-0 right-0 h-topbar-height z-30 border-b border-outline-variant/10 flex justify-between items-center px-margin-desktop w-full md:w-[calc(100%-260px)] md:ml-[260px]">
+<div class="flex items-center gap-4">
+  <div class="flex items-center gap-2 text-on-surface-variant">
+    <span class="hover:text-primary transition-colors cursor-pointer">{{ app.app_name }}</span>
+    <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+    <span class="text-primary font-bold">Content Editor</span>
+  </div>
+</div>
+<div class="flex items-center gap-6">
+  <div class="relative hidden lg:block">
+    <form action="" method="GET">
+      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+      <input name="q" value="{{ request.args.get('q', '') }}" class="bg-[#050505] border border-outline-variant/30 rounded pl-10 pr-12 py-1.5 text-body-sm text-on-surface focus:border-primary focus:outline-none w-64 transition-colors" placeholder="Search..." type="text"/>
+    </form>
+  </div>
+  <div class="px-2 py-1 bg-surface-variant rounded text-on-surface-variant">{{ current_role }}</div>
+</div>
+</header>
 
-  <!-- ── Sidebar ────────────────────────────────────────────── -->
-  <aside class="sidebar">
-    <div class="sidebar-header">Tables</div>
-    <nav class="sidebar-nav">
-      {% set grouped = namespace(done=[]) %}
-
-      {# Render grouped tables first #}
-      {% for group_name, group_tables in table_groups.items() %}
-        {% set visible_in_group = [] %}
-        {% for t in group_tables %}{% if t in tables %}{% set _ = visible_in_group.append(t) %}{% endif %}{% endfor %}
-        {% if visible_in_group %}
-          <div class="sidebar-group-label">{{ group_name }}</div>
-          {% for t in visible_in_group %}
-            {% set _ = grouped.done.append(t) %}
-            <a href="?table={{ t }}"
-               class="table-link {% if t == selected_table %}active{% endif %}">
-              <span class="tl-name">
-                <span class="tl-icon">📋</span>
-                {{ cms_config.get('tables',{}).get(t,{}).get('label', t) }}
-              </span>
-            </a>
-          {% endfor %}
-        {% endif %}
-      {% endfor %}
-
-      {# Ungrouped tables #}
-      {% for t in tables %}
-        {% if t not in grouped.done %}
-          <a href="?table={{ t }}"
-             class="table-link {% if t == selected_table %}active{% endif %}">
-            <span class="tl-name">
-              <span class="tl-icon">📋</span>
-              {{ cms_config.get('tables',{}).get(t,{}).get('label', t) }}
-            </span>
-          </a>
-        {% endif %}
-      {% endfor %}
-
-      {% if not tables %}
-        <p style="padding:12px 10px;font-size:12px;color:var(--sub);">No tables visible. Check schema config.</p>
-      {% endif %}
-    </nav>
-  </aside>
-
-  <!-- ── Main ───────────────────────────────────────────────── -->
-  <main class="main">
-
-    <!-- Flash alerts -->
-    <div class="alerts">
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% for cat, msg in messages %}
-          <div class="alert alert-{{ 'success' if cat=='success' else ('warning' if cat=='warning' else 'danger') }}">{{ msg }}</div>
-        {% endfor %}
-      {% endwith %}
+<!-- Main Content Area -->
+<main class="pt-topbar-height md:pl-sidebar-width w-full h-full flex flex-col bg-background relative z-10">
+{% if selected_table %}
+<!-- Toolbar -->
+<div class="px-margin-desktop py-4 flex flex-wrap items-center justify-between gap-4 border-b border-outline-variant/10">
+  <div class="flex items-center gap-3">
+    <div class="font-headline-md text-headline-md text-on-surface">
+      {{ cms_config.get('tables',{}).get(selected_table,{}).get('label', selected_table) }}
+      {% if readonly_table %}<span class="text-error text-[14px] ml-2">Read-only</span>{% endif %}
     </div>
-
-    {% if selected_table %}
-
-    <!-- Table action bar -->
-    <div class="table-header">
-      <div>
-        <div class="table-title">
-          {{ cms_config.get('tables',{}).get(selected_table,{}).get('label', selected_table) }}
-          {% if readonly_table %}<span style="font-size:11px;font-weight:500;color:var(--warn);margin-left:8px;">read-only</span>{% endif %}
-        </div>
-        <div class="table-subtitle">
-          {{ rows|length }} row{{ 's' if rows|length != 1 else '' }} · {{ visible_columns|length }} column{{ 's' if visible_columns|length != 1 else '' }}
-          · public.{{ selected_table }}
-        </div>
-      </div>
-      <div class="table-actions">
-        <form action="" method="GET" class="search-form" style="display: flex; gap: 8px;">
-          <input type="text" name="q" placeholder="Search..." value="{{ request.args.get('q', '') }}" class="search-input" style="padding: 5px 10px; border-radius: 6px; border: 1px solid var(--hair); background: var(--bg2); color: var(--ink); font-size: 13px;">
-          <button type="submit" class="btn btn-secondary btn-sm" style="padding: 5px 10px;">Find</button>
-        </form>
-        {% if can_write %}
-        <button class="btn btn-primary btn-sm" onclick="openCreate()">+ New row</button>
-        {% endif %}
-      </div>
-    </div>
-
-    <!-- Grid -->
-    <div class="table-wrap">
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              {% if can_write %}
-              <th style="width: 32px;"><input type="checkbox" id="selectAllRows" onclick="toggleAllRows(this)"></th>
-              {% endif %}
-              {% for col in visible_columns %}
-              <th>
-                {{ table_col_config.get(col,{}).get('label', col) }}
-              </th>
-              {% endfor %}
-              {% if can_write %}
-              <th style="text-align: right;">Actions</th>
-              {% endif %}
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in rows %}
-            <tr>
-              {% if can_write %}
-              <td><input type="checkbox" class="row-checkbox" value="{{ row.id }}" onchange="updateBulkActions()"></td>
-              {% endif %}
-              {% for col in visible_columns %}
-              {% set val = row[col] %}
-              {% set sm  = schema_by_col.get(col, {}) %}
-              {% set pg  = sm.get('data_type','') %}
-              {% set ov  = table_col_config.get(col,{}).get('type','') %}
-              <td>
-                {% if val is none or val == '' %}
-                  <span class="cell-null">—</span>
-                {% elif ov == 'boolean' or pg == 'boolean' %}
-                  <span class="cell-bool">
-                    <span class="bool-dot {{ 'bool-true' if val else 'bool-false' }}"></span>
-                    {{ 'Yes' if val else 'No' }}
-                  </span>
-                {% elif pg in ('integer','bigint','smallint','numeric','real','double precision') %}
-                  {% if 'price' in col or 'amount' in col or 'balance' in col %}
-                    <span class="cell-num" style="font-weight:600;color:var(--good);">${{ val }}</span>
-                  {% else %}
-                    <span class="cell-num">{{ val }}</span>
-                  {% endif %}
-                {% elif pg == 'jsonb' or pg == 'json' or ov == 'json' %}
-                  <span class="cell-json" title="{{ val }}">{{ val }}</span>
-                {% elif ov == 'mono' or pg.startswith('uuid') %}
-                  <span class="cell-mono">{{ val }}</span>
-                {% elif pg in ('timestamp without time zone','timestamp with time zone','date') %}
-                  <span class="cell-mono" style="font-size:12px;">{{ val }}</span>
-                {% elif col in ('photo_url', 'avatar', 'profile_image', 'image_url') and val %}
-                  <img src="{{ val }}" alt="Avatar" style="width:32px; height:32px; border-radius:50%; object-fit:cover; border:1px solid var(--hair);">
-                {% elif col.endswith('status') or col.endswith('state') %}
-                  {% set status_color = 'var(--bad)' %}
-                  {% if val in ('active', 'completed', 'success', 'paid') %}
-                    {% set status_color = 'var(--good)' %}
-                  {% elif val in ('pending', 'processing', 'waiting') %}
-                    {% set status_color = 'var(--warn)' %}
-                  {% endif %}
-                  {% if can_write %}
-                    <span class="status-pill interactive" style="background-color:{{ status_color }};" onclick="openStatusMenu(event, '{{ row.id }}', '{{ col }}', '{{ val }}')">{{ val|upper }}</span>
-                  {% else %}
-                    <span class="status-pill" style="background-color:{{ status_color }};">{{ val|upper }}</span>
-                  {% endif %}
-                {% elif col in ('name', 'title', 'email', 'username') %}
-                  <strong class="cell-text" style="color:var(--ink);">{{ val }}</strong>
-                {% else %}
-                  <span class="cell-text">{{ val }}</span>
-                {% endif %}
-              </td>
-              {% endfor %}
-
-              {% if can_write %}
-              <td>
-                <div class="td-actions" style="justify-content:flex-end;">
-                  <button class="btn btn-secondary btn-sm"
-                    onclick='openEdit({{ row | tojson | safe }})'>Edit</button>
-                  <form method="POST"
-                    action="/backoffice/app/{{ app._id }}/cms/{{ selected_table }}/delete/{{ row.id }}"
-                    onsubmit="return confirm('Delete this row permanently?')">
-                    <button type="submit" class="btn btn-danger btn-sm">Delete</button>
-                  </form>
-                </div>
-              </td>
-              {% endif %}
-            </tr>
-            {% endfor %}
-
-            {% if not rows %}
-            <tr><td colspan="{{ visible_columns|length + (1 if can_write else 0) }}">
-              <div class="empty-state">
-                <div class="es-icon">📭</div>
-                <div class="es-title">No records</div>
-                <div class="es-sub">{{ selected_table }} has no rows yet.</div>
-              </div>
-            </td></tr>
-            {% endif %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Footer row count -->
-    <div class="page-footer">
-      <span>Showing <span class="row-count">{{ rows|length }}</span> rows (max 500)</span>
-      <span>·</span>
-      <span>{{ app.app_name }} · {{ selected_table }}</span>
-    </div>
-
-    {% else %}
-    <div style="flex:1;display:flex;align-items:center;justify-content:center;">
-      <div class="empty-state">
-        <div class="es-icon">🗄️</div>
-        <div class="es-title">No tables available</div>
-        <div class="es-sub">Connect a tenant database or adjust schema visibility in config.</div>
-      </div>
-    </div>
+    <div class="bg-primary/10 text-primary px-2 py-0.5 rounded font-tabular-nums text-tabular-nums">{{ rows|length }} rows</div>
+  </div>
+  <div class="flex items-center gap-3">
+    {% if can_write %}
+    <button onclick="openCreate()" class="flex items-center gap-2 px-4 py-1.5 bg-primary hover:bg-primary-fixed text-on-primary rounded transition-colors text-body-sm font-medium">
+      <span class="material-symbols-outlined text-[18px]">add</span>
+      New Entry
+    </button>
     {% endif %}
-
-  </main>
-</div>
-
-
-<!-- ── Edit Modal ──────────────────────────────────────────── -->
-<div class="modal-overlay" id="editModal">
-  <div class="modal">
-    <div class="modal-head">
-      <span class="modal-title" id="editModalTitle">Edit row</span>
-      <button class="modal-close" onclick="closeEdit()">×</button>
-    </div>
-    <form id="editForm" method="POST">
-      <div class="modal-body" id="editFields"></div>
-      <div class="modal-foot">
-        <button type="button" class="btn btn-secondary" onclick="closeEdit()">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save changes</button>
-      </div>
-    </form>
   </div>
 </div>
-
-<!-- ── Create Modal ────────────────────────────────────────── -->
-<div class="modal-overlay" id="createModal">
-  <div class="modal">
-    <div class="modal-head">
-      <span class="modal-title">New row — {{ selected_table }}</span>
-      <button class="modal-close" onclick="closeCreate()">×</button>
-    </div>
-    <form method="POST"
-      action="/backoffice/app/{{ app._id }}/cms/{{ selected_table }}/create">
-      <div class="modal-body">
-        {% for col in visible_columns %}
-        {% if col != 'id' %}
-        {% set sm = schema_by_col.get(col, {}) %}
-        {% set pg = sm.get('data_type','') %}
-        {% set ov = table_col_config.get(col,{}).get('type','') %}
-        {% set label = table_col_config.get(col,{}).get('label', col) %}
-        <div class="field">
-          <label class="field-label">
-            {{ label }}
-            {% if sm.get('foreign_table') %}<span class="fk-hint">→ {{ sm.foreign_table }}</span>{% endif %}
-            {% if col in role_readonly_cols %}<span class="fk-hint" style="color:var(--sub);margin-left:8px;">🔒 Read Only</span>{% endif %}
-          </label>
-          
-          {% set disabled_attr = 'disabled' if col in role_readonly_cols else '' %}
-          {% set readonly_attr = 'readonly' if col in role_readonly_cols else '' %}
-
-          {% if sm.get('foreign_table') %}
-            <div class="relation-picker" data-table="{{ sm.foreign_table }}" data-input-name="{{ col }}">
-              <select name="{{ col }}" {{ disabled_attr }} class="relation-select">
-                <option value="">Loading {{ sm.foreign_table }}...</option>
-              </select>
-            </div>
-          {% elif ov == 'boolean' or pg == 'boolean' %}
-            <div class="toggle-wrap">
-              <label class="toggle">
-                <input type="checkbox" name="{{ col }}" value="true" {{ disabled_attr }}>
-                <div class="toggle-track"><div class="toggle-thumb"></div></div>
-              </label>
-              <span class="toggle-label">{{ label }}</span>
-            </div>
-          {% elif pg == 'jsonb' or pg == 'json' or ov == 'json' %}
-            <textarea name="{{ col }}" class="mono" rows="3" placeholder='{"key": "value"}' {{ readonly_attr }}></textarea>
-          {% elif sm.get('character_maximum_length') and sm.character_maximum_length > 255 %}
-            {% set is_khmer = 'kh' in col or 'khmer' in col %}
-            <textarea name="{{ col }}" class="{{ 'khmer' if is_khmer else '' }}" rows="3" {{ readonly_attr }}></textarea>
-          {% elif pg in ('text',) and not sm.get('character_maximum_length') %}
-            {% set is_khmer = 'kh' in col or 'khmer' in col %}
-            <textarea name="{{ col }}" class="{{ 'khmer' if is_khmer else '' }}" rows="3" {{ readonly_attr }}></textarea>
-          {% elif pg in ('integer','bigint','smallint','numeric','real','double precision') %}
-            <input type="number" name="{{ col }}" step="any" {{ readonly_attr }}>
-          {% elif pg in ('timestamp without time zone','timestamp with time zone') %}
-            <input type="datetime-local" name="{{ col }}" {{ readonly_attr }}>
-          {% elif pg == 'date' %}
-            <input type="date" name="{{ col }}" {{ readonly_attr }}>
-          {% else %}
-            <input type="text" name="{{ col }}" {{ readonly_attr }}>
-          {% endif %}
-        </div>
+<!-- Filter/View Bar -->
+<div class="px-margin-desktop py-2 flex items-center justify-between bg-surface-container-lowest border-b border-outline-variant/10">
+  <div class="flex items-center gap-2">
+    <span class="text-label-caps text-on-surface-variant">Table: public.{{ selected_table }}</span>
+  </div>
+  <div class="flex items-center gap-4">
+    <span class="text-label-caps text-on-surface-variant">Showing {{ rows|length }} (Max 500)</span>
+  </div>
+</div>
+<!-- Grid Container -->
+<div class="flex-1 overflow-auto bg-surface-container-lowest">
+  <table class="w-full text-left border-collapse whitespace-nowrap">
+    <thead class="sticky top-0 bg-surface-container-low border-b border-outline-variant/20 z-10 shadow-sm shadow-background">
+      <tr>
+        {% if can_write %}
+        <th class="py-3 px-4 w-12 text-center border-r border-outline-variant/10">
+          <input class="mx-auto cursor-pointer" type="checkbox" id="selectAllRows" onclick="toggleAllRows(this)"/>
+        </th>
         {% endif %}
+        {% for col in visible_columns %}
+        <th class="py-3 px-4 font-label-caps text-label-caps text-on-surface-variant border-r border-outline-variant/10">
+          {{ table_col_config.get(col,{}).get('label', col) }}
+        </th>
         {% endfor %}
-      </div>
-      <div class="modal-foot">
-        <button type="button" class="btn btn-secondary" onclick="closeCreate()">Cancel</button>
-        <button type="submit" class="btn btn-primary">Create row</button>
-      </div>
-    </form>
+        {% if can_write %}
+        <th class="py-3 px-4 w-12 text-center text-on-surface-variant">Actions</th>
+        {% endif %}
+      </tr>
+    </thead>
+    <tbody class="font-tabular-nums text-tabular-nums text-on-surface">
+      {% for row in rows %}
+      <tr class="border-b border-outline-variant/10 table-row-hover cursor-pointer" {% if can_write %}onclick='openEdit({{ row | tojson | safe }})'{% endif %}>
+        {% if can_write %}
+        <td class="py-3 px-4 text-center border-r border-outline-variant/10" onclick="event.stopPropagation()">
+          <input class="mx-auto cursor-pointer row-checkbox" type="checkbox" value="{{ row.id }}"/>
+        </td>
+        {% endif %}
+        {% for col in visible_columns %}
+        {% set val = row[col] %}
+        {% set sm  = schema_by_col.get(col, {}) %}
+        {% set pg  = sm.get('data_type','') %}
+        {% set ov  = table_col_config.get(col,{}).get('type','') %}
+        <td class="py-3 px-4 border-r border-outline-variant/10 text-on-surface-variant max-w-[300px] truncate">
+          {% if val is none or val == '' %}
+            <span class="italic opacity-50">—</span>
+          {% elif ov == 'boolean' or pg == 'boolean' %}
+            <span class="flex items-center gap-1.5 {{ 'text-primary' if val else 'text-error' }}">
+              <div class="w-1.5 h-1.5 rounded-full {{ 'bg-primary' if val else 'bg-error' }}"></div>
+              {{ 'Yes' if val else 'No' }}
+            </span>
+          {% elif pg in ('integer','bigint','smallint','numeric','real','double precision') %}
+            {% if 'price' in col or 'amount' in col or 'balance' in col %}
+              <span class="font-tabular-nums text-primary font-medium">${{ val }}</span>
+            {% else %}
+              <span class="font-tabular-nums">{{ val }}</span>
+            {% endif %}
+          {% elif pg == 'jsonb' or pg == 'json' or ov == 'json' %}
+            <span class="font-mono text-[11px] truncate" title="{{ val }}">{{ val }}</span>
+          {% elif ov == 'mono' or pg.startswith('uuid') %}
+            <span class="font-mono text-[12px]">{{ val }}</span>
+          {% elif pg in ('timestamp without time zone','timestamp with time zone','date') %}
+            <span class="font-mono text-[12px]">{{ val }}</span>
+          {% elif col in ('photo_url', 'avatar', 'profile_image', 'image_url') and val %}
+            <div class="w-8 h-8 rounded-full bg-surface-variant overflow-hidden border border-outline-variant/30 flex-shrink-0">
+              <img src="{{ val }}" class="w-full h-full object-cover">
+            </div>
+          {% elif col.endswith('status') or col.endswith('state') %}
+            {% set status_color = 'bg-error/20 text-error border-error/30' %}
+            {% if val in ('active', 'completed', 'success', 'paid') %}
+              {% set status_color = 'bg-primary/20 text-primary border-primary/30' %}
+            {% elif val in ('pending', 'processing', 'waiting', 'draft') %}
+              {% set status_color = 'bg-tertiary/20 text-tertiary border-tertiary/30' %}
+            {% endif %}
+            <span class="px-2 py-0.5 rounded text-label-caps border {{ status_color }}" 
+                  {% if can_write %}onclick="openStatusMenu(event, '{{ row.id }}', '{{ col }}', '{{ val }}')"{% endif %}>
+              {{ val|upper }}
+            </span>
+          {% elif col in ('name', 'title', 'email', 'username') %}
+            <strong class="text-on-surface">{{ val }}</strong>
+          {% else %}
+            <span>{{ val }}</span>
+          {% endif %}
+        </td>
+        {% endfor %}
+        {% if can_write %}
+        <td class="py-3 px-4 text-center text-on-surface-variant" onclick="event.stopPropagation()">
+          <div class="flex justify-end items-center gap-2">
+            <button class="hover:text-primary transition-colors" onclick='openEdit({{ row | tojson | safe }})'><span class="material-symbols-outlined text-[18px]">edit</span></button>
+            <form method="POST" action="/backoffice/app/{{ app._id }}/cms/{{ selected_table }}/delete/{{ row.id }}" onsubmit="return confirm('Delete this row permanently?')">
+              <button type="submit" class="hover:text-error transition-colors"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+            </form>
+          </div>
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+      
+      {% if not rows %}
+      <tr><td colspan="{{ visible_columns|length + (1 if can_write else 0) }}">
+        <div class="text-center py-20">
+          <div class="text-[32px] opacity-40 mb-2">📭</div>
+          <div class="text-on-surface font-medium">No records</div>
+          <div class="text-on-surface-variant text-sm">{{ selected_table }} has no rows yet.</div>
+        </div>
+      </td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div style="flex:1;display:flex;align-items:center;justify-content:center;">
+  <div class="text-center">
+    <div class="text-[40px] opacity-40 mb-4">🗄️</div>
+    <div class="text-on-surface font-medium text-lg">No tables available</div>
+    <div class="text-on-surface-variant">Connect a tenant database or adjust schema visibility in config.</div>
   </div>
 </div>
+{% endif %}
+</main>
 
+<!-- Side Drawer (Editor) -->
+<aside class="fixed top-0 right-0 h-full w-[480px] glass-drawer z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col" id="editor-drawer">
+<div class="px-6 py-5 border-b border-outline-variant/20 flex items-center justify-between bg-surface/80 backdrop-blur-md sticky top-0 z-10">
+  <div>
+    <div class="font-label-caps text-label-caps text-on-surface-variant mb-1" id="drawerSubtitle">New Entry</div>
+    <div class="font-headline-sm text-headline-sm text-on-surface" id="drawerTitle">Create Row</div>
+  </div>
+  <div class="flex items-center gap-2">
+    <button class="p-2 text-on-surface-variant hover:text-on-surface rounded hover:bg-surface-variant/50 transition-colors" onclick="closeDrawer()">
+      <span class="material-symbols-outlined">close</span>
+    </button>
+  </div>
+</div>
+<form id="drawerForm" method="POST" action="/backoffice/app/{{ app._id }}/cms/{{ selected_table }}/create" class="flex flex-col h-full overflow-hidden">
+  <div class="flex-1 overflow-y-auto p-6 space-y-6" id="drawerFields">
+    <!-- Fields will be dynamically injected here for edit, or rendered directly for create -->
+  </div>
+  <div class="p-4 border-t border-outline-variant/20 bg-surface-container/50 backdrop-blur-md flex justify-end gap-3 sticky bottom-0">
+    <button type="button" class="px-4 py-2 border border-outline-variant/50 rounded text-on-surface hover:bg-surface-variant/50 transition-colors text-body-md" onclick="closeDrawer()">Cancel</button>
+    <button type="submit" class="px-4 py-2 bg-primary hover:bg-primary-fixed text-on-primary rounded font-medium transition-colors text-body-md">Save Changes</button>
+  </div>
+</form>
+</aside>
+<div class="fixed inset-0 bg-background/50 backdrop-blur-sm z-40 hidden" id="drawer-overlay" onclick="closeDrawer()"></div>
 
 <script>
-  // ── Theme switcher ──────────────────────────────────────────
-  const html = document.documentElement;
-  const themeBtn = document.getElementById('themeBtn');
-  let theme = localStorage.getItem('bifrost-theme') || 'light';
-
-  function applyTheme(t) {
-    html.setAttribute('data-theme', t);
-    themeBtn.textContent = t === 'dark' ? '☀️' : '🌙';
-    localStorage.setItem('bifrost-theme', t);
+  function openDrawer() {
+    const drawer = document.getElementById('editor-drawer');
+    const overlay = document.getElementById('drawer-overlay');
+    drawer.classList.remove('hidden');
+    overlay.classList.remove('hidden');
+    setTimeout(() => {
+      drawer.classList.remove('translate-x-full');
+    }, 10);
   }
-  applyTheme(theme);
-  themeBtn.addEventListener('click', () => {
-    theme = theme === 'dark' ? 'light' : 'dark';
-    applyTheme(theme);
-  });
+  function closeDrawer() {
+    const drawer = document.getElementById('editor-drawer');
+    const overlay = document.getElementById('drawer-overlay');
+    drawer.classList.add('translate-x-full');
+    setTimeout(() => {
+      drawer.classList.add('hidden');
+      overlay.classList.add('hidden');
+    }, 300);
+  }
 
-  // Close modal on overlay click
-  document.querySelectorAll('.modal-overlay').forEach(overlay => {
-    overlay.addEventListener('click', e => {
-      if (e.target === overlay) { overlay.classList.remove('open'); }
-    });
-  });
-
-  // ── Schema metadata passed from Flask ──────────────────────
+  // Schema metadata passed from Flask
   const schemaByCol  = {{ schema_by_col  | tojson | safe }};
   const tableColConf = {{ table_col_config | tojson | safe }};
   const appId        = "{{ app._id }}";
@@ -744,208 +351,106 @@
   const visibleCols  = {{ visible_columns | tojson | safe }};
   const roleReadonlyCols = {{ (role_readonly_cols or []) | tojson | safe }};
 
-  // ── Edit Modal ──────────────────────────────────────────────
-  function openEdit(row) {
-    const modal = document.getElementById('editModal');
-    const form  = document.getElementById('editForm');
-    form.action = `/backoffice/app/${appId}/cms/${tableName}/save/${row.id}`;
-    document.getElementById('editModalTitle').textContent = `Edit row #${row.id}`;
-
-    const body = document.getElementById('editFields');
-    body.innerHTML = '';
-
+  function buildFieldsHtml(row) {
+    let html = '';
     visibleCols.forEach(col => {
-      if (col === 'id') return;
-
+      if (col === 'id' && row) return;
       const sm    = schemaByCol[col] || {};
       const pg    = sm.data_type || '';
       const ov    = (tableColConf[col] || {}).type || '';
       const label = (tableColConf[col] || {}).label || col;
-      const val   = row[col];
+      const val   = row ? row[col] : '';
       const isReadonly = roleReadonlyCols.includes(col);
       const readonlyAttr = isReadonly ? 'readonly' : '';
       const disabledAttr = isReadonly ? 'disabled' : '';
 
-      const div = document.createElement('div');
-      div.className = 'field';
-
-      const fkHint = sm.foreign_table
-        ? `<span class="fk-hint"> → ${sm.foreign_table}</span>` : '';
+      html += `<div>`;
+      const fkHint = sm.foreign_table ? `<span class="material-symbols-outlined text-[14px] text-on-surface-variant">link</span>` : '';
+      const lockHint = isReadonly ? `<span class="text-error ml-2" style="font-size:10px;">Read Only</span>` : '';
       
-      const lockHint = isReadonly ? `<span class="fk-hint" style="color:var(--sub);margin-left:8px;">🔒 Read Only</span>` : '';
-      div.innerHTML = `<label class="field-label">${label}${fkHint}${lockHint}</label>`;
-
-      let input;
+      html += `<label class="block font-label-caps text-label-caps text-on-surface-variant mb-2 flex items-center justify-between">
+                 <span>${label} ${lockHint}</span>
+                 ${fkHint}
+               </label>`;
 
       if (sm.foreign_table) {
-        div.innerHTML += `
-          <div class="relation-picker" data-table="${sm.foreign_table}" data-input-name="${col}">
-            <select name="${col}" ${isReadonly ? 'disabled' : ''} class="relation-select" data-selected="${val ?? ''}">
-                <option value="${val ?? ''}">${val ? 'Loading...' : 'None'}</option>
-            </select>
-          </div>`;
+        html += `<div class="relative relation-picker" data-table="${sm.foreign_table}" data-input-name="${col}">
+                   <select name="${col}" ${disabledAttr} class="w-full bg-[#050505] border border-outline-variant/50 rounded px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none appearance-none transition-colors" data-selected="${val ?? ''}">
+                     <option value="${val ?? ''}">${val ? 'Loading...' : 'None'}</option>
+                   </select>
+                   <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+                 </div>`;
       } else if (ov === 'boolean' || pg === 'boolean') {
         const checked = val === true || val === 't' || val === 'true' ? 'checked' : '';
-        div.innerHTML += `
-          <div class="toggle-wrap">
-            <label class="toggle">
-              <input type="checkbox" name="${col}" value="true" ${checked}>
-              <div class="toggle-track"><div class="toggle-thumb"></div></div>
-            </label>
-            <span class="toggle-label">${label}</span>
-          </div>`;
+        html += `<div class="flex items-center justify-between bg-surface-container-low p-4 rounded border border-outline-variant/20">
+                   <div>
+                     <div class="font-body-md text-on-surface font-medium">${label}</div>
+                   </div>
+                   <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                     <input type="checkbox" name="${col}" value="true" ${checked} ${disabledAttr} class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-on-surface border-4 appearance-none cursor-pointer z-10" id="toggle-${col}"/>
+                     <label class="toggle-label block overflow-hidden h-5 rounded-full bg-surface-variant cursor-pointer" for="toggle-${col}"></label>
+                   </div>
+                 </div>`;
       } else if (pg === 'jsonb' || pg === 'json' || ov === 'json') {
         const pretty = val ? JSON.stringify(typeof val === 'string' ? JSON.parse(val) : val, null, 2) : '';
-        div.innerHTML += `<textarea name="${col}" class="mono" rows="4">${pretty}</textarea>`;
+        html += `<textarea name="${col}" class="w-full bg-[#050505] border border-outline-variant/50 rounded px-3 py-2 text-body-sm text-on-surface focus:border-primary focus:outline-none transition-colors font-mono" rows="4" ${readonlyAttr}>${pretty}</textarea>`;
       } else if (pg === 'text' || (sm.character_maximum_length && sm.character_maximum_length > 255)) {
-        const isKhmer = col.includes('kh') || col.includes('khmer');
-        div.innerHTML += `<textarea name="${col}" class="${isKhmer ? 'khmer' : ''}" rows="3">${val ?? ''}</textarea>`;
-      } else if (['integer','bigint','smallint','numeric','real','double precision'].includes(pg)) {
-        div.innerHTML += `<input type="number" name="${col}" step="any" value="${val ?? ''}">`;
-      } else if (pg.startsWith('timestamp')) {
-        const dt = val ? val.slice(0,16) : '';
-        div.innerHTML += `<input type="datetime-local" name="${col}" value="${dt}">`;
-      } else if (pg === 'date') {
-        div.innerHTML += `<input type="date" name="${col}" value="${val ?? ''}">`;
+        html += `<textarea name="${col}" class="w-full bg-[#050505] border border-outline-variant/50 rounded px-3 py-2 text-body-sm text-on-surface focus:border-primary focus:outline-none transition-colors" rows="3" ${readonlyAttr}>${val ?? ''}</textarea>`;
+      } else if (pg === 'date' || pg.includes('timestamp')) {
+        let valDate = val ?? '';
+        if (valDate && valDate.length > 10 && pg === 'date') valDate = valDate.substring(0, 10);
+        html += `<input type="date" name="${col}" value="${valDate}" ${readonlyAttr} class="w-full bg-[#050505] border border-outline-variant/50 rounded px-3 py-2 text-tabular-nums font-tabular-nums text-on-surface focus:border-primary focus:outline-none transition-colors [&::-webkit-calendar-picker-indicator]:filter-[invert(1)]"/>`;
       } else {
-        div.innerHTML += `<input type="text" name="${col}" value="${(val ?? '').toString().replace(/"/g,'&quot;')}">`;
+        html += `<input type="text" name="${col}" value="${val ?? ''}" ${readonlyAttr} class="w-full bg-[#050505] border border-outline-variant/50 rounded px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none transition-colors"/>`;
       }
-
-      body.appendChild(div);
+      html += `</div>`;
     });
-
-    modal.classList.add('open');
-    initRelationPickers(modal);
+    return html;
   }
 
-  function initRelationPickers(container) {
-    const pickers = container.querySelectorAll('.relation-picker');
-    pickers.forEach(picker => {
-      const table = picker.dataset.table;
-      const select = picker.querySelector('select');
-      const selectedValue = select.dataset.selected || '';
-
-      fetch(`/api/app/{{ app._id }}/cms/${table}/lookup`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.error) throw new Error(data.error);
-          
-          select.innerHTML = '<option value="">None</option>';
-          data.forEach(row => {
-            const opt = document.createElement('option');
-            opt.value = row.id;
-            opt.textContent = row.label;
-            if (String(row.id) === String(selectedValue)) opt.selected = true;
-            select.appendChild(opt);
-          });
-        })
-        .catch(err => {
-          console.error("Failed to load relation:", err);
-          select.innerHTML = `<option value="${selectedValue}">Error loading</option>`;
-        });
-    });
-  }
-
-  function closeEdit() {
-    document.getElementById('editModal').classList.remove('open');
-  }
-
-  // ── Create Modal ────────────────────────────────────────────
   function openCreate() {
-    document.getElementById('createModal').classList.add('open');
-  }
-  function closeCreate() {
-    document.getElementById('createModal').classList.remove('open');
-  }
-
-  // ── Bulk Actions ──────────────────────────────────────────────
-  function toggleAllRows(source) {
-    const checkboxes = document.querySelectorAll('.row-checkbox');
-    checkboxes.forEach(cb => cb.checked = source.checked);
-    updateBulkActions();
+    const form = document.getElementById('drawerForm');
+    form.action = `/backoffice/app/${appId}/cms/${tableName}/create`;
+    document.getElementById('drawerSubtitle').textContent = 'New Entry';
+    document.getElementById('drawerTitle').textContent = `Create ${tableName}`;
+    
+    document.getElementById('drawerFields').innerHTML = buildFieldsHtml(null);
+    openDrawer();
+    initRelationPickers();
   }
 
-  function updateBulkActions() {
-    const checked = document.querySelectorAll('.row-checkbox:checked').length;
-    let bar = document.getElementById('bulkActionBar');
-    if (!bar) {
-      bar = document.createElement('div');
-      bar.id = 'bulkActionBar';
-      bar.className = 'bulk-action-bar';
-      document.body.appendChild(bar);
-    }
+  function openEdit(row) {
+    const form = document.getElementById('drawerForm');
+    form.action = `/backoffice/app/${appId}/cms/${tableName}/save/${row.id}`;
+    document.getElementById('drawerSubtitle').textContent = `Editing Entry`;
+    document.getElementById('drawerTitle').textContent = `Row #${row.id}`;
     
-    if (checked > 0) {
-      bar.innerHTML = `
-        <span style="font-weight:600; margin-right:16px;">${checked} selected</span>
-        <button class="btn btn-secondary btn-sm" onclick="bulkUpdateStatus()">Update Status</button>
-        <button class="btn btn-danger btn-sm" onclick="bulkDelete()">Delete</button>
-      `;
-      bar.classList.add('visible');
-    } else {
-      bar.classList.remove('visible');
-    }
+    document.getElementById('drawerFields').innerHTML = buildFieldsHtml(row);
+    openDrawer();
+    initRelationPickers();
   }
 
-  function getSelectedIds() {
-    return Array.from(document.querySelectorAll('.row-checkbox:checked')).map(cb => cb.value);
-  }
-
-  function bulkUpdateStatus() {
-    const ids = getSelectedIds();
-    const newStatus = prompt("Enter new status (e.g. active, pending, rejected):");
-    if (!newStatus) return;
-    
-    // In a real app, this would be an AJAX call to a bulk-update endpoint.
-    // For now, we will just alert to demonstrate the UI flow (and log to console).
-    console.log("Bulk updating status to", newStatus, "for IDs:", ids);
-    alert(`Status for ${ids.length} records updated to '${newStatus}'. (Demonstration only)`);
-  }
-
-  function bulkDelete() {
-    const ids = getSelectedIds();
-    if (!confirm(`Delete ${ids.length} records permanently?`)) return;
-    
-    // In a real app, this would be an AJAX call to a bulk-delete endpoint.
-    console.log("Bulk deleting IDs:", ids);
-    alert(`Deleted ${ids.length} records. (Demonstration only)`);
-  }
-
-  // ── Inline Status Pill ────────────────────────────────────────
-  function openStatusMenu(e, rowId, col, currentVal) {
-    e.stopPropagation();
-    let menu = document.getElementById('statusMenu');
-    if (menu) menu.remove();
-    
-    menu = document.createElement('div');
-    menu.id = 'statusMenu';
-    menu.className = 'status-menu';
-    menu.style.top = (e.clientY + 10) + 'px';
-    menu.style.left = e.clientX + 'px';
-    
-    const statuses = ['pending', 'active', 'completed', 'rejected', 'failed'];
-    statuses.forEach(s => {
-      const item = document.createElement('div');
-      item.className = 'status-menu-item';
-      item.textContent = s.toUpperCase();
-      item.onclick = () => {
-        console.log(`Update ${rowId} ${col} to ${s}`);
-        alert(`Status updated to ${s} (Demonstration only)`);
-        menu.remove();
-      };
-      menu.appendChild(item);
-    });
-    
-    document.body.appendChild(menu);
-    
-    document.addEventListener('click', function closeMenu(ev) {
-      if (menu && !menu.contains(ev.target)) {
-        menu.remove();
-        document.removeEventListener('click', closeMenu);
-      }
+  function initRelationPickers() {
+    document.querySelectorAll('.relation-picker').forEach(picker => {
+      const ft = picker.getAttribute('data-table');
+      const sel = picker.querySelector('select');
+      const selectedVal = sel.getAttribute('data-selected');
+      
+      fetch(`/backoffice/app/${appId}/cms/api/lookup?table=${ft}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) {
+             sel.innerHTML = `<option value="">Error loading</option>`;
+             return;
+          }
+          sel.innerHTML = `<option value="">None</option>` + data.map(opt => {
+            const isSel = (opt.value == selectedVal) ? 'selected' : '';
+            return `<option value="${opt.value}" ${isSel}>${opt.label}</option>`;
+          }).join('');
+        })
+        .catch(() => sel.innerHTML = `<option value="">Error</option>`);
     });
   }
-
 </script>
 </body>
 </html>

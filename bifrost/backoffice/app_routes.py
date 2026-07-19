@@ -84,6 +84,13 @@ def update_app_settings(app_id):
         'heimdall_monitor': bool(request.form.get('service_heimdall_monitor'))
     }
 
+    raw_db_conn = request.form.get('db_connection')
+    if raw_db_conn and not raw_db_conn.startswith('gAAAAA'):
+        from ..utils.encryption import encrypt_value
+        app_doc = db.db.applications.find_one({"_id": ObjectId(app_id)})
+        if app_doc and app_doc.get('webhook_secret'):
+            raw_db_conn = encrypt_value(raw_db_conn, app_doc['webhook_secret'])
+
     data = {
         'app_name': request.form.get('app_name'),
         'app_web_url': request.form.get('web_url'),
@@ -92,7 +99,7 @@ def update_app_settings(app_id):
         'app_logo_url': request.form.get('logo_url'),
         'app_qr_url': request.form.get('qr_url'),
         'telegram_bot_token': request.form.get('telegram_bot_token'),
-        'db_connection': request.form.get('db_connection'),
+        'db_connection': raw_db_conn,
         'enabled_services': enabled_services
     }
 

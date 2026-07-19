@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 ### Added
+- **Valhalla Console UI**: Completely redesigned the `content_grid.html` Backoffice template to use the modern, dark-mode premium "Stitch" design system (Valhalla Console). Added dynamic glassmorphic side drawer for entity creation/editing.
+- **Security**: Added `Flask-WTF` dependency to properly enforce CSRF protection across all Jinja backoffice forms.
 - **Option B Backoffice CMS Console (Phase 1)**: Built manual payment receipt validation queue, dynamic CNAME host header resolution routing, and user entitlement suspension and overrides (commit: payments proxy, user overrides, dynamic template split-screen queue with Alpine.js).
 - **Telegram Bot SQL Ingestion**: Integrated the payment bot with multi-tenant SQL databases. The bot now automatically maps Telegram IDs to Postgres users, downloads and stores payment receipts in the tenant database, and routes admin approvals and rejections directly to the custom SQL connection.
 - **Developer Guidelines & Verification Script**: Created project-scoped developer instructions (`.agents/AGENTS.md`) and automated initiation shell scripts (`scripts/init_dev.sh`) to support onboarding and pre-release testing.
