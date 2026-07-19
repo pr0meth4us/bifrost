@@ -8,7 +8,12 @@ def get_tenant_db_conn_str(app):
     if not db_conn:
         return None
     if isinstance(db_conn, dict):
-        return db_conn.get('url')
+        db_conn = db_conn.get('url')
+        
+    if db_conn and isinstance(db_conn, str) and db_conn.startswith('gAAAAA'):
+        from ..utils.encryption import decrypt_value
+        db_conn = decrypt_value(db_conn, app.get('webhook_secret', ''))
+        
     return str(db_conn)
 
 @backoffice_bp.route('/app/<app_id>/payments')
@@ -49,8 +54,7 @@ def view_manual_payments(app_id):
 @login_required
 def approve_payment(app_id, payment_id):
     db = get_db()
-    my_role = get_current_role_in_app(app_id)
-    if my_role not in ('owner', 'super_admin', 'admin', 'billing_agent', 'operations', 'heimdall', 'pr0meth4us'):
+    if not check_permission(app_id, "payments:approve"):
         flash("Unauthorized to approve payments.", "danger")
         return redirect(url_for('backoffice.view_app', app_id=app_id))
         
@@ -68,7 +72,7 @@ def approve_payment(app_id, payment_id):
         if success:
             # Trigger subscription success webhook via Bifrost event layer
             db._trigger_event_for_user(
-                account_id=reviewer_id,
+                account_id=payment.get('user_id'),
                 event_type="subscription_success",
                 specific_app_id=app_id,
                 extra_data={
@@ -91,8 +95,7 @@ def approve_payment(app_id, payment_id):
 @login_required
 def reject_payment(app_id, payment_id):
     db = get_db()
-    my_role = get_current_role_in_app(app_id)
-    if my_role not in ('owner', 'super_admin', 'admin', 'billing_agent', 'operations', 'heimdall', 'pr0meth4us'):
+    if not check_permission(app_id, "payments:approve"):
         flash("Unauthorized to reject payments.", "danger")
         return redirect(url_for('backoffice.view_app', app_id=app_id))
         
@@ -120,8 +123,7 @@ def reject_payment(app_id, payment_id):
 @login_required
 def refund_payment(app_id, payment_id):
     db = get_db()
-    my_role = get_current_role_in_app(app_id)
-    if my_role not in ('owner', 'super_admin', 'admin', 'billing_agent', 'operations', 'heimdall', 'pr0meth4us'):
+    if not check_permission(app_id, "payments:approve"):
         flash("Unauthorized to refund payments.", "danger")
         return redirect(url_for('backoffice.view_app', app_id=app_id))
         
@@ -131,7 +133,11 @@ def refund_payment(app_id, payment_id):
         flash("Tenant DB connection not configured.", "danger")
         return redirect(url_for('backoffice.view_app', app_id=app_id))
         
-    track_id = request.form.get('track_id') or app.get('default_track_id') or 1
+    track_id = request.form.get('track_id')
+    if not track_id:
+        flash("track_id is required to process refund.", "danger")
+        return redirect(url_for('backoffice.view_manual_payments', app_id=app_id))
+        
     reviewer_id = session.get('backoffice_user')
     reason = request.form.get('reason') or "Refund issued"
     
@@ -204,6 +210,10 @@ def api_notify_new_payment(app_id):
     app = db.db.applications.find_one({"_id": ObjectId(app_id)})
     if not app:
         return {"status": "error", "message": "App not found"}, 404
+        
+    webhook_secret = request.headers.get('X-Webhook-Secret')
+    if not webhook_secret or webhook_secret != app.get('webhook_secret'):
+        return {"status": "error", "message": "Unauthorized"}, 401
         
     data = request.json or {}
     txn_ref = data.get('txn_ref')
@@ -477,7 +487,7 @@ def lookup_cms_table(app_id, table_name):
         return jsonify({"error": "DB not configured"}), 400
 
     try:
-        rows, _ = db.get_tenant_table_data(db_conn_str, table_name, limit=200, offset=0)
+        _, rows, _ = db.get_tenant_table_data(db_conn_str, table_name, limit=200, offset=0)
         results = []
         for r in rows:
             # Synthesize label

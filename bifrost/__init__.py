@@ -154,6 +154,14 @@ def create_app(config_class):
     app.register_blueprint(backoffice_bp)
     app.register_blueprint(config_api_bp)
 
+    # --- CSRF PROTECTION ---
+    from flask_wtf.csrf import CSRFProtect
+    csrf = CSRFProtect(app)
+    csrf.exempt(auth_api_bp)
+    csrf.exempt(internal_bp)
+    csrf.exempt(bot_webhook_bp)
+    csrf.exempt(config_api_bp)
+
     from .scheduler import start_scheduler
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         start_scheduler(app)

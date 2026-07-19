@@ -360,7 +360,7 @@ class PaymentMixin:
                     )
                 
                 cur.execute(
-                    "UPDATE entitlements SET status = 'rejected' WHERE user_id = %s AND exam_track_id = %s",
+                    "UPDATE entitlements SET status = 'revoked' WHERE user_id = %s AND exam_track_id = %s",
                     [user_id, track_id]
                 )
                 conn.commit()
@@ -550,10 +550,13 @@ class PaymentMixin:
         from bifrost.utils.tenant_db import get_tenant_db
         assert re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', table_name)
 
+        schema = self.get_tenant_table_schema(db_conn_str, table_name)
+        valid_columns = {col['column_name'] for col in schema}
+
         fields = []
         params = []
         for k, v in data.items():
-            if k == 'id':
+            if k == 'id' or k not in valid_columns:
                 continue
             fields.append(f'"{k}" = %s')
             params.append(v if v != '' else None)
@@ -593,9 +596,12 @@ class PaymentMixin:
         from bifrost.utils.tenant_db import get_tenant_db
         assert re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', table_name)
 
+        schema = self.get_tenant_table_schema(db_conn_str, table_name)
+        valid_columns = {col['column_name'] for col in schema}
+
         cols, placeholders, params = [], [], []
         for k, v in data.items():
-            if k == 'id':
+            if k == 'id' or k not in valid_columns:
                 continue
             cols.append(f'"{k}"')
             placeholders.append('%s')

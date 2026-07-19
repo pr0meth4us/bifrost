@@ -133,7 +133,7 @@ To ensure seamless handoffs and continuous memory tracking across coding session
 2. **Annotation Logging**: During development, insert milestones directly into the SQLite notes table.
 3. **Session Summary**: Before closing, run:
    ```bash
-   GEMINI_API_KEY="<api_key>" ANTIGRAVITY_MEM_DB="/Users/nicksng/.antigravity-mem/memory.db" /opt/homebrew/bin/antigravity-mem summarize -s "<session_id>"
+   GEMINI_API_KEY="<api_key>" GEMINI_MODEL="gemini-2.5-flash-lite" ANTIGRAVITY_MEM_DB="/Users/nicksng/.antigravity-mem/memory.db" /opt/homebrew/bin/antigravity-mem summarize -s "<session_id>"
    ```
 4. **Obsidian Sync**: Export all session notes to the vault:
    ```bash
