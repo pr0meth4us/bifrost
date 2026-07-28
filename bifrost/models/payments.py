@@ -1,13 +1,54 @@
 # bifrost/models/payments.py
-import re
 import secrets
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from bson import ObjectId
 import logging
 
+from .queue_schema import (  # noqa: F401 — safe_ident is re-exported for callers
+    DEFAULT as DEFAULT_QUEUE, IDENT_RE, QueueSchema, _table_columns, safe_ident,
+)
+
 log = logging.getLogger(__name__)
 UTC = ZoneInfo("UTC")
+
+# --- Manual payment state machine (SOW 3.1) -------------------------------
+# FREE -> PENDING -> PREMIUM | REJECTED, plus PREMIUM -> REFUNDED.
+# Enforced server-side; the UI is not the gate. This is the default vocabulary;
+# a tenant may declare its own in cms_config.payment_queue.states.
+PAYMENT_TRANSITIONS = DEFAULT_QUEUE.transitions
+
+REJECT_REASON_CODES = ('wrong_amount', 'unreadable', 'duplicate_reference', 'other')
+REFUND_REASON_CODES = ('duplicate_payment', 'user_request', 'chargeback', 'other')
+
+SLA_HOURS = 6            # approval SLA the client manages against
+SLA_WARN_HOURS = 4.5     # "approaching" threshold that fires the alert
+
+
+def _as(expr, canonical):
+    """Aliases a tenant column to the canonical key callers expect.
+
+    Emits the bare expression when the tenant already uses that name, which keeps
+    the default (Ministry) SQL identical to the pre-config build.
+    """
+    return expr if expr.split('.')[-1] == canonical else f'{expr} AS {canonical}'
+
+
+def _sla_age(created_at, status, queue=DEFAULT_QUEUE):
+    """Returns (age_hours, state) where state is ok | warn | breach | done."""
+    if not isinstance(created_at, datetime):
+        return None, 'unknown'
+    if not queue.is_open(status):
+        return None, 'done'
+    now = datetime.now(created_at.tzinfo or UTC)
+    hours = (now - created_at).total_seconds() / 3600.0
+    if hours >= SLA_HOURS:
+        state = 'breach'
+    elif hours >= SLA_WARN_HOURS:
+        state = 'warn'
+    else:
+        state = 'ok'
+    return round(hours, 1), state
 
 
 class PaymentMixin:
@@ -224,24 +265,55 @@ class PaymentMixin:
 
     # ---------------------------------------------------------
     # MULTI-TENANT POSTGRESQL PROXIED MANUAL PAYMENTS
+    #
+    # Table and column names come from the app's cms_config.payment_queue block
+    # (see queue_schema.py). An app with no block gets QueueSchema defaults, which
+    # are Ministry Exam Prep's shape and emit byte-identical SQL to the build that
+    # hardcoded them.
+    #
+    # Every method takes `queue` last so existing callers keep working; routes build
+    # one schema per request and pass it down. Rows come back keyed by CANONICAL
+    # names (id, user_id, txn_ref, ...) whatever the tenant calls its columns, so
+    # templates and webhook payloads never see tenant vocabulary.
     # ---------------------------------------------------------
-    def get_manual_payments(self, db_conn_str, status_filter=None):
-        """Fetches manual payments from the tenant's PostgreSQL database."""
+    def get_manual_payments(self, db_conn_str, status_filter=None, queue=DEFAULT_QUEUE):
+        """Fetches manual payments from the tenant's PostgreSQL database.
+
+        Adds derived SLA fields (age_hours, sla_state) so the queue shows the real
+        age of a receipt against the 6h approval SLA.
+        """
         from bifrost.utils.tenant_db import get_tenant_db
         from decimal import Decimal
-        sql = """
-        SELECT p.id, p.user_id, p.amount, p.txn_ref, p.receipt_url, p.status, p.reviewed_at, u.email
-        FROM payments p
-        LEFT JOIN users u ON p.user_id = u.id
-        """
-        params = []
-        if status_filter:
-            sql += " WHERE p.status = %s"
-            params.append(status_filter)
-        sql += " ORDER BY p.id DESC"
-        
+        q = queue
         with get_tenant_db(db_conn_str) as conn:
             with conn.cursor() as cur:
+                cols = _table_columns(cur, q.table)
+                created = (_as(f'p.{q.created}', 'created_at') if q.created in cols
+                           else 'NULL::timestamptz AS created_at')
+                track = (_as(f'p.{q.scope}', 'exam_track_id') if q.scope in cols
+                         else 'NULL::int AS exam_track_id')
+                selected = ', '.join([
+                    _as(f'p.{q.id}', 'id'), _as(f'p.{q.subject_key}', 'user_id'),
+                    _as(f'p.{q.amount}', 'amount'), _as(f'p.{q.reference}', 'txn_ref'),
+                    _as(f'p.{q.receipt}', 'receipt_url'), _as(f'p.{q.status}', 'status'),
+                    _as(f'p.{q.reviewed_at}', 'reviewed_at'), _as(f'p.{q.reviewed_by}', 'reviewed_by'),
+                    created, track, _as(f'u.{q.subject.label}', 'email'),
+                ])
+                sql = f"""
+                SELECT {selected}
+                FROM {q.table} p
+                LEFT JOIN {q.subject.table} u ON p.{q.subject_key} = u.{q.subject.id}
+                """
+                params = []
+                if isinstance(status_filter, (list, tuple, set)):
+                    statuses = list(status_filter)
+                    sql += f" WHERE p.{q.status} IN ({', '.join(['%s'] * len(statuses))})"
+                    params.extend(statuses)
+                elif status_filter:
+                    sql += f" WHERE p.{q.status} = %s"
+                    params.append(status_filter)
+                sql += f" ORDER BY p.{q.id} DESC"
+
                 cur.execute(sql, params)
                 columns = [desc[0] for desc in cur.description]
                 results = []
@@ -250,18 +322,52 @@ class PaymentMixin:
                     for k, v in d.items():
                         if isinstance(v, Decimal):
                             d[k] = float(v)
+                    d['age_hours'], d['sla_state'] = _sla_age(d.get('created_at'), d.get('status'), q)
+                    if isinstance(d.get('created_at'), datetime):
+                        d['created_at'] = d['created_at'].isoformat()
+                    if isinstance(d.get('reviewed_at'), datetime):
+                        d['reviewed_at'] = d['reviewed_at'].isoformat()
                     results.append(d)
                 return results
 
-    def get_manual_payment_by_id(self, db_conn_str, payment_id):
+    def get_active_tracks(self, db_conn_str, queue=DEFAULT_QUEUE):
+        """Options for the approve dropdown. Rows, never hard-coded options.
+
+        A queue with no scope_options (nothing to pick when approving) returns [].
+        """
+        from bifrost.utils.tenant_db import get_tenant_db
+        opts = queue.scope_options
+        if not opts:
+            return []
+        with get_tenant_db(db_conn_str) as conn:
+            with conn.cursor() as cur:
+                cols = _table_columns(cur, opts.table)
+                if not cols:
+                    return []
+                name = opts.label if opts.label in cols else 'name'
+                group = f'{opts.group}' if opts.group in cols else "NULL"
+                where = f" WHERE {opts.active}" if opts.active in cols else ""
+                cur.execute(
+                    f'SELECT {opts.id}, {group}, "{name}" FROM {opts.table}{where} ORDER BY {opts.id}'
+                )
+                return [{"id": r[0], "ministry": r[1], "name": r[2]} for r in cur.fetchall()]
+
+    def get_manual_payment_by_id(self, db_conn_str, payment_id, queue=DEFAULT_QUEUE):
         """Fetches a single manual payment from the tenant's PostgreSQL database."""
         from bifrost.utils.tenant_db import get_tenant_db
         from decimal import Decimal
-        sql = """
-        SELECT p.id, p.user_id, p.amount, p.txn_ref, p.receipt_url, p.status, p.reviewed_at, u.email
-        FROM payments p
-        LEFT JOIN users u ON p.user_id = u.id
-        WHERE p.id = %s
+        q = queue
+        selected = ', '.join([
+            _as(f'p.{q.id}', 'id'), _as(f'p.{q.subject_key}', 'user_id'),
+            _as(f'p.{q.amount}', 'amount'), _as(f'p.{q.reference}', 'txn_ref'),
+            _as(f'p.{q.receipt}', 'receipt_url'), _as(f'p.{q.status}', 'status'),
+            _as(f'p.{q.reviewed_at}', 'reviewed_at'), _as(f'u.{q.subject.label}', 'email'),
+        ])
+        sql = f"""
+        SELECT {selected}
+        FROM {q.table} p
+        LEFT JOIN {q.subject.table} u ON p.{q.subject_key} = u.{q.subject.id}
+        WHERE p.{q.id} = %s
         """
         with get_tenant_db(db_conn_str) as conn:
             with conn.cursor() as cur:
@@ -276,125 +382,369 @@ class PaymentMixin:
                     return d
                 return None
 
-    def approve_manual_payment(self, db_conn_str, payment_id, track_id, reviewer_id):
-        """Atomically approves payment and activates tenant premium entitlement."""
+    def _lock_payment(self, cur, payment_id, target_status, queue=DEFAULT_QUEUE):
+        """SELECT ... FOR UPDATE + state-machine check. Returns (payment_dict, error_dict)."""
+        q = queue
+        cols = _table_columns(cur, q.table)
+        track = (_as(q.scope, 'exam_track_id') if q.scope in cols
+                 else 'NULL::int AS exam_track_id')
+        checksum = (_as(q.checksum, 'receipt_checksum') if q.checksum in cols
+                    else 'NULL::text AS receipt_checksum')
+        selected = ', '.join([
+            _as(q.id, 'id'), _as(q.subject_key, 'user_id'), _as(q.amount, 'amount'),
+            _as(q.reference, 'txn_ref'), _as(q.receipt, 'receipt_url'), _as(q.status, 'status'),
+            track, checksum,
+        ])
+        cur.execute(
+            f"SELECT {selected} "
+            f"FROM {q.table} WHERE {q.id} = %s FOR UPDATE",
+            [payment_id]
+        )
+        row = cur.fetchone()
+        if not row:
+            return None, {"error": "not_found", "message": "Payment record not found."}
+        payment = dict(zip([d[0] for d in cur.description], row))
+        current = (payment.get('status') or '').lower()
+        if target_status not in q.transitions.get(current, set()):
+            return payment, {
+                "error": "invalid_transition",
+                "message": f"Cannot move payment from '{current}' to '{target_status}'.",
+            }
+        return payment, None
+
+    def find_duplicate_txn_ref(self, db_conn_str, txn_ref, exclude_payment_id=None, queue=DEFAULT_QUEUE):
+        """Returns the id of an already-settled payment sharing this txn_ref, else None."""
         from bifrost.utils.tenant_db import get_tenant_db
-        payment = self.get_manual_payment_by_id(db_conn_str, payment_id)
-        if not payment:
-            return False, "Payment record not found."
-        
-        user_id = payment["user_id"]
-        
         with get_tenant_db(db_conn_str) as conn:
             with conn.cursor() as cur:
+                return self._find_duplicate_txn_ref(cur, txn_ref, exclude_payment_id, queue)
+
+    def _find_duplicate_txn_ref(self, cur, txn_ref, exclude_payment_id=None, queue=DEFAULT_QUEUE):
+        if not txn_ref:
+            return None
+        q = queue
+        cur.execute(
+            f"SELECT {q.id} FROM {q.table} WHERE {q.reference} = %s AND {q.id} <> %s "
+            f"AND {q.status} IN ({q.settled_sql()}) LIMIT 1",
+            [txn_ref, exclude_payment_id or -1]
+        )
+        row = cur.fetchone()
+        return row[0] if row else None
+
+    def find_duplicate_receipt(self, db_conn_str, payment, queue=DEFAULT_QUEUE):
+        """Warn-only: another payment carrying the same receipt image.
+
+        Matches on the checksum column when the tenant schema has it (their uploader
+        computes it), otherwise falls back to an exact receipt-URL match.
+        """
+        from bifrost.utils.tenant_db import get_tenant_db
+        q = queue
+        with get_tenant_db(db_conn_str) as conn:
+            with conn.cursor() as cur:
+                cols = _table_columns(cur, q.table)
+                if q.checksum in cols and payment.get('receipt_checksum'):
+                    field, value = q.checksum, payment['receipt_checksum']
+                elif payment.get('receipt_url'):
+                    field, value = q.receipt, payment['receipt_url']
+                else:
+                    return None
                 cur.execute(
-                    "UPDATE payments SET status = 'approved', reviewed_by = %s, reviewed_at = NOW() WHERE id = %s",
-                    [reviewer_id, payment_id]
+                    f'SELECT {q.id} FROM {q.table} WHERE "{field}" = %s AND {q.id} <> %s LIMIT 1',
+                    [value, payment.get('id') or -1]
                 )
+                row = cur.fetchone()
+                return row[0] if row else None
+
+    def approve_manual_payment(self, db_conn_str, payment_id, track_id, reviewer_id, app_id=None,
+                               queue=DEFAULT_QUEUE):
+        """Approves a payment and activates the grant in ONE transaction.
+
+        Returns (True, payment) or (False, error_dict). A payment is never marked
+        approved unless the matching grant write commits with it.
+
+        A queue with no `grant` configured settles the payment and stops there — the
+        tenant's app is told over the webhook and owns whatever "granting" means for
+        it (stock, fulfilment, partial refunds). That logic does not belong here.
+        """
+        from bifrost.utils.tenant_db import get_tenant_db
+        q = queue
+        if q.grant and not track_id:
+            return False, {"error": "track_required", "message": "An exam track must be selected."}
+
+        with get_tenant_db(db_conn_str) as conn:
+            with conn.cursor() as cur:
+                payment, err = self._lock_payment(cur, payment_id, q.status_for('approve'), q)
+                if err:
+                    return False, err
+
+                dup = self._find_duplicate_txn_ref(cur, payment.get('txn_ref'), payment_id, q)
+                if dup:
+                    return False, {
+                        "error": "duplicate_txn_ref",
+                        "duplicate_of": dup,
+                        "message": f"Transaction reference already settled on payment #{dup}.",
+                    }
+
+                cols = _table_columns(cur, q.table)
+                sets = [f"{q.status} = '{q.status_for('approve')}'",
+                        f"{q.reviewed_by} = %s", f"{q.reviewed_at} = NOW()"]
+                params = [reviewer_id]
+                if q.scope in cols and track_id is not None:
+                    sets.append(f"{q.scope} = %s")
+                    params.append(track_id)
                 cur.execute(
-                    """
-                    INSERT INTO entitlements (user_id, exam_track_id, status, activated_at)
-                    VALUES (%s, %s, 'premium', NOW())
-                    ON CONFLICT (user_id, exam_track_id)
-                    DO UPDATE SET status = 'premium', activated_at = NOW();
-                    """,
-                    [user_id, track_id]
+                    f"UPDATE {q.table} SET {', '.join(sets)} WHERE {q.id} = %s",
+                    params + [payment_id]
                 )
+
+                if q.grant:
+                    g = q.grant
+                    # Upsert without depending on a unique constraint we don't own yet.
+                    cur.execute(
+                        f"UPDATE {g.table} SET {g.status} = '{g.on_approve}', {g.activated_at} = NOW() "
+                        f"WHERE {g.subject_key} = %s AND {g.scope_key} = %s",
+                        [payment['user_id'], track_id]
+                    )
+                    if cur.rowcount == 0:
+                        cur.execute(
+                            f"INSERT INTO {g.table} "
+                            f"({g.subject_key}, {g.scope_key}, {g.status}, {g.activated_at}) "
+                            f"VALUES (%s, %s, '{g.on_approve}', NOW())",
+                            [payment['user_id'], track_id]
+                        )
                 conn.commit()
+
+        payment['exam_track_id'] = track_id
+        self.log_audit(app_id, q.table, 'APPROVE', payment_id, reviewer_id,
+                       before={"status": payment.get('status')},
+                       after={"status": q.status_for('approve'), "exam_track_id": track_id,
+                              "user_id": payment.get('user_id')})
         return True, payment
 
-    def reject_manual_payment(self, db_conn_str, payment_id, reviewer_id, reason):
-        """Rejects manual payment with reason logged defensively."""
+    def reject_manual_payment(self, db_conn_str, payment_id, reviewer_id, reason_code, reason_text=None,
+                              app_id=None, queue=DEFAULT_QUEUE):
+        """Rejects a pending payment. Reason code is mandatory and validated."""
         from bifrost.utils.tenant_db import get_tenant_db
+        if reason_code not in REJECT_REASON_CODES:
+            return False, {"error": "bad_reason", "message": "A valid rejection reason code is required."}
+        reason = reason_code if not reason_text else f"{reason_code}: {reason_text}"
+        q = queue
+        rejected = q.status_for('reject')
+
         with get_tenant_db(db_conn_str) as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='payments'")
-                columns = [r[0] for r in cur.fetchall()]
-                
-                if 'reject_reason' in columns:
+                payment, err = self._lock_payment(cur, payment_id, rejected, q)
+                if err:
+                    return False, err
+
+                cols = _table_columns(cur, q.table)
+                sets = [f"{q.status} = '{rejected}'", f"{q.reviewed_by} = %s", f"{q.reviewed_at} = NOW()"]
+                params = [reviewer_id]
+                for candidate in q.reject_reason:
+                    if candidate in cols:
+                        sets.append(f'"{candidate}" = %s')
+                        params.append(reason)
+                        break
+                cur.execute(f"UPDATE {q.table} SET {', '.join(sets)} WHERE {q.id} = %s",
+                            params + [payment_id])
+                conn.commit()
+
+        self.log_audit(app_id, q.table, 'REJECT', payment_id, reviewer_id,
+                       before={"status": payment.get('status')},
+                       after={"status": rejected, "reason": reason})
+        return True, payment
+
+    def refund_manual_payment(self, db_conn_str, payment_id, reviewer_id, reason_code, reason_text=None,
+                              app_id=None, queue=DEFAULT_QUEUE):
+        """Refunds an approved payment and revokes THAT payment's grant.
+
+        The scope is derived from the payment itself, never from the form — refunding
+        the wrong track was a named defect in the prior build.
+
+        Refunds are all-or-nothing by design. A tenant whose refunds are partial (one
+        line item of five) must not configure a `grant`: settle the payment here and
+        let the webhook hand the decision back to their app.
+        """
+        from bifrost.utils.tenant_db import get_tenant_db
+        if reason_code not in REFUND_REASON_CODES:
+            return False, {"error": "bad_reason", "message": "A valid refund reason code is required."}
+        reason = reason_code if not reason_text else f"{reason_code}: {reason_text}"
+        q = queue
+        refunded = q.status_for('refund')
+
+        with get_tenant_db(db_conn_str) as conn:
+            with conn.cursor() as cur:
+                payment, err = self._lock_payment(cur, payment_id, refunded, q)
+                if err:
+                    return False, err
+
+                track_id = payment.get('exam_track_id')
+                if q.grant and not track_id:
+                    g = q.grant
+                    # Legacy rows predate the scope column: fall back to the payer's
+                    # single active grant, and refuse to guess when ambiguous.
                     cur.execute(
-                        "UPDATE payments SET status = 'rejected', reviewed_by = %s, reviewed_at = NOW(), reject_reason = %s WHERE id = %s",
-                        [reviewer_id, reason, payment_id]
+                        f"SELECT {g.scope_key} FROM {g.table} "
+                        f"WHERE {g.subject_key} = %s AND {g.status} = '{g.on_approve}'",
+                        [payment['user_id']]
                     )
-                elif 'notes' in columns:
+                    active = [r[0] for r in cur.fetchall()]
+                    if len(active) != 1:
+                        return False, {
+                            "error": "ambiguous_track",
+                            "message": ("Cannot determine which exam track this payment unlocked "
+                                        f"({len(active)} active entitlements). Resolve manually."),
+                        }
+                    track_id = active[0]
+
+                cols = _table_columns(cur, q.table)
+                sets = [f"{q.status} = '{refunded}'", f"{q.reviewed_by} = %s", f"{q.reviewed_at} = NOW()"]
+                params = [reviewer_id]
+                for candidate in q.refund_reason:
+                    if candidate in cols:
+                        sets.append(f'"{candidate}" = %s')
+                        params.append(reason)
+                        break
+                cur.execute(f"UPDATE {q.table} SET {', '.join(sets)} WHERE {q.id} = %s",
+                            params + [payment_id])
+
+                if q.grant:
+                    g = q.grant
                     cur.execute(
-                        "UPDATE payments SET status = 'rejected', reviewed_by = %s, reviewed_at = NOW(), notes = %s WHERE id = %s",
-                        [reviewer_id, reason, payment_id]
+                        f"UPDATE {g.table} SET {g.status} = '{g.on_revoke}' "
+                        f"WHERE {g.subject_key} = %s AND {g.scope_key} = %s",
+                        [payment['user_id'], track_id]
+                    )
+                conn.commit()
+
+        payment['exam_track_id'] = track_id
+        self.log_audit(app_id, q.table, 'REFUND', payment_id, reviewer_id,
+                       before={"status": payment.get('status'), "exam_track_id": track_id},
+                       after={"status": refunded, "exam_track_id": track_id, "reason": reason})
+        return True, payment
+
+    def suspend_tenant_user(self, db_conn_str, user_id, reason, actor=None, app_id=None,
+                            queue=DEFAULT_QUEUE):
+        """Suspends a user in the tenant DB.
+
+        Deliberately does NOT touch grants: suspension is reversible and a reinstated
+        user must get their paid access back. Access is gated on the subject's status
+        column, so revoking here would silently destroy a purchase that reinstate
+        cannot restore.
+        """
+        from bifrost.utils.tenant_db import get_tenant_db
+        s = queue.subject
+        with get_tenant_db(db_conn_str) as conn:
+            with conn.cursor() as cur:
+                cols = _table_columns(cur, s.table)
+                if s.status not in cols:
+                    raise ValueError(f"{s.table}.{s.status} column is required to suspend accounts.")
+                sets, params = [f"{s.status} = 'suspended'"], []
+                if s.suspended_at in cols:
+                    sets.append(f"{s.suspended_at} = NOW()")
+                if s.suspend_reason in cols:
+                    sets.append(f"{s.suspend_reason} = %s")
+                    params.append(reason)
+                cur.execute(f"UPDATE {s.table} SET {', '.join(sets)} WHERE {s.id} = %s",
+                            params + [user_id])
+                conn.commit()
+
+        self.log_audit(app_id, s.table, 'SUSPEND', user_id, actor,
+                       before={"status": "active"}, after={"status": "suspended", "reason": reason})
+        return True
+
+    def reinstate_tenant_user(self, db_conn_str, user_id, actor=None, app_id=None, queue=DEFAULT_QUEUE):
+        """Reinstates a user in the tenant DB. Grants are untouched by design."""
+        from bifrost.utils.tenant_db import get_tenant_db
+        s = queue.subject
+        with get_tenant_db(db_conn_str) as conn:
+            with conn.cursor() as cur:
+                cols = _table_columns(cur, s.table)
+                if s.status not in cols:
+                    raise ValueError(f"{s.table}.{s.status} column is required to reinstate accounts.")
+                sets = [f"{s.status} = 'active'"]
+                if s.suspended_at in cols:
+                    sets.append(f"{s.suspended_at} = NULL")
+                cur.execute(f"UPDATE {s.table} SET {', '.join(sets)} WHERE {s.id} = %s", [user_id])
+                conn.commit()
+
+        self.log_audit(app_id, s.table, 'REINSTATE', user_id, actor,
+                       before={"status": "suspended"}, after={"status": "active"})
+        return True
+
+    def set_entitlement(self, db_conn_str, user_id, track_id, status, actor=None, app_id=None,
+                        queue=DEFAULT_QUEUE):
+        """Manual grant override for support cases (SOW 3.5)."""
+        from bifrost.utils.tenant_db import get_tenant_db
+        g = queue.grant
+        if not g:
+            raise ValueError("This app's payment queue has no grant configured to override.")
+        if status not in g.statuses:
+            raise ValueError(f"Invalid entitlement status: {status}")
+        with get_tenant_db(db_conn_str) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"SELECT {g.status} FROM {g.table} "
+                    f"WHERE {g.subject_key} = %s AND {g.scope_key} = %s FOR UPDATE",
+                    [user_id, track_id]
+                )
+                row = cur.fetchone()
+                before = row[0] if row else None
+                if row:
+                    cur.execute(
+                        f"UPDATE {g.table} SET {g.status} = %s, {g.activated_at} = NOW() "
+                        f"WHERE {g.subject_key} = %s AND {g.scope_key} = %s",
+                        [status, user_id, track_id]
                     )
                 else:
                     cur.execute(
-                        "UPDATE payments SET status = 'rejected', reviewed_by = %s, reviewed_at = NOW() WHERE id = %s",
-                        [reviewer_id, payment_id]
+                        f"INSERT INTO {g.table} "
+                        f"({g.subject_key}, {g.scope_key}, {g.status}, {g.activated_at}) "
+                        f"VALUES (%s, %s, %s, NOW())",
+                        [user_id, track_id, status]
                     )
                 conn.commit()
+
+        self.log_audit(app_id, g.table, 'OVERRIDE', f"{user_id}:{track_id}", actor,
+                       before={"status": before}, after={"status": status})
         return True
 
-    def refund_manual_payment(self, db_conn_str, payment_id, track_id, reviewer_id, reason):
-        """Atomically marks payment as refunded and revokes premium entitlement."""
+    def validate_question_publishable(self, db_conn_str, question_id):
+        """Publish-time MCQ validation (SOW 3.2). Returns a list of blocking reasons.
+
+        Rules, in the client's words: exactly 4 choices, exactly 1 correct, explanation
+        in both languages, non-empty source_ref. The bilingual-explanation rule is
+        applied to the correct choice — that is the text the student is shown.
+        """
         from bifrost.utils.tenant_db import get_tenant_db
-        payment = self.get_manual_payment_by_id(db_conn_str, payment_id)
-        if not payment:
-            return False, "Payment record not found."
-        
-        user_id = payment["user_id"]
-        
+        errors = []
         with get_tenant_db(db_conn_str) as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='payments'")
-                columns = [r[0] for r in cur.fetchall()]
-                
-                if 'refund_reason' in columns:
-                    cur.execute(
-                        "UPDATE payments SET status = 'refunded', reviewed_by = %s, reviewed_at = NOW(), refund_reason = %s WHERE id = %s",
-                        [reviewer_id, reason, payment_id]
-                    )
-                elif 'notes' in columns:
-                    cur.execute(
-                        "UPDATE payments SET status = 'refunded', reviewed_by = %s, reviewed_at = NOW(), notes = %s WHERE id = %s",
-                        [reviewer_id, reason, payment_id]
-                    )
-                else:
-                    cur.execute(
-                        "UPDATE payments SET status = 'refunded', reviewed_by = %s, reviewed_at = NOW() WHERE id = %s",
-                        [reviewer_id, payment_id]
-                    )
-                
+                cur.execute("SELECT source_ref FROM questions WHERE id = %s", [question_id])
+                row = cur.fetchone()
+                if not row:
+                    return ["Question not found."]
+                if not (row[0] or '').strip():
+                    errors.append("source_ref is empty — every published question must trace to a source document.")
+
                 cur.execute(
-                    "UPDATE entitlements SET status = 'revoked' WHERE user_id = %s AND exam_track_id = %s",
-                    [user_id, track_id]
+                    "SELECT id, is_correct, explanation_kh, explanation_en "
+                    "FROM choices WHERE question_id = %s ORDER BY id",
+                    [question_id]
                 )
-                conn.commit()
-        return True, payment
+                choices = cur.fetchall()
 
-    def suspend_tenant_user(self, db_conn_str, user_id, reason):
-        """Suspends user in tenant DB and revokes entitlements."""
-        from bifrost.utils.tenant_db import get_tenant_db
-        with get_tenant_db(db_conn_str) as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='users'")
-                cols = [r[0] for r in cur.fetchall()]
-                
-                if 'status' in cols:
-                    cur.execute("UPDATE users SET status = 'suspended' WHERE id = %s", [user_id])
-                if 'suspended_at' in cols:
-                    cur.execute("UPDATE users SET suspended_at = NOW() WHERE id = %s", [user_id])
-                
-                cur.execute("UPDATE entitlements SET status = 'rejected' WHERE user_id = %s", [user_id])
-                conn.commit()
-        return True
-
-    def reinstate_tenant_user(self, db_conn_str, user_id):
-        """Reinstates a user in the tenant DB."""
-        from bifrost.utils.tenant_db import get_tenant_db
-        with get_tenant_db(db_conn_str) as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='users'")
-                cols = [r[0] for r in cur.fetchall()]
-                
-                if 'status' in cols:
-                    cur.execute("UPDATE users SET status = 'active' WHERE id = %s", [user_id])
-                conn.commit()
-        return True
+        if len(choices) != 4:
+            errors.append(f"Question has {len(choices)} choices — exactly 4 are required.")
+        correct = [c for c in choices if c[1]]
+        if len(correct) != 1:
+            errors.append(f"Question has {len(correct)} correct choices — exactly 1 is required.")
+        for c in correct:
+            if not (c[2] or '').strip():
+                errors.append("Correct choice is missing its Khmer explanation.")
+            if not (c[3] or '').strip():
+                errors.append("Correct choice is missing its English explanation.")
+        return errors
 
     def get_tenant_tables(self, db_conn_str):
         """Fetches the list of tables in the tenant's PostgreSQL database public schema."""
@@ -449,8 +799,8 @@ class PaymentMixin:
         """Fetches rows for a target table with pagination, sorting, and optional search."""
         from bifrost.utils.tenant_db import get_tenant_db
         from decimal import Decimal
-        # Defensive check on table_name and sort_dir to avoid SQL injection
-        assert re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', table_name), "Invalid table name"
+        # Identifiers are validated against the introspected schema; never interpolated raw.
+        safe_ident(table_name)
         sort_dir = 'ASC' if sort_dir.lower() == 'asc' else 'DESC'
 
         # Also validate sort_by against valid columns (fetch schema first)
@@ -503,8 +853,8 @@ class PaymentMixin:
     def get_distinct_column_values(self, db_conn_str, table_name, column_name):
         """Returns distinct values for a column — used to build enum selects."""
         from bifrost.utils.tenant_db import get_tenant_db
-        assert re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', table_name)
-        assert re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', column_name)
+        safe_ident(table_name)
+        safe_ident(column_name)
         sql = f'SELECT DISTINCT "{column_name}" FROM "{table_name}" WHERE "{column_name}" IS NOT NULL LIMIT 50'
         with get_tenant_db(db_conn_str) as conn:
             with conn.cursor() as cur:
@@ -531,11 +881,16 @@ class PaymentMixin:
         )
         return True
 
-    def log_cms_mutation(self, app_id, table_name, action, row_id, acting_user, before=None, after=None):
-        """Mandatory server-side logging for CMS edits (PRD Sec 8.5)."""
+    def log_audit(self, app_id, table_name, action, row_id, acting_user, before=None, after=None):
+        """Single audit sink for every console mutation (SOW 3.9).
+
+        Content edits, payment transitions and user actions all land here with
+        actor / table / row / before / after / timestamp. Retention is a minimum of
+        one year — there is deliberately no TTL index on this collection.
+        """
         from datetime import datetime, timezone
         self.db.cms_audit_log.insert_one({
-            "app_id": str(app_id),
+            "app_id": str(app_id) if app_id else None,
             "table": table_name,
             "action": action,
             "row_id": row_id,
@@ -545,10 +900,22 @@ class PaymentMixin:
             "after": after
         })
 
+    # Legacy name kept so existing call sites keep working.
+    log_cms_mutation = log_audit
+
+    def get_audit_log(self, app_id, table=None, actor=None, limit=200):
+        """Filterable audit timeline for the console (SOW 3.9)."""
+        query = {"app_id": str(app_id)}
+        if table:
+            query["table"] = table
+        if actor:
+            query["acting_user"] = actor
+        return list(self.db.cms_audit_log.find(query).sort("timestamp", -1).limit(int(limit)))
+
     def save_tenant_table_row(self, db_conn_str, table_name, row_id, data, app_id=None, acting_user=None):
         """Updates a row in the tenant database public schema."""
         from bifrost.utils.tenant_db import get_tenant_db
-        assert re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', table_name)
+        safe_ident(table_name)
 
         schema = self.get_tenant_table_schema(db_conn_str, table_name)
         valid_columns = {col['column_name'] for col in schema}
@@ -594,7 +961,7 @@ class PaymentMixin:
     def insert_tenant_table_row(self, db_conn_str, table_name, data, app_id=None, acting_user=None):
         """Inserts a new row in the tenant database public schema."""
         from bifrost.utils.tenant_db import get_tenant_db
-        assert re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', table_name)
+        safe_ident(table_name)
 
         schema = self.get_tenant_table_schema(db_conn_str, table_name)
         valid_columns = {col['column_name'] for col in schema}
@@ -633,7 +1000,7 @@ class PaymentMixin:
     def delete_tenant_table_row(self, db_conn_str, table_name, row_id, app_id=None, acting_user=None):
         """Deletes a row from the tenant database public schema."""
         from bifrost.utils.tenant_db import get_tenant_db
-        assert re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', table_name)
+        safe_ident(table_name)
 
         with get_tenant_db(db_conn_str) as conn:
             with conn.cursor() as cur:

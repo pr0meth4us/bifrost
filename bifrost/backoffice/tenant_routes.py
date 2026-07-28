@@ -1,7 +1,11 @@
 # bifrost/backoffice/tenant_routes.py
-from flask import render_template, request, redirect, url_for, flash, session, current_app
+from flask import render_template, request, redirect, url_for, flash, session, current_app, abort
 from bson import ObjectId
-from . import backoffice_bp, get_db, login_required, get_current_role_in_app, check_permission
+from . import backoffice_bp, get_db, login_required, requires, get_current_role_in_app, check_permission
+from ..models.payments import (
+    REJECT_REASON_CODES, REFUND_REASON_CODES, SLA_HOURS,
+)
+from ..models.queue_schema import QueueSchema
 
 def get_tenant_db_conn_str(app):
     db_conn = app.get('db_connection')
@@ -16,189 +20,301 @@ def get_tenant_db_conn_str(app):
         
     return str(db_conn)
 
+def locked_tables_for(app):
+    """Tables the console must never let a tenant edit.
+
+    Union, never override: the platform defaults stay enforced whatever the app
+    document says, so a tenant cannot unlock its own ledger by editing config.
+    """
+    from config import Config
+    platform = Config.PLATFORM_LOCKED_TABLES.get(app.get('client_id'), [])
+    return sorted(set(platform) | set(app.get('platform_locked_tables') or []))
+
+
+def _validate_payment_queue(db, db_conn_str, new_config):
+    """Rejects a payment_queue block whose identifiers don't exist in the tenant schema.
+
+    Runs at save time so a bad config is a readable error in the console rather than
+    a 500 the first time someone opens the queue. No block configured, nothing to check.
+    """
+    if not (new_config or {}).get('payment_queue'):
+        return []
+    try:
+        queue = QueueSchema.from_config(new_config)
+    except (ValueError, TypeError) as e:
+        return [str(e)]
+    if not db_conn_str:
+        return ["cannot validate against the tenant database — no connection configured."]
+    from ..utils.tenant_db import get_tenant_db
+    with get_tenant_db(db_conn_str) as conn:
+        with conn.cursor() as cur:
+            return queue.validate(cur)
+
+
+def _app_and_conn(db, app_id):
+    """Loads the tenant app doc, its decrypted connection string and its queue schema.
+
+    A payment_queue config that cannot be built is returned as a missing connection:
+    every caller already refuses to touch the tenant DB in that case, which is exactly
+    what we want — better a clear "go fix the config" than SQL built from a bad one.
+    """
+    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
+    if not app:
+        return None, None, None
+    try:
+        queue = QueueSchema.from_config(db.get_cms_config(str(app['_id'])))
+    except (ValueError, TypeError) as e:
+        flash(f"Invalid payment_queue config — fix it in CMS settings: {e}", "danger")
+        return app, None, None
+    return app, get_tenant_db_conn_str(app), queue
+
+
 @backoffice_bp.route('/app/<app_id>/payments')
-@login_required
+@requires("payments:view")
 def view_manual_payments(app_id):
     db = get_db()
-    if not check_permission(app_id, "read:config"):
-        flash("Unauthorized.", "danger")
-        return redirect(url_for('backoffice.dashboard'))
-        
-    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
+    app, db_conn_str, queue = _app_and_conn(db, app_id)
     if not app:
         flash("Application not found.", "danger")
         return redirect(url_for('backoffice.dashboard'))
-        
-    db_conn_str = get_tenant_db_conn_str(app)
+
+    payments, tracks = [], []
     if not db_conn_str:
         flash("Tenant database connection not configured.", "warning")
-        payments = []
     else:
         try:
             status_filter = request.args.get('status', 'pending')
-            payments = db.get_manual_payments(db_conn_str, status_filter=status_filter)
+            payments = db.get_manual_payments(db_conn_str, status_filter=status_filter, queue=queue)
+            tracks = db.get_active_tracks(db_conn_str, queue=queue)
         except Exception as e:
             flash(f"Error querying tenant database: {e}", "danger")
-            payments = []
-            
-    current_role = get_current_role_in_app(app_id)
+
     return render_template(
         'backoffice/payment_queue.html',
         app=app,
         payments=payments,
-        current_role=current_role,
+        tracks=tracks,
+        reject_reasons=REJECT_REASON_CODES,
+        refund_reasons=REFUND_REASON_CODES,
+        sla_hours=SLA_HOURS,
+        can_approve=check_permission(app_id, "payments:approve"),
+        current_role=get_current_role_in_app(app_id),
         status_filter=request.args.get('status', 'pending')
     )
 
+
 @backoffice_bp.route('/app/<app_id>/payments/<payment_id>/approve', methods=['POST'])
-@login_required
+@requires("payments:approve")
 def approve_payment(app_id, payment_id):
     db = get_db()
-    if not check_permission(app_id, "payments:approve"):
-        flash("Unauthorized to approve payments.", "danger")
-        return redirect(url_for('backoffice.view_app', app_id=app_id))
-        
-    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
-    db_conn_str = get_tenant_db_conn_str(app)
+    app, db_conn_str, queue = _app_and_conn(db, app_id)
     if not db_conn_str:
         flash("Tenant DB connection not configured.", "danger")
         return redirect(url_for('backoffice.view_app', app_id=app_id))
-        
-    track_id = request.form.get('track_id') or app.get('default_track_id') or 1
-    reviewer_id = session.get('backoffice_user')
-    
+
+    track_id = request.form.get('track_id')
+    if queue.grant and not track_id:
+        flash("Select the exam track to grant before approving.", "danger")
+        return redirect(url_for('backoffice.view_manual_payments', app_id=app_id))
+
+    reviewer_id = str(session.get('backoffice_user'))
     try:
-        success, payment = db.approve_manual_payment(db_conn_str, int(payment_id), int(track_id), str(reviewer_id))
-        if success:
-            # Trigger subscription success webhook via Bifrost event layer
-            db._trigger_event_for_user(
-                account_id=payment.get('user_id'),
-                event_type="subscription_success",
-                specific_app_id=app_id,
-                extra_data={
-                    "payment_id": payment_id,
-                    "txn_ref": payment.get('txn_ref'),
-                    "amount": payment.get('amount'),
-                    "role": "premium_user",
-                    "method": "manual_approval"
-                }
-            )
-            flash("Payment approved successfully. Premium entitlement granted.", "success")
-        else:
-            flash("Failed to approve payment.", "danger")
+        success, result = db.approve_manual_payment(
+            db_conn_str, int(payment_id), int(track_id) if track_id else None, reviewer_id,
+            app_id=app_id, queue=queue
+        )
     except Exception as e:
         flash(f"Approval error: {e}", "danger")
-        
+        return redirect(url_for('backoffice.view_manual_payments', app_id=app_id))
+
+    if not success:
+        if result.get('error') == 'duplicate_txn_ref':
+            flash(f"{result['message']} Open payment #{result['duplicate_of']} to compare.", "danger")
+        else:
+            flash(result.get('message', 'Failed to approve payment.'), "danger")
+        return redirect(url_for('backoffice.view_manual_payments', app_id=app_id))
+
+    # Notify the tenant app. The webhook must carry the PAYER's identity — resolved
+    # from the tenant user's email — never the reviewing admin's, and never a raw
+    # Postgres id where a Bifrost account id belongs.
+    detail = db.get_manual_payment_by_id(db_conn_str, int(payment_id), queue=queue) or {}
+    payer = db.find_account_by_email(detail['email']) if detail.get('email') else None
+    if payer:
+        db._trigger_event_for_user(
+            account_id=payer['_id'],
+            event_type="subscription_success",
+            specific_app_id=app_id,
+            extra_data={
+                "payment_id": int(payment_id),
+                "txn_ref": result.get('txn_ref'),
+                "amount": result.get('amount'),
+                "exam_track_id": int(track_id) if track_id else None,
+                "tenant_user_id": result.get('user_id'),
+                "role": "premium_user",
+                "method": "manual_approval",
+            }
+        )
+        flash("Payment approved. Premium entitlement granted and the app was notified.", "success")
+    else:
+        flash("Payment approved and entitlement granted, but no Bifrost account matched "
+              f"'{detail.get('email')}' — the app was NOT notified. Link the account, then re-send.",
+              "warning")
     return redirect(url_for('backoffice.view_manual_payments', app_id=app_id))
+
 
 @backoffice_bp.route('/app/<app_id>/payments/<payment_id>/reject', methods=['POST'])
-@login_required
+@requires("payments:approve")
 def reject_payment(app_id, payment_id):
     db = get_db()
-    if not check_permission(app_id, "payments:approve"):
-        flash("Unauthorized to reject payments.", "danger")
-        return redirect(url_for('backoffice.view_app', app_id=app_id))
-        
-    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
-    db_conn_str = get_tenant_db_conn_str(app)
+    app, db_conn_str, queue = _app_and_conn(db, app_id)
     if not db_conn_str:
         flash("Tenant DB connection not configured.", "danger")
         return redirect(url_for('backoffice.view_app', app_id=app_id))
-        
-    reviewer_id = session.get('backoffice_user')
-    reason = request.form.get('reason') or "Unspecified reason"
-    
+
     try:
-        success = db.reject_manual_payment(db_conn_str, int(payment_id), str(reviewer_id), reason)
-        if success:
-            flash("Payment rejected.", "warning")
-        else:
-            flash("Failed to reject payment.", "danger")
+        success, result = db.reject_manual_payment(
+            db_conn_str, int(payment_id), str(session.get('backoffice_user')),
+            request.form.get('reason_code'), request.form.get('reason_text'), app_id=app_id,
+            queue=queue
+        )
+        flash("Payment rejected. The user can retry." if success
+              else result.get('message', 'Failed to reject payment.'),
+              "warning" if success else "danger")
     except Exception as e:
         flash(f"Rejection error: {e}", "danger")
-        
+
     return redirect(url_for('backoffice.view_manual_payments', app_id=app_id))
+
 
 @backoffice_bp.route('/app/<app_id>/payments/<payment_id>/refund', methods=['POST'])
-@login_required
+@requires("payments:approve")
 def refund_payment(app_id, payment_id):
     db = get_db()
-    if not check_permission(app_id, "payments:approve"):
-        flash("Unauthorized to refund payments.", "danger")
-        return redirect(url_for('backoffice.view_app', app_id=app_id))
-        
-    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
-    db_conn_str = get_tenant_db_conn_str(app)
+    app, db_conn_str, queue = _app_and_conn(db, app_id)
     if not db_conn_str:
         flash("Tenant DB connection not configured.", "danger")
         return redirect(url_for('backoffice.view_app', app_id=app_id))
-        
-    track_id = request.form.get('track_id')
-    if not track_id:
-        flash("track_id is required to process refund.", "danger")
-        return redirect(url_for('backoffice.view_manual_payments', app_id=app_id))
-        
-    reviewer_id = session.get('backoffice_user')
-    reason = request.form.get('reason') or "Refund issued"
-    
+
     try:
-        success, payment = db.refund_manual_payment(db_conn_str, int(payment_id), int(track_id), str(reviewer_id), reason)
-        if success:
-            flash("Payment refunded and premium entitlement revoked immediately.", "success")
-        else:
-            flash("Failed to issue refund.", "danger")
+        success, result = db.refund_manual_payment(
+            db_conn_str, int(payment_id), str(session.get('backoffice_user')),
+            request.form.get('reason_code'), request.form.get('reason_text'), app_id=app_id,
+            queue=queue
+        )
     except Exception as e:
         flash(f"Refund error: {e}", "danger")
-        
+        return redirect(url_for('backoffice.view_manual_payments', app_id=app_id))
+
+    if not success:
+        flash(result.get('message', 'Failed to issue refund.'), "danger")
+        return redirect(url_for('backoffice.view_manual_payments', app_id=app_id))
+
+    detail = db.get_manual_payment_by_id(db_conn_str, int(payment_id), queue=queue) or {}
+    payer = db.find_account_by_email(detail['email']) if detail.get('email') else None
+    if payer:
+        db._trigger_event_for_user(
+            account_id=payer['_id'],
+            event_type="subscription_revoked",
+            specific_app_id=app_id,
+            extra_data={
+                "payment_id": int(payment_id),
+                "exam_track_id": result.get('exam_track_id'),
+                "reason": request.form.get('reason_code'),
+                "method": "manual_refund",
+            }
+        )
+    flash(f"Payment refunded. Access to track #{result.get('exam_track_id')} revoked immediately.",
+          "success")
     return redirect(url_for('backoffice.view_manual_payments', app_id=app_id))
 
+
 @backoffice_bp.route('/app/<app_id>/users/<user_id>/suspend', methods=['POST'])
-@login_required
+@requires("users:suspend")
 def suspend_user(app_id, user_id):
     db = get_db()
-    my_role = get_current_role_in_app(app_id)
-    if my_role not in ('owner', 'super_admin', 'admin', 'heimdall', 'pr0meth4us'):
-        flash("Unauthorized to suspend users.", "danger")
-        return redirect(url_for('backoffice.view_app', app_id=app_id))
-        
-    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
-    db_conn_str = get_tenant_db_conn_str(app)
+    app, db_conn_str, queue = _app_and_conn(db, app_id)
     if not db_conn_str:
         flash("Tenant DB connection not configured.", "danger")
         return redirect(url_for('backoffice.view_app', app_id=app_id))
-        
-    reason = request.form.get('reason') or "Anti-scraping trigger / admin suspension"
-    
+
+    reason = (request.form.get('reason') or '').strip()
+    if not reason:
+        flash("A reason is required to suspend an account.", "danger")
+        return redirect(url_for('backoffice.view_app', app_id=app_id))
+
     try:
-        db.suspend_tenant_user(db_conn_str, int(user_id), reason)
-        flash("User suspended and active entitlements revoked on tenant database.", "warning")
+        db.suspend_tenant_user(db_conn_str, int(user_id), reason,
+                               actor=str(session.get('backoffice_user')), app_id=app_id,
+                               queue=queue)
+        flash("User suspended. Entitlements are preserved and restore on reinstatement.", "warning")
     except Exception as e:
         flash(f"Suspension error: {e}", "danger")
-        
+
     return redirect(url_for('backoffice.view_app', app_id=app_id))
 
+
 @backoffice_bp.route('/app/<app_id>/users/<user_id>/reinstate', methods=['POST'])
-@login_required
+@requires("users:suspend")
 def reinstate_user(app_id, user_id):
     db = get_db()
-    my_role = get_current_role_in_app(app_id)
-    if my_role not in ('owner', 'super_admin', 'admin', 'heimdall', 'pr0meth4us'):
-        flash("Unauthorized to reinstate users.", "danger")
-        return redirect(url_for('backoffice.view_app', app_id=app_id))
-        
-    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
-    db_conn_str = get_tenant_db_conn_str(app)
+    app, db_conn_str, queue = _app_and_conn(db, app_id)
     if not db_conn_str:
         flash("Tenant DB connection not configured.", "danger")
         return redirect(url_for('backoffice.view_app', app_id=app_id))
-        
+
     try:
-        db.reinstate_tenant_user(db_conn_str, int(user_id))
+        db.reinstate_tenant_user(db_conn_str, int(user_id),
+                                 actor=str(session.get('backoffice_user')), app_id=app_id,
+                                 queue=queue)
         flash("User status reinstated to active.", "success")
     except Exception as e:
         flash(f"Reinstatement error: {e}", "danger")
-        
+
     return redirect(url_for('backoffice.view_app', app_id=app_id))
+
+
+@backoffice_bp.route('/app/<app_id>/entitlements/override', methods=['POST'])
+@requires("entitlements:override")
+def override_entitlement(app_id):
+    """Force-grant or revoke premium for support cases (SOW 3.5)."""
+    db = get_db()
+    app, db_conn_str, queue = _app_and_conn(db, app_id)
+    if not db_conn_str:
+        flash("Tenant DB connection not configured.", "danger")
+        return redirect(url_for('backoffice.view_app', app_id=app_id))
+
+    try:
+        db.set_entitlement(
+            db_conn_str, int(request.form['user_id']), int(request.form['track_id']),
+            request.form['status'], actor=str(session.get('backoffice_user')), app_id=app_id,
+            queue=queue
+        )
+        flash("Entitlement overridden and audit-logged.", "success")
+    except (KeyError, ValueError) as e:
+        flash(f"Invalid override request: {e}", "danger")
+    except Exception as e:
+        flash(f"Override error: {e}", "danger")
+
+    return redirect(url_for('backoffice.view_app', app_id=app_id))
+
+
+@backoffice_bp.route('/app/<app_id>/audit')
+@requires("audit:view")
+def view_audit_log(app_id):
+    """Filterable before/after timeline of every console mutation (SOW 3.9)."""
+    db = get_db()
+    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
+    entries = db.get_audit_log(
+        app_id,
+        table=request.args.get('table') or None,
+        actor=request.args.get('actor') or None,
+        limit=min(int(request.args.get('limit', 200)), 1000),
+    )
+    return render_template('backoffice/audit_log.html', app=app, entries=entries,
+                           current_role=get_current_role_in_app(app_id),
+                           filter_table=request.args.get('table', ''),
+                           filter_actor=request.args.get('actor', ''))
+
 
 @backoffice_bp.route('/api/tenant/<app_id>/payments/notify-new', methods=['POST'])
 def api_notify_new_payment(app_id):
@@ -211,8 +327,9 @@ def api_notify_new_payment(app_id):
     if not app:
         return {"status": "error", "message": "App not found"}, 404
         
-    webhook_secret = request.headers.get('X-Webhook-Secret')
-    if not webhook_secret or webhook_secret != app.get('webhook_secret'):
+    import hmac
+    webhook_secret = request.headers.get('X-Webhook-Secret') or ''
+    if not hmac.compare_digest(str(webhook_secret), str(app.get('webhook_secret') or '')):
         return {"status": "error", "message": "Unauthorized"}, 401
         
     data = request.json or {}
@@ -265,14 +382,12 @@ def view_cms_grid(app_id):
     table_groups = cms_config.get('table_groups', {})
 
     try:
-        from config import Config
         tables = db.get_tenant_tables(db_conn_str)
-        
+
         current_role = get_current_role_in_app(app_id)
-        
+
         # Apply Platform-Level Locks (PRD Sec 8.4)
-        client_id = app.get('client_id')
-        locked_tables = Config.PLATFORM_LOCKED_TABLES.get(client_id, [])
+        locked_tables = locked_tables_for(app)
 
         # Apply hidden tables from CMS config
         hidden = cms_config.get('hidden_tables', [])
@@ -335,6 +450,12 @@ def view_cms_grid(app_id):
             if not table_col_config.get(c, {}).get('hidden', False) and c not in role_hidden_cols
         ]
 
+        # Strip hidden columns from the DATA, not just the rendering. A role without
+        # access to a column must never receive its value in the payload — the drawer
+        # serialises whole rows into the page, so filtering in the template leaks.
+        if len(visible_columns) != len(columns):
+            rows = [{k: v for k, v in r.items() if k in visible_columns} for r in rows]
+
         # Build augmented schema: merge pg types with cms overrides
         schema_by_col = {s['column_name']: s for s in schema_meta}
 
@@ -396,27 +517,54 @@ def check_cms_write_permission(db, app_id, table_name):
     perms_list = tbl_cfg.get('permissions', []) if isinstance(tbl_cfg, dict) else tbl_cfg
     return 'write' in perms_list
 
+def check_publish_permission(app_id, table_name, data, db, db_conn_str, row_id=None):
+    """Guards the draft -> review -> published workflow (SOW 3.2).
+
+    Returns an error string, or None when the write may proceed. Content Managers
+    may move draft -> review; only Admin/Owner may publish, and nothing publishes
+    that fails MCQ validation. This runs on the write path, so it covers the grid,
+    the drawer and the status-pill quick menu with one check.
+    """
+    if 'status' not in data or str(data.get('status')).lower() != 'published':
+        return None
+    if not check_permission(app_id, "content:publish"):
+        return "Only an Admin or Owner may publish content. Move it to 'review' instead."
+    # WHICH table gets publish validation is configuration; the rules themselves stay
+    # domain-specific on purpose — a rules-config would be worse than a second function.
+    validated = (db.get_cms_config(app_id) or {}).get('publish_validation_table', 'questions')
+    if table_name != validated or row_id is None:
+        return None
+    errors = db.validate_question_publishable(db_conn_str, int(row_id))
+    if errors:
+        return "Cannot publish: " + " ".join(errors)
+    return None
+
+
 @backoffice_bp.route('/app/<app_id>/cms/<table_name>/save/<row_id>', methods=['POST'])
 @login_required
 def save_cms_row(app_id, table_name, row_id):
     db = get_db()
     if not check_cms_write_permission(db, app_id, table_name):
-        flash("Unauthorized.", "danger")
-        return redirect(url_for('backoffice.view_app', app_id=app_id))
-        
+        abort(403, description="No write access to this table.")
+
     app = db.db.applications.find_one({"_id": ObjectId(app_id)})
     db_conn_str = get_tenant_db_conn_str(app)
-    
+
     # Exclude internal form variables
     data = {k: v for k, v in request.form.items() if k not in ('csrf_token', '_method')}
     acting_user = session.get('backoffice_user', 'unknown')
-    
+
+    blocked = check_publish_permission(app_id, table_name, data, db, db_conn_str, row_id)
+    if blocked:
+        flash(blocked, "danger")
+        return redirect(url_for('backoffice.view_cms_grid', app_id=app_id, table=table_name))
+
     try:
         db.save_tenant_table_row(db_conn_str, table_name, int(row_id), data, app_id=app_id, acting_user=acting_user)
         flash("Row updated successfully.", "success")
     except Exception as e:
         flash(f"Update failed: {e}", "danger")
-        
+
     return redirect(url_for('backoffice.view_cms_grid', app_id=app_id, table=table_name))
 
 @backoffice_bp.route('/app/<app_id>/cms/<table_name>/create', methods=['POST'])
@@ -424,15 +572,19 @@ def save_cms_row(app_id, table_name, row_id):
 def create_cms_row(app_id, table_name):
     db = get_db()
     if not check_cms_write_permission(db, app_id, table_name):
-        flash("Unauthorized.", "danger")
-        return redirect(url_for('backoffice.view_app', app_id=app_id))
-        
+        abort(403, description="No write access to this table.")
+
     app = db.db.applications.find_one({"_id": ObjectId(app_id)})
     db_conn_str = get_tenant_db_conn_str(app)
-    
+
     data = {k: v for k, v in request.form.items() if k not in ('csrf_token', '_method')}
     acting_user = session.get('backoffice_user', 'unknown')
-    
+
+    blocked = check_publish_permission(app_id, table_name, data, db, db_conn_str)
+    if blocked:
+        flash(blocked, "danger")
+        return redirect(url_for('backoffice.view_cms_grid', app_id=app_id, table=table_name))
+
     try:
         db.insert_tenant_table_row(db_conn_str, table_name, data, app_id=app_id, acting_user=acting_user)
         flash("Row inserted successfully.", "success")
@@ -446,9 +598,9 @@ def create_cms_row(app_id, table_name):
 def delete_cms_row(app_id, table_name, row_id):
     db = get_db()
     if not check_cms_write_permission(db, app_id, table_name):
-        flash("Unauthorized.", "danger")
-        return redirect(url_for('backoffice.view_app', app_id=app_id))
-        
+        abort(403, description="No write access to this table.")
+
+
     app = db.db.applications.find_one({"_id": ObjectId(app_id)})
     db_conn_str = get_tenant_db_conn_str(app)
     acting_user = session.get('backoffice_user', 'unknown')
@@ -523,8 +675,12 @@ def cms_settings(app_id):
         raw = request.form.get('cms_config_json', '{}')
         try:
             new_config = json.loads(raw)
-            db.save_cms_config(str(app['_id']), new_config)
-            flash("CMS configuration saved.", "success")
+            errors = _validate_payment_queue(db, db_conn_str, new_config)
+            if errors:
+                flash("Payment queue config rejected: " + " ".join(errors), "danger")
+            else:
+                db.save_cms_config(str(app['_id']), new_config)
+                flash("CMS configuration saved.", "success")
         except Exception as e:
             flash(f"Invalid config JSON: {e}", "danger")
         return redirect(url_for('backoffice.cms_settings', app_id=app_id))
@@ -538,8 +694,7 @@ def cms_settings(app_id):
         flash(f"DB error: {e}", "danger")
         all_tables, table_schemas = [], {}
 
-    from config import Config
-    locked_tables = Config.PLATFORM_LOCKED_TABLES.get(app.get('client_id'), [])
+    locked_tables = locked_tables_for(app)
     
     current_role = get_current_role_in_app(app_id)
     return render_template(
