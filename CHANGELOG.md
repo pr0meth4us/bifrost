@@ -6,7 +6,7 @@ work. Gap analysis and vendor reply in `docs/scope-response-admin-console.md`;
 operator runbook in `docs/console-onboarding.md`.
 
 ### Fixed
-- **Missing `.gitmodules` file caused submodule build failure**: Added `.gitmodules` configuration for submodule `prolong` (`https://github.com/pr0meth4us/prolong.git`) resolving `fatal: No url found for submodule path 'prolong' in .gitmodules` during automated CI/CD git clones.
+- **Koyeb build failure due to submodule gitlink**: Removed `prolong` submodule gitlink and `.gitmodules` so Koyeb and automated CI/CD runners build the `bifrost` Docker container cleanly without git credential errors.
 - **CSRF tokens were missing from every backoffice form.** `CSRFProtect` had been enabled without them, so approve, reject, refund and all CMS writes were returning 400. Tokens added to all 10 templates; `/api/tenant/<app_id>/payments/notify-new` explicitly exempted (machine-to-machine, secret-authenticated) and its secret comparison made constant-time.
 - **Refund could never succeed** — the route required a `track_id` the form never sent. The track is now derived from the payment itself, never from a form field.
 - **The approval webhook silently never fired** — a tenant Postgres `user_id` was passed where a Bifrost `ObjectId` was expected and the `InvalidId` was swallowed. The payer is now resolved from their email, and a failure to resolve is surfaced instead of reported as success.
