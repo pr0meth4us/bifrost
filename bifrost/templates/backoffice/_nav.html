@@ -1,0 +1,87 @@
+{# The single console sidebar. Every page used to invent its own navigation —
+   some had a "← Back to App" link, some a top row of coloured pills, some
+   nothing at all — so the same destination had three different names.
+
+   Visibility here is cosmetic ONLY. `can()` calls the same check_permission()
+   the routes use, so the menu matches reality, but the routes are still the
+   thing enforcing access — hiding a link is not access control. #}
+{% set ep = request.endpoint %}
+<nav class="sidebar" aria-label="Console navigation">
+
+  <div class="flex items-center gap-2.5 px-4 h-[--topbar-h] border-b border-border shrink-0">
+    {# The tenant's own app is the brand here, not ours. Only fall back to a
+       generic mark when no app is in scope (the all-applications list). #}
+    {% if app and app.app_logo_url %}
+      <img src="{{ app.app_logo_url }}" alt="" class="w-7 h-7 rounded object-contain shrink-0">
+    {% else %}
+      <div class="w-7 h-7 rounded bg-accent text-accent-fg grid place-items-center font-bold shrink-0"
+           aria-hidden="true">{{ app.app_name[0]|upper if app else '·' }}</div>
+    {% endif %}
+    <div class="min-w-0">
+      <div class="font-semibold leading-tight truncate" title="{{ app.app_name if app }}">
+        {{ app.app_name if app else 'Console' }}
+      </div>
+      <div class="text-[11px] muted leading-tight">Console</div>
+    </div>
+  </div>
+
+  <div class="flex-1 overflow-y-auto py-2">
+    <a class="nav-link" href="{{ url_for('backoffice.dashboard') }}"
+       {% if ep == 'backoffice.dashboard' %}aria-current="page"{% endif %}>All applications</a>
+
+    {% if app %}
+      {% set app_id = app._id|string %}
+
+      <div class="nav-section">Manage</div>
+
+      <a class="nav-link" href="{{ url_for('backoffice.view_app') }}"
+         {% if ep == 'backoffice.view_app' %}aria-current="page"{% endif %}>Users &amp; settings</a>
+
+      {% if can(app_id, 'content:read') %}
+        <a class="nav-link" href="{{ url_for('backoffice.view_cms_grid') }}"
+           {% if ep == 'backoffice.view_cms_grid' %}aria-current="page"{% endif %}>Content</a>
+      {% endif %}
+
+      {% if can(app_id, 'payments:view') %}
+        <a class="nav-link" href="{{ url_for('backoffice.view_manual_payments') }}"
+           {% if ep == 'backoffice.view_manual_payments' %}aria-current="page"{% endif %}>Payments</a>
+      {% endif %}
+
+      {% if can(app_id, 'audit:view') %}
+        <a class="nav-link" href="{{ url_for('backoffice.view_audit_log', app_id=app_id) }}"
+           {% if ep == 'backoffice.view_audit_log' %}aria-current="page"{% endif %}>Audit log</a>
+      {% endif %}
+
+      {% if can(app_id, 'write:config') %}
+        <div class="nav-section">Configure</div>
+        <a class="nav-link" href="{{ url_for('backoffice.cms_settings', app_id=app_id) }}"
+           {% if ep in ('backoffice.cms_settings', 'backoffice.cms_onboarding') %}aria-current="page"{% endif %}>Schema</a>
+        <a class="nav-link" href="{{ url_for('backoffice.cms_rbac', app_id=app_id) }}"
+           {% if ep == 'backoffice.cms_rbac' %}aria-current="page"{% endif %}>Roles &amp; permissions</a>
+      {% endif %}
+
+      {% if can(app_id, 'db:execute') %}
+        <div class="nav-section">Developer</div>
+        <a class="nav-link" href="{{ url_for('backoffice.devtools', app_id=app_id) }}"
+           {% if ep == 'backoffice.devtools' %}aria-current="page"{% endif %}>
+          SQL Studio
+          <span class="badge badge-danger ml-auto">raw</span>
+        </a>
+      {% endif %}
+    {% endif %}
+
+    {% if session.get('is_heimdall') %}
+      <div class="nav-section">Platform</div>
+      <a class="nav-link" href="{{ url_for('backoffice.monitor') }}"
+         {% if ep == 'backoffice.monitor' %}aria-current="page"{% endif %}>Live monitor</a>
+      <a class="nav-link" href="{{ url_for('backoffice.ai_metrics') }}"
+         {% if ep == 'backoffice.ai_metrics' %}aria-current="page"{% endif %}>AI metrics</a>
+      <a class="nav-link" href="{{ url_for('backoffice.global_users') }}"
+         {% if ep in ('backoffice.global_users', 'backoffice.global_user_details') %}aria-current="page"{% endif %}>All users</a>
+      <a class="nav-link" href="{{ url_for('backoffice.global_api_keys') }}"
+         {% if ep == 'backoffice.global_api_keys' %}aria-current="page"{% endif %}>API vault</a>
+      <a class="nav-link" href="{{ url_for('backoffice.create_app') }}"
+         {% if ep == 'backoffice.create_app' %}aria-current="page"{% endif %}>New application</a>
+    {% endif %}
+  </div>
+</nav>

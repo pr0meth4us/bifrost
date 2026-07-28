@@ -1,482 +1,323 @@
-<!DOCTYPE html>
-<html lang="en" data-theme="light">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Schema Config · {{ app.app_name }}</title>
+{% extends "backoffice/base.html" %}
+
+{% block title %}Schema{% endblock %}
+{% block page_title %}Schema · {{ app.app_name }}{% endblock %}
+
+{% block head %}
 <style>
-  :root {
-    --ink:#1d1d1f; --sub:#6e6e73; --hair:#d2d2d7;
-    --bg:#ffffff; --bg2:#f5f5f7;
-    --accent:#0071e3; --good:#1d7a3c; --warn:#b25000; --bad:#c22222;
-    --nav-h:48px;
-  }
-  [data-theme="dark"] {
-    --ink:#f5f5f7; --sub:#98989d; --hair:#3a3a3c;
-    --bg:#1c1c1e; --bg2:#2c2c2e;
-    --accent:#2997ff; --good:#30d158; --warn:#ff9f0a; --bad:#ff453a;
-  }
-  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-  html{-webkit-font-smoothing:antialiased;}
-  body{
-    font-family:-apple-system,"Helvetica Neue",Helvetica,Arial,sans-serif;
-    font-size:14px; background:var(--bg2); color:var(--ink);
-    min-height:100vh; display:flex; flex-direction:column;
-  }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; align-items: start; }
+  @media (max-width: 1100px) { .split { grid-template-columns: minmax(0, 1fr); } }
 
-  /* Nav */
-  .topnav{
-    position:sticky; top:0; z-index:100; height:var(--nav-h);
-    background:rgba(255,255,255,.82);
-    backdrop-filter:saturate(180%) blur(20px);
-    border-bottom:1px solid var(--hair);
-    display:flex; align-items:center; justify-content:space-between; padding:0 20px;
-  }
-  [data-theme="dark"] .topnav{background:rgba(28,28,30,.88);}
-  .topnav-left{display:flex;align-items:center;gap:14px;}
-  .topnav-sep{width:1px;height:18px;background:var(--hair);}
-  .btn-back{font-size:12px;font-weight:600;color:var(--sub);text-decoration:none;transition:color .15s;}
-  .btn-back:hover{color:var(--ink);}
-
-  .main { padding: 32px 40px; max-width: 1200px; margin: 0 auto; width: 100%; display: flex; gap: 40px; }
-  .left-pane { flex: 1; }
-  .right-pane { width: 300px; flex-shrink: 0; }
-
-  /* Header */
-  .header-area { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid var(--hair); padding-bottom: 16px; margin-bottom: 24px; position:relative; }
-  .header-area::after { content: ''; position: absolute; left: 0; bottom: -2px; height: 2px; background: var(--good); width: var(--progress-pct, 0%); transition: width 0.3s; }
-  .page-title { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
-  .progress-text { font-size: 14px; font-weight: 500; color: var(--sub); }
-
-  /* Toolbar */
-  .toolbar { display: flex; gap: 12px; margin-bottom: 24px; align-items: center; }
-  .search-input { 
-    flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--hair); 
-    background: var(--bg); color: var(--ink); font-size: 14px; outline: none;
-  }
-  .search-input:focus { border-color: var(--accent); }
-  .filter-pill {
-    padding: 6px 14px; border-radius: 99px; border: 1px solid var(--hair); background: var(--bg);
-    font-size: 13px; font-weight: 500; cursor: pointer; color: var(--ink);
-  }
-  .filter-pill.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-
-  /* Accordion rows */
-  .tbl-row { 
-    background: var(--bg); border: 1px solid var(--hair); border-radius: 8px; margin-bottom: 8px; overflow: hidden;
-  }
-  .tbl-head {
-    padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;
-  }
-  .tbl-title-area { display: flex; flex-direction: column; }
-  .tbl-title { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
-  .tbl-meta { font-size: 12px; color: var(--sub); }
-  .badge { padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
-  .badge.configured { color: var(--good); }
-  .badge.review { background: #fff5e0; color: var(--warn); }
-  .badge.hidden { color: var(--sub); }
-  [data-theme="dark"] .badge.review { background: #2e1e00; }
-
-  /* Expanded state */
-  .tbl-body { display: none; padding: 20px; border-top: 1px solid var(--hair); background: var(--bg2); }
+  .tbl-row + .tbl-row { margin-top: 8px; }
+  .tbl-body { display: none; padding: 16px; border-top: 1px solid rgb(var(--c-border)); }
   .tbl-row.expanded .tbl-body { display: block; }
-  .tbl-row.expanded .tbl-head { border-bottom: 1px solid var(--hair); }
 
-  .col-row { display: flex; gap: 16px; align-items: center; margin-bottom: 12px; }
-  .col-row:last-child { margin-bottom: 0; }
-  .col-name { width: 140px; font-size: 13px; color: var(--sub); font-family: monospace; }
-  .col-input { flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--hair); background: var(--bg); color: var(--ink); font-size: 13px; }
-  .col-select { width: 120px; padding: 8px; border-radius: 6px; border: 1px solid var(--hair); background: var(--bg); color: var(--ink); font-size: 13px; }
-  
-  .table-settings { display: flex; gap: 16px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--hair); align-items:center; }
-  .table-settings label { font-size: 13px; font-weight: 600; }
-
-  /* Right pane preview */
-  .preview-box {
-    background: var(--bg); border: 1px solid var(--hair); border-radius: 12px; padding: 20px;
-    position: sticky; top: 80px;
+  .col-row {
+    display: grid; grid-template-columns: 180px minmax(0, 1fr) 150px auto;
+    gap: 10px; align-items: center;
+    padding: 7px 0; border-top: 1px solid rgb(var(--c-border) / .6);
   }
-  .preview-title { font-size: 13px; font-weight: 600; color: var(--sub); margin-bottom: 16px; }
-  .preview-group { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; margin-top: 16px; }
-  .preview-group:first-of-type { margin-top: 0; }
-  .preview-item { font-size: 14px; font-weight: 500; margin-bottom: 8px; padding-left: 8px; }
+  @media (max-width: 700px) { .col-row { grid-template-columns: minmax(0, 1fr); } }
 
-  .btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; }
-  .btn-primary { background: var(--accent); color: white; }
-
+  .preview-item { padding: 6px 12px; border-radius: var(--radius); color: rgb(var(--c-fg-muted)); }
 </style>
-{% include 'backoffice/_khmer_font.html' %}
-</head>
-<body>
+{% endblock %}
 
-<nav class="topnav">
-  <div class="topnav-left">
-    <a class="btn-back" href="/backoffice/cms">← Content Editor</a>
-    <div class="topnav-sep"></div>
-    <a class="btn-back" href="/backoffice/app/{{ app._id }}/cms/rbac">Roles &amp; Permissions</a>
-  </div>
-  <div style="display:flex; gap:10px; align-items:center;">
-    <button class="btn" style="border:1px solid var(--hair); background:var(--bg); color:var(--ink); padding:8px 14px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;" onclick="openJsonModal()">{ } Raw JSON Editor</button>
-    <button class="btn btn-primary" onclick="submitConfig()">Save configuration</button>
-  </div>
-</nav>
+{% block topbar_actions %}
+  <button type="button" class="btn btn-sm" onclick="openRawJson()">Raw JSON</button>
+  <button type="button" class="btn btn-primary btn-sm" onclick="submitConfig()">Save schema</button>
+{% endblock %}
 
-<!-- Raw JSON Editor Modal -->
-<div id="jsonModal" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.6); backdrop-filter:blur(10px); align-items:center; justify-content:center; padding:20px;">
-  <div style="background:var(--bg); border:1px solid var(--hair); border-radius:16px; width:100%; max-width:800px; max-height:85vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.4);">
-    <div style="padding:16px 24px; border-bottom:1px solid var(--hair); display:flex; justify-content:space-between; align-items:center;">
-      <div style="font-weight:700; font-size:16px; display:flex; align-items:center; gap:8px;">
-        <span style="font-family:monospace; color:var(--accent); font-weight:800;">{ }</span> Raw Schema Configuration JSON
-      </div>
-      <button onclick="closeJsonModal()" style="background:none; border:none; color:var(--sub); font-size:22px; cursor:pointer;">&times;</button>
-    </div>
-    <div style="padding:20px; flex:1; display:flex; flex-direction:column; gap:12px; overflow:hidden;">
-      <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--sub);">
-        <span>Edit or paste raw <code style="font-family:monospace; color:var(--accent); font-weight:600;">cms_config</code> JSON below. Changes apply directly to MongoDB.</span>
-        <span id="jsonStatus" style="font-weight:700; color:var(--good);">✓ Valid JSON</span>
-      </div>
-      <textarea id="jsonEditorArea" style="width:100%; flex:1; min-height:360px; font-family:'JetBrains Mono', Monaco, monospace; font-size:13px; line-height:1.5; padding:16px; background:var(--bg2); color:var(--ink); border:1px solid var(--hair); border-radius:10px; outline:none; resize:none;" oninput="validateJsonInput()"></textarea>
-    </div>
-    <div style="padding:16px 24px; border-top:1px solid var(--hair); background:var(--bg2); display:flex; justify-content:space-between; align-items:center;">
-      <button onclick="copyJsonText()" style="padding:8px 14px; border-radius:6px; border:1px solid var(--hair); background:var(--bg); font-size:12px; font-weight:600; cursor:pointer; color:var(--ink);">Copy JSON</button>
-      <div style="display:flex; gap:10px;">
-        <button onclick="closeJsonModal()" style="padding:8px 16px; border-radius:6px; border:1px solid var(--hair); background:var(--bg); font-size:13px; font-weight:600; cursor:pointer; color:var(--ink);">Cancel</button>
-        <button onclick="applyAndSubmitJson()" style="padding:8px 20px; border-radius:6px; background:var(--accent); color:white; border:none; font-size:13px; font-weight:700; cursor:pointer;">Apply &amp; Save JSON</button>
-      </div>
-    </div>
-  </div>
-</div>
+{% block content %}
+<div class="main-pad split">
 
-
-<div class="main">
-  <div class="left-pane">
-    <div class="header-area" id="headerArea">
-      <h1 class="page-title">Schema config</h1>
-      <div class="progress-text" id="progressText">0 of 0 tables configured</div>
-    </div>
-
-    <div class="toolbar">
-      <input type="text" class="search-input" id="searchInput" placeholder="Search tables and columns..." onkeyup="filterTables()">
-      <button class="filter-pill active" data-filter="all" onclick="setFilter('all')">All</button>
-      <button class="filter-pill" data-filter="review" onclick="setFilter('review')">Needs review <span id="cnt-review"></span></button>
-      <button class="filter-pill" data-filter="hidden" onclick="setFilter('hidden')">Hidden <span id="cnt-hidden"></span></button>
-      <button class="filter-pill" data-filter="configured" onclick="setFilter('configured')">Configured <span id="cnt-config"></span></button>
+  <div class="min-w-0">
+    <div class="card card-pad mb-3 flex flex-wrap gap-2 items-center">
+      <label class="sr-only" for="searchInput">Search tables and columns</label>
+      <input class="input w-64" id="searchInput" type="search" onkeyup="filterTables()"
+             placeholder="Search tables and columns">
+      {% for value, label in [('all', 'All'), ('review', 'Needs review'),
+                              ('hidden', 'Hidden'), ('configured', 'Configured')] %}
+        <button type="button" class="btn btn-sm filter-pill {% if value == 'all' %}btn-primary{% endif %}"
+                data-filter="{{ value }}" aria-pressed="{{ 'true' if value == 'all' else 'false' }}"
+                onclick="setFilter('{{ value }}')">
+          {{ label }} <span class="count" data-count="{{ value }}"></span>
+        </button>
+      {% endfor %}
+      <span class="muted ml-auto" id="progressText"></span>
     </div>
 
     <div id="tableList">
       {% for t in all_tables %}
-      {% set is_locked = t in locked_tables %}
-      {% set tcfg = cms_config.get('tables', {}).get(t, {}) %}
-      {% set cols = table_schemas.get(t, []) %}
-      {% set is_hidden = t in cms_config.get('hidden_tables', []) %}
-      
-      <!-- We determine status based on presence in config -->
-      {% set status = 'hidden' if is_hidden else ('configured' if tcfg else 'review') %}
+        {% set is_locked = t in locked_tables %}
+        {% set tcfg = cms_config.get('tables', {}).get(t, {}) %}
+        {% set cols = table_schemas.get(t, []) %}
+        {% set is_hidden = t in cms_config.get('hidden_tables', []) %}
+        {% set status = 'hidden' if is_hidden else ('configured' if tcfg else 'review') %}
 
-      <div class="tbl-row" data-table="{{ t }}" data-status="{{ status }}" data-locked="{{ 'true' if is_locked else 'false' }}">
-        <div class="tbl-head" onclick="toggleRow('{{ t }}')">
-          <div class="tbl-title-area">
-            <div class="tbl-title">
-              {% if tcfg.get('label') %}{{ tcfg.get('label') }}{% else %}{{ t }}{% endif %}
-            </div>
-            <div class="tbl-meta">
-              <code>{{ t }}</code> · {{ cols|length }} columns
-              {% if is_locked %} · 🔒 Protected{% endif %}
-            </div>
-          </div>
-          <div>
-            {% if is_hidden %}
-              <span class="badge hidden">Hidden</span>
-            {% elif status == 'configured' %}
-              <span class="badge configured">Configured</span>
-            {% else %}
-              <span class="badge review">Needs review</span>
-            {% endif %}
-          </div>
-        </div>
+        <div class="tbl-row card" data-table="{{ t }}" data-status="{{ status }}"
+             data-locked="{{ 'true' if is_locked else 'false' }}">
 
-        {% if not is_locked %}
-        <div class="tbl-body" id="body-{{ t }}">
-          <div class="table-settings">
-            <div>
-              <label>Table Label:</label>
-              <input type="text" class="col-input t-label" value="{{ tcfg.get('label', '') }}" placeholder="{{ t }}" onkeyup="updatePreview()">
-            </div>
-            <div>
-              <label>Group:</label>
-              <!-- Determine group -->
-              {% set current_group = '' %}
-              {% for gname, gtables in cms_config.get('table_groups', {}).items() %}
-                {% if t in gtables %} {% set current_group = gname %} {% endif %}
+          {# Locked tables have no editable body, so the disclosure is disabled
+             rather than swapped for a div — it stays out of the tab order and
+             announces itself as unavailable instead of silently doing nothing. #}
+          <button type="button"
+                  class="w-full text-left card-head flex items-center justify-between gap-3"
+                  {% if is_locked %}disabled{% else %}
+                  onclick="toggleRow('{{ t }}')" aria-expanded="false" aria-controls="body-{{ t }}"
+                  {% endif %}>
+            <span class="min-w-0">
+              <span class="block font-semibold truncate tbl-title">{{ tcfg.get('label') or t }}</span>
+              <span class="block mono muted truncate">
+                {{ t }} · {{ cols|length }} columns{% if is_locked %} · protected by the platform{% endif %}
+              </span>
+            </span>
+            <span class="badge shrink-0
+                         {% if is_hidden %}{% elif status == 'configured' %}badge-success{% else %}badge-warning{% endif %}">
+              {% if is_hidden %}Hidden{% elif status == 'configured' %}Configured{% else %}Needs review{% endif %}
+            </span>
+          </button>
+
+          {% if not is_locked %}
+            <div class="tbl-body" id="body-{{ t }}">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label class="label" for="lbl-{{ t }}">Display name</label>
+                  <input class="input t-label" id="lbl-{{ t }}" type="text"
+                         value="{{ tcfg.get('label', '') }}" placeholder="{{ t }}"
+                         onkeyup="updatePreview()">
+                </div>
+                <div>
+                  {% set ns = namespace(group='') %}
+                  {% for gname, gtables in cms_config.get('table_groups', {}).items() %}
+                    {% if t in gtables %}{% set ns.group = gname %}{% endif %}
+                  {% endfor %}
+                  <label class="label" for="grp-{{ t }}">Group</label>
+                  <input class="input t-group" id="grp-{{ t }}" type="text"
+                         value="{{ ns.group }}" placeholder="e.g. Finance" onkeyup="updatePreview()">
+                </div>
+                <label class="flex items-center gap-2">
+                  <input type="checkbox" class="t-hidden" {% if is_hidden %}checked{% endif %}
+                         onchange="updatePreview()">
+                  <span>Hide this table completely</span>
+                </label>
+                <label class="flex items-center gap-2">
+                  <input type="checkbox" class="t-readonly" {% if tcfg.get('readonly') %}checked{% endif %}>
+                  <span>Read only</span>
+                </label>
+              </div>
+
+              {% for col in cols %}
+                {% set ccfg = tcfg.get('columns', {}).get(col.column_name, {}) %}
+                <div class="col-row" data-col="{{ col.column_name }}">
+                  <div class="mono truncate" title="{{ col.data_type }}">{{ col.column_name }}</div>
+                  <input class="input c-label" type="text" value="{{ ccfg.get('label', '') }}"
+                         placeholder="Display name" aria-label="Display name for {{ col.column_name }}">
+                  <select class="select c-type" aria-label="Editor type for {{ col.column_name }}">
+                    <option value="" {% if not ccfg.get('type') %}selected{% endif %}>Auto ({{ col.data_type }})</option>
+                    {% for value, label in [('text', 'Text'), ('textarea', 'Long text'),
+                                            ('boolean', 'Toggle'), ('number', 'Number'),
+                                            ('json', 'JSON')] %}
+                      <option value="{{ value }}" {% if ccfg.get('type') == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                  <label class="flex items-center gap-1.5 whitespace-nowrap">
+                    <input type="checkbox" class="c-hidden" {% if ccfg.get('hidden') %}checked{% endif %}>
+                    <span class="muted">Hide</span>
+                  </label>
+                </div>
               {% endfor %}
-              <input type="text" class="col-input t-group" value="{{ current_group }}" placeholder="e.g. Finance" onkeyup="updatePreview()">
             </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <input type="checkbox" class="t-hidden" {% if is_hidden %}checked{% endif %} onchange="updatePreview()">
-              <label>Hide completely</label>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <input type="checkbox" class="t-readonly" {% if tcfg.get('readonly') %}checked{% endif %}>
-              <label>Read-only table</label>
-            </div>
-          </div>
-
-          {% for col in cols %}
-          {% set ccfg = tcfg.get('columns', {}).get(col.column_name, {}) %}
-          <div class="col-row" data-col="{{ col.column_name }}">
-            <div class="col-name">{{ col.column_name }}</div>
-            <div>&rarr;</div>
-            <input type="text" class="col-input c-label" value="{{ ccfg.get('label', '') }}" placeholder="Label">
-            <select class="col-select c-type">
-              <option value="" {% if not ccfg.get('type') %}selected{% endif %}>Auto ({{ col.data_type }})</option>
-              <option value="text" {% if ccfg.get('type') == 'text' %}selected{% endif %}>Text Input</option>
-              <option value="textarea" {% if ccfg.get('type') == 'textarea' %}selected{% endif %}>Textarea</option>
-              <option value="boolean" {% if ccfg.get('type') == 'boolean' %}selected{% endif %}>Toggle</option>
-              <option value="number" {% if ccfg.get('type') == 'number' %}selected{% endif %}>Number</option>
-              <option value="json" {% if ccfg.get('type') == 'json' %}selected{% endif %}>JSON Editor</option>
-            </select>
-            <label style="font-size:12px; color:var(--sub); display:flex; align-items:center; gap:4px;">
-              <input type="checkbox" class="c-hidden" {% if ccfg.get('hidden') %}checked{% endif %}> Hide
-            </label>
-          </div>
-          {% endfor %}
+          {% endif %}
         </div>
-        {% endif %}
-      </div>
+      {% else %}
+        <p class="empty">No tables found in the tenant database.</p>
       {% endfor %}
     </div>
   </div>
 
-  <div class="right-pane">
-    <div class="preview-box">
-      <div class="preview-title">Sidebar preview</div>
-      <div id="previewContent">
-        <!-- Injected via JS -->
-      </div>
-    </div>
+  <div class="card card-pad sticky top-4">
+    <div class="label">Content menu preview</div>
+    <div id="previewContent"></div>
   </div>
 </div>
 
-<form id="configForm" method="POST" action="/backoffice/app/{{ app._id }}/cms/settings" style="display:none;">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+<form id="configForm" method="POST" hidden
+      action="{{ url_for('backoffice.cms_settings', app_id=app._id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
   <input type="hidden" name="cms_config_json" id="configJsonInput">
 </form>
 
+{% include 'backoffice/_json_editor.html' %}
+{% endblock %}
+
+{% block scripts %}
 <script>
-  let theme = localStorage.getItem('bifrost-theme') || 'light';
-  document.documentElement.setAttribute('data-theme', theme);
+let currentFilter = 'all';
 
-  let currentFilter = 'all';
+function toggleRow(t) {
+  const row = document.querySelector(`.tbl-row[data-table="${CSS.escape(t)}"]`);
+  if (!row || row.dataset.locked === 'true') return;
+  const open = row.classList.toggle('expanded');
+  row.querySelector('[aria-expanded]')?.setAttribute('aria-expanded', open);
+}
 
-  function toggleRow(t) {
-    const row = document.querySelector(`.tbl-row[data-table="${t}"]`);
-    if(row.dataset.locked === 'true') return;
-    row.classList.toggle('expanded');
-  }
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-pill').forEach(p => {
+    const on = p.dataset.filter === f;
+    p.classList.toggle('btn-primary', on);
+    p.setAttribute('aria-pressed', on);
+  });
+  filterTables();
+}
 
-  function setFilter(f) {
-    currentFilter = f;
-    document.querySelectorAll('.filter-pill').forEach(p => {
-      p.classList.toggle('active', p.dataset.filter === f);
-    });
-    filterTables();
-  }
+function filterTables() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  document.querySelectorAll('.tbl-row').forEach(row => {
+    const matchesQuery = row.innerText.toLowerCase().includes(q);
+    const matchesFilter = currentFilter === 'all' || row.dataset.status === currentFilter;
+    row.hidden = !(matchesQuery && matchesFilter);
+  });
+}
 
-  function filterTables() {
-    const q = document.getElementById('searchInput').value.toLowerCase();
-    const rows = document.querySelectorAll('.tbl-row');
-    
-    rows.forEach(row => {
-      const isMatchQuery = row.innerText.toLowerCase().includes(q);
-      let isMatchFilter = true;
-      if(currentFilter !== 'all') {
-        isMatchFilter = row.dataset.status === currentFilter;
-      }
-      
-      if(isMatchQuery && isMatchFilter) row.style.display = 'block';
-      else row.style.display = 'none';
-    });
-  }
+function updatePreview() {
+  const groups = { '': [] };
+  let total = 0, configured = 0, needsReview = 0, hidden = 0;
 
-  function updatePreview() {
-    const rows = document.querySelectorAll('.tbl-row');
-    let groups = { '': [] };
-    let total = 0;
-    let configured = 0;
-    let revCnt = 0;
-    let hidCnt = 0;
+  document.querySelectorAll('.tbl-row').forEach(row => {
+    if (row.dataset.locked === 'true') return;
+    total++;
 
-    rows.forEach(row => {
-      if(row.dataset.locked === 'true') return;
-      total++;
-      const t = row.dataset.table;
-      
-      const isHidden = row.querySelector('.t-hidden').checked;
-      const tLabelInput = row.querySelector('.t-label').value.trim();
-      const tGroupInput = row.querySelector('.t-group').value.trim();
-      
-      const label = tLabelInput || t;
-      
-      if(isHidden) {
-        row.dataset.status = 'hidden';
-        row.querySelector('.badge').className = 'badge hidden';
-        row.querySelector('.badge').innerText = 'Hidden';
-        hidCnt++;
+    const table = row.dataset.table;
+    const isHidden = row.querySelector('.t-hidden').checked;
+    const labelInput = row.querySelector('.t-label').value.trim();
+    const groupInput = row.querySelector('.t-group').value.trim();
+    const label = labelInput || table;
+    const badge = row.querySelector('.badge');
+
+    if (isHidden) {
+      row.dataset.status = 'hidden';
+      badge.className = 'badge shrink-0';
+      badge.textContent = 'Hidden';
+      hidden++;
+    } else {
+      (groups[groupInput] ||= []).push(label);
+      // "Configured" means someone has actually looked at it: named it, grouped
+      // it, or opened it.
+      if (labelInput || groupInput || row.classList.contains('expanded')) {
+        row.dataset.status = 'configured';
+        badge.className = 'badge badge-success shrink-0';
+        badge.textContent = 'Configured';
+        configured++;
       } else {
-        if(!groups[tGroupInput]) groups[tGroupInput] = [];
-        groups[tGroupInput].push(label);
-        
-        // Simple heuristic for "configured": if it has a label or group, or user expanded it
-        if(tLabelInput || tGroupInput || row.classList.contains('expanded')) {
-          row.dataset.status = 'configured';
-          row.querySelector('.badge').className = 'badge configured';
-          row.querySelector('.badge').innerText = 'Configured';
-          configured++;
-        } else {
-          row.dataset.status = 'review';
-          row.querySelector('.badge').className = 'badge review';
-          row.querySelector('.badge').innerText = 'Needs review';
-          revCnt++;
-        }
+        row.dataset.status = 'review';
+        badge.className = 'badge badge-warning shrink-0';
+        badge.textContent = 'Needs review';
+        needsReview++;
       }
-      
-      // Update header title in row
-      row.querySelector('.tbl-title').innerText = label;
-    });
-
-    document.getElementById('cnt-review').innerText = revCnt > 0 ? `· ${revCnt}` : '';
-    document.getElementById('cnt-hidden').innerText = hidCnt > 0 ? `· ${hidCnt}` : '';
-    document.getElementById('cnt-config').innerText = configured > 0 ? `· ${configured}` : '';
-
-    // Header progress
-    document.getElementById('progressText').innerText = `${configured + hidCnt} of ${total} tables configured`;
-    let pct = total === 0 ? 0 : Math.round(((configured + hidCnt)/total)*100);
-    document.getElementById('headerArea').style.setProperty('--progress-pct', `${pct}%`);
-
-    // Render Preview
-    const pBox = document.getElementById('previewContent');
-    pBox.innerHTML = '';
-    
-    Object.keys(groups).sort().forEach(g => {
-      if(groups[g].length === 0) return;
-      if(g !== '') {
-        const h = document.createElement('div');
-        h.className = 'preview-group';
-        h.innerText = g;
-        pBox.appendChild(h);
-      }
-      groups[g].forEach(lbl => {
-        const item = document.createElement('div');
-        item.className = 'preview-item';
-        item.innerText = lbl;
-        pBox.appendChild(item);
-      });
-    });
-  }
-
-  function buildConfigObject() {
-    const config = {
-      is_onboarded: true,
-      hidden_tables: [],
-      table_groups: {},
-      tables: {}
-    };
-
-    document.querySelectorAll('.tbl-row').forEach(row => {
-      if(row.dataset.locked === 'true') return;
-      
-      const t = row.dataset.table;
-      const isHidden = row.querySelector('.t-hidden').checked;
-      if(isHidden) {
-        config.hidden_tables.push(t);
-        return;
-      }
-
-      const tLabel = row.querySelector('.t-label').value.trim();
-      const tGroup = row.querySelector('.t-group').value.trim();
-      const tReadonly = row.querySelector('.t-readonly').checked;
-
-      if(tGroup) {
-        if(!config.table_groups[tGroup]) config.table_groups[tGroup] = [];
-        config.table_groups[tGroup].push(t);
-      }
-
-      const tblData = { columns: {} };
-      if(tLabel) tblData.label = tLabel;
-      if(tReadonly) tblData.readonly = true;
-
-      row.querySelectorAll('.col-row').forEach(cRow => {
-        const c = cRow.dataset.col;
-        const cLabel = cRow.querySelector('.c-label').value.trim();
-        const cType = cRow.querySelector('.c-type').value;
-        const cHidden = cRow.querySelector('.c-hidden').checked;
-
-        if(cLabel || cType || cHidden) {
-          tblData.columns[c] = {};
-          if(cLabel) tblData.columns[c].label = cLabel;
-          if(cType) tblData.columns[c].type = cType;
-          if(cHidden) tblData.columns[c].hidden = true;
-        }
-      });
-
-      config.tables[t] = tblData;
-    });
-
-    const existingRoles = {{ cms_config.get('roles', {}) | tojson | forceescape }};
-    config.roles = existingRoles;
-    return config;
-  }
-
-  function submitConfig() {
-    const config = buildConfigObject();
-    document.getElementById('configJsonInput').value = JSON.stringify(config);
-    document.getElementById('configForm').submit();
-  }
-
-  function openJsonModal() {
-    const config = buildConfigObject();
-    document.getElementById('jsonEditorArea').value = JSON.stringify(config, null, 2);
-    document.getElementById('jsonModal').style.display = 'flex';
-    validateJsonInput();
-  }
-
-  function closeJsonModal() {
-    document.getElementById('jsonModal').style.display = 'none';
-  }
-
-  function validateJsonInput() {
-    const txt = document.getElementById('jsonEditorArea').value;
-    const status = document.getElementById('jsonStatus');
-    try {
-      JSON.parse(txt);
-      status.innerText = '✓ Valid JSON';
-      status.style.color = 'var(--good)';
-      return true;
-    } catch(e) {
-      status.innerText = '✗ Syntax Error: ' + e.message;
-      status.style.color = 'var(--bad)';
-      return false;
     }
-  }
 
-  function copyJsonText() {
-    const txt = document.getElementById('jsonEditorArea').value;
-    navigator.clipboard.writeText(txt);
-    alert('Raw JSON copied to clipboard!');
-  }
+    row.querySelector('.tbl-title').textContent = label;
+  });
 
-  function applyAndSubmitJson() {
-    if(!validateJsonInput()) {
-      alert('Please fix JSON syntax errors before saving.');
+  const counts = { review: needsReview, hidden: hidden, configured: configured };
+  document.querySelectorAll('.count').forEach(el => {
+    const n = counts[el.dataset.count];
+    el.textContent = n ? '· ' + n : '';
+  });
+  document.getElementById('progressText').textContent =
+    `${configured + hidden} of ${total} tables configured`;
+
+  const preview = document.getElementById('previewContent');
+  preview.replaceChildren();
+  Object.keys(groups).sort().forEach(group => {
+    if (!groups[group].length) return;
+    if (group) {
+      const heading = document.createElement('div');
+      heading.className = 'nav-section';
+      heading.textContent = group;
+      preview.append(heading);
+    }
+    groups[group].forEach(label => {
+      const item = document.createElement('div');
+      item.className = 'preview-item';
+      item.textContent = label;
+      preview.append(item);
+    });
+  });
+}
+
+function buildConfigObject() {
+  const config = {{ cms_config | tojson | forceescape }};
+  config.is_onboarded = true;
+  config.hidden_tables = [];
+  config.table_groups = {};
+  config.tables = {};
+
+  document.querySelectorAll('.tbl-row').forEach(row => {
+    // Locked tables are skipped, never emitted — a tenant must not be able to
+    // unlock its own ledger by saving this form. locked_tables_for() unions the
+    // platform defaults back in server-side regardless.
+    if (row.dataset.locked === 'true') return;
+
+    const table = row.dataset.table;
+    if (row.querySelector('.t-hidden').checked) {
+      config.hidden_tables.push(table);
       return;
     }
-    const txt = document.getElementById('jsonEditorArea').value;
-    document.getElementById('configJsonInput').value = txt;
-    document.getElementById('configForm').submit();
-  }
 
-  document.addEventListener('DOMContentLoaded', updatePreview);
+    const label = row.querySelector('.t-label').value.trim();
+    const group = row.querySelector('.t-group').value.trim();
+    const readonly = row.querySelector('.t-readonly').checked;
+
+    if (group) (config.table_groups[group] ||= []).push(table);
+
+    const tableData = { columns: {} };
+    if (label) tableData.label = label;
+    if (readonly) tableData.readonly = true;
+
+    row.querySelectorAll('.col-row').forEach(colRow => {
+      const columnLabel = colRow.querySelector('.c-label').value.trim();
+      const columnType = colRow.querySelector('.c-type').value;
+      const columnHidden = colRow.querySelector('.c-hidden').checked;
+      if (!columnLabel && !columnType && !columnHidden) return;
+
+      const entry = {};
+      if (columnLabel) entry.label = columnLabel;
+      if (columnType) entry.type = columnType;
+      if (columnHidden) entry.hidden = true;
+      tableData.columns[colRow.dataset.col] = entry;
+    });
+
+    config.tables[table] = tableData;
+  });
+
+  // Roles are owned by the RBAC screen; carry them through untouched.
+  config.roles = {{ cms_config.get('roles', {}) | tojson | forceescape }};
+  return config;
+}
+
+function submitConfig() {
+  document.getElementById('configJsonInput').value = JSON.stringify(buildConfigObject());
+  document.getElementById('configForm').submit();
+}
+
+// The hidden field is empty until a save, so seed it from the live form state
+// first — otherwise the raw editor opens showing `{}` instead of the config
+// actually on screen.
+function openRawJson() {
+  document.getElementById('configJsonInput').value = JSON.stringify(buildConfigObject());
+  openJsonModal();
+}
+
+// Hand-edited JSON submits directly. Routing it through submitConfig() would
+// call buildConfigObject(), which rebuilds from the form controls and would
+// silently throw the hand-edited version away.
+document.addEventListener('json-config-applied', () => {
+  document.getElementById('configForm').submit();
+});
+
+updatePreview();
 </script>
-</body>
-</html>
-
+{% endblock %}

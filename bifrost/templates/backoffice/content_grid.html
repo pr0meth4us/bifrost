@@ -1,460 +1,373 @@
-<!DOCTYPE html>
-<html class="dark" lang="en">
-<head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Valhalla Console - {{ app.app_name }}</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
-<script id="tailwind-config">
-tailwind.config = {
-  darkMode: "class",
-  theme: {
-    extend: {
-      "colors": {
-              "secondary-fixed": "#d4e4fa", "primary": "#c0c1ff", "secondary": "#b9c8de", "surface-bright": "#37393f",
-              "inverse-on-surface": "#2e3036", "background": "#111318", "inverse-surface": "#e2e2e9",
-              "on-primary": "#1000a9", "on-tertiary-fixed-variant": "#703700", "surface-variant": "#33353a",
-              "on-error": "#690005", "on-background": "#e2e2e9", "on-surface": "#e2e2e9",
-              "on-primary-container": "#0d0096", "inverse-primary": "#494bd6", "surface-dim": "#111318",
-              "on-secondary-container": "#a7b6cc", "on-tertiary-container": "#452000", "primary-fixed-dim": "#c0c1ff",
-              "error": "#ffb4ab", "tertiary-fixed-dim": "#ffb783", "on-primary-fixed-variant": "#2f2ebe",
-              "surface-container-highest": "#33353a", "secondary-container": "#39485a", "on-primary-fixed": "#07006c",
-              "surface-tint": "#c0c1ff", "surface-container": "#1e1f25", "surface-container-lowest": "#0c0e13",
-              "on-tertiary-fixed": "#301400", "on-secondary": "#233143", "outline": "#908fa0",
-              "secondary-fixed-dim": "#b9c8de", "error-container": "#93000a", "tertiary-fixed": "#ffdcc5",
-              "outline-variant": "#464554", "surface": "#111318", "surface-container-low": "#1a1b21",
-              "surface-container-high": "#282a2f", "tertiary-container": "#d97721", "on-error-container": "#ffdad6",
-              "tertiary": "#ffb783", "on-tertiary": "#4f2500", "primary-fixed": "#e1e0ff",
-              "primary-container": "#8083ff", "on-secondary-fixed-variant": "#39485a", "on-surface-variant": "#c7c4d7",
-              "on-secondary-fixed": "#0d1c2d"
-      },
-      "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
-      "spacing": { "margin-desktop": "32px", "topbar-height": "64px", "margin-mobile": "16px", "unit": "4px", "gutter": "16px", "sidebar-width": "260px" },
-      "fontFamily": {
-              "headline-sm": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "headline-md": ["Plus Jakarta Sans"],
-              "display-lg": ["Plus Jakarta Sans"], "body-sm": ["Plus Jakarta Sans"], "tabular-nums": ["Plus Jakarta Sans"],
-              "label-caps": ["Plus Jakarta Sans"]
-      },
-      "fontSize": {
-              "headline-sm": ["18px", {"lineHeight": "1.4", "fontWeight": "600"}],
-              "body-md": ["14px", {"lineHeight": "1.6", "fontWeight": "400"}],
-              "headline-md": ["24px", {"lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "600"}],
-              "display-lg": ["36px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
-              "body-sm": ["13px", {"lineHeight": "1.5", "fontWeight": "400"}],
-              "tabular-nums": ["14px", {"fontWeight": "500"}],
-              "label-caps": ["11px", {"lineHeight": "1.0", "letterSpacing": "0.1em", "fontWeight": "600"}]
-      }
-    }
-  }
-}
-</script>
+{% extends "backoffice/base.html" %}
+{% set khmer = true %}{# the grid and drawer render tenant content #}
+
+{% block title %}Content{% endblock %}
+{% block page_title %}Content · {{ app.app_name }}{% endblock %}
+
+{% block head %}
 <style>
-  body { background-color: #111318; color: #e2e2e9; }
-  .glass-panel { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.10); }
-  .glass-drawer { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(40px); border-left: 1px solid rgba(255, 255, 255, 0.15); box-shadow: -10px 0 30px rgba(0,0,0,0.5); }
-  .table-row-hover:hover { background-color: rgba(255, 255, 255, 0.05); }
-  input[type="checkbox"] { appearance: none; background-color: #050505; margin: 0; font: inherit; color: currentColor; width: 1.15em; height: 1.15em; border: 1px solid #464554; border-radius: 0.125rem; display: grid; place-content: center; }
-  input[type="checkbox"]::before { content: ""; width: 0.65em; height: 0.65em; transform: scale(0); transition: 120ms transform ease-in-out; box-shadow: inset 1em 1em #c0c1ff; background-color: transform-origin: bottom left; clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%); }
-  input[type="checkbox"]:checked::before { transform: scale(1); }
-  .toggle-checkbox:checked { right: 0; border-color: #c0c1ff; }
-  .toggle-checkbox:checked + .toggle-label { background-color: #494bd6; }
-  .toggle-checkbox:checked + .toggle-label:after { transform: translateX(100%); border-color: white; }
-  ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #33353a; border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: #464554; }
-  .status-menu { position: fixed; background: #1e1f25; border: 1px solid #33353a; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 1000; padding: 4px; display: flex; flex-direction: column; min-width: 120px; }
-  .status-menu-item { padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; border-radius: 4px; transition: background 0.15s; color: #e2e2e9; }
-  .status-menu-item:hover { background: #282a2f; }
+  .grid-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); flex: 1; min-height: 0; }
+  @media (max-width: 900px) { .grid-layout { grid-template-columns: minmax(0, 1fr); } }
+
+  .table-list { border-right: 1px solid rgb(var(--c-border)); overflow-y: auto; padding: 8px 0; }
+  @media (max-width: 900px) { .table-list { border-right: 0; border-bottom: 1px solid rgb(var(--c-border)); max-height: 180px; } }
+
+  .cell { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Right-hand editor. `hidden` until opened so it is out of the tab order. */
+  .drawer {
+    position: fixed; inset: 0 0 0 auto; z-index: 50;
+    width: min(480px, 100%);
+    display: flex; flex-direction: column;
+    background: rgb(var(--c-surface));
+    border-left: 1px solid rgb(var(--c-border));
+    transform: translateX(100%); transition: transform .2s;
+  }
+  .drawer[data-open="true"] { transform: none; }
+  .drawer-overlay { position: fixed; inset: 0; z-index: 49; background: rgb(0 0 0 / .5); }
 </style>
-{% include 'backoffice/_khmer_font.html' %}
-</head>
-<body class="font-body-md text-body-md antialiased overflow-hidden flex h-screen w-screen">
+{% endblock %}
 
-<!-- Alerts -->
-<div class="fixed top-20 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2">
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% for cat, msg in messages %}
-      <div class="px-4 py-2 rounded shadow-lg {% if cat == 'success' %}bg-[#0a2e12] border border-[#1a5c27] text-[#30d158]{% elif cat == 'warning' %}bg-[#2e1e00] border border-[#5c3a00] text-[#ff9f0a]{% else %}bg-[#2e0a0a] border border-[#5c1a1a] text-[#ff453a]{% endif %} flex items-center gap-2">
-        <span class="material-symbols-outlined text-[18px]">info</span>
-        {{ msg }}
-      </div>
+{% block topbar_actions %}
+  {% if selected_table %}
+    <form method="GET" class="hidden md:block">
+      <input type="hidden" name="table" value="{{ selected_table }}">
+      <label class="sr-only" for="q">Search {{ selected_table }}</label>
+      <input class="input w-56" id="q" name="q" type="search" value="{{ search_query or '' }}"
+             placeholder="Search {{ selected_table }}">
+    </form>
+    {% if can_write %}
+      <button type="button" class="btn btn-primary btn-sm" onclick="openCreate()">New row</button>
+    {% endif %}
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+{% if not tables %}
+  <div class="main-pad">
+    <p class="empty">
+      No tables are visible. Connect a tenant database, or adjust table visibility
+      in <a class="text-accent underline" href="{{ url_for('backoffice.cms_settings', app_id=app._id) }}">Schema</a>.
+    </p>
+  </div>
+{% else %}
+
+<div class="grid-layout">
+
+  <!-- table picker -->
+  <nav class="table-list" aria-label="Tables">
+    {% set ns = namespace(grouped=[]) %}
+    {% for group_name, group_tables in table_groups.items() %}
+      {% set visible = group_tables | select('in', tables) | list %}
+      {% if visible %}
+        <div class="nav-section">{{ group_name }}</div>
+        {% for t in visible %}
+          {% set ns.grouped = ns.grouped + [t] %}
+          <a class="nav-link" href="?table={{ t }}"
+             {% if t == selected_table %}aria-current="page"{% endif %}>
+            {{ cms_config.get('tables', {}).get(t, {}).get('label', t) }}
+          </a>
+        {% endfor %}
+      {% endif %}
     {% endfor %}
-  {% endwith %}
-</div>
 
-<!-- SideNavBar -->
-<nav class="bg-background/80 dark:bg-background/80 backdrop-blur-xl font-body-md text-body-md fixed left-0 top-0 h-full w-[260px] border-r border-outline-variant/10 flex flex-col h-full py-margin-desktop z-40 hidden md:flex">
-<div class="px-6 mb-8 flex items-center gap-3">
-  <div class="w-8 h-8 rounded bg-primary-container flex items-center justify-center text-on-primary-container">
-    <span class="material-symbols-outlined font-headline-sm" style="font-variation-settings: 'FILL' 1;">terminal</span>
-  </div>
-  <div>
-    <div class="font-headline-md text-headline-md font-bold text-on-background dark:text-on-background leading-tight">Valhalla</div>
-    <div class="font-label-caps text-label-caps text-on-surface-variant">Admin Console</div>
-  </div>
-</div>
-<div class="px-4 mb-6">
-  <a href="/backoffice/app" class="w-full bg-surface-variant hover:bg-surface-bright text-on-surface font-body-md py-2 px-4 rounded transition-colors flex items-center justify-center gap-2">
-    <span class="material-symbols-outlined text-[18px]">arrow_back</span>
-    Back to App
-  </a>
-</div>
-<div class="flex-1 overflow-y-auto space-y-1">
-  {% set grouped = namespace(done=[]) %}
-  {% for group_name, group_tables in table_groups.items() %}
-    {% set visible_in_group = [] %}
-    {% for t in group_tables %}{% if t in tables %}{% set _ = visible_in_group.append(t) %}{% endif %}{% endfor %}
-    {% if visible_in_group %}
-      <div class="px-4 mt-6 mb-2 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">{{ group_name }}</div>
-      {% for t in visible_in_group %}
-        {% set _ = grouped.done.append(t) %}
-        <a href="?table={{ t }}" class="flex items-center gap-3 px-4 py-2 transition-colors duration-200 {% if t == selected_table %}border-l-2 border-primary bg-primary/10 text-primary font-bold{% else %}text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/50{% endif %}">
-          <span class="material-symbols-outlined" {% if t == selected_table %}style="font-variation-settings: 'FILL' 1;"{% endif %}>table_chart</span>
-          {{ cms_config.get('tables',{}).get(t,{}).get('label', t) }}
+    {% set ungrouped = tables | reject('in', ns.grouped) | list %}
+    {% if ungrouped %}
+      {% if ns.grouped %}<div class="nav-section">Other</div>{% endif %}
+      {% for t in ungrouped %}
+        <a class="nav-link" href="?table={{ t }}"
+           {% if t == selected_table %}aria-current="page"{% endif %}>
+          {{ cms_config.get('tables', {}).get(t, {}).get('label', t) }}
         </a>
       {% endfor %}
     {% endif %}
-  {% endfor %}
+  </nav>
 
-  {% for t in tables %}
-    {% if t not in grouped.done %}
-      <a href="?table={{ t }}" class="flex items-center gap-3 px-4 py-2 transition-colors duration-200 {% if t == selected_table %}border-l-2 border-primary bg-primary/10 text-primary font-bold{% else %}text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/50{% endif %}">
-        <span class="material-symbols-outlined" {% if t == selected_table %}style="font-variation-settings: 'FILL' 1;"{% endif %}>table_chart</span>
-        {{ cms_config.get('tables',{}).get(t,{}).get('label', t) }}
-      </a>
-    {% endif %}
-  {% endfor %}
-</div>
-<div class="mt-auto px-4 space-y-1 border-t border-outline-variant/10 pt-4">
-  {% if current_role in ('owner','super_admin','admin','heimdall') %}
-  <a href="/backoffice/onboarding" class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:text-on-surface transition-colors hover:bg-surface-variant/50 transition-all duration-200">
-    <span class="material-symbols-outlined">settings</span>
-    Schema Config
-  </a>
-  {% endif %}
-</div>
+  <!-- grid -->
+  <section class="flex flex-col min-w-0">
+    {% if selected_table %}
+      <div class="px-5 py-3 border-b border-border flex flex-wrap items-center gap-3">
+        <h2 class="font-semibold">
+          {{ cms_config.get('tables', {}).get(selected_table, {}).get('label', selected_table) }}
+        </h2>
+        <span class="badge">{{ total_count }} rows</span>
+        <span class="mono muted">public.{{ selected_table }}</span>
+        {% if readonly_table %}<span class="badge badge-warning">Read only</span>{% endif %}
+      </div>
 
-</nav>
+      <div class="flex-1 min-h-0 table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              {% for col in visible_columns %}
+                <th>{{ table_col_config.get(col, {}).get('label', col) }}</th>
+              {% endfor %}
+              {% if can_write %}<th class="text-right">Actions</th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                {% for col in visible_columns %}
+                  {% set val = row[col] %}
+                  {% set pg = schema_by_col.get(col, {}).get('data_type', '') %}
+                  {% set ov = table_col_config.get(col, {}).get('type', '') %}
+                  <td class="cell">
+                    {% if val is none or val == '' %}
+                      <span class="muted">—</span>
+                    {% elif ov == 'boolean' or pg == 'boolean' %}
+                      {{ 'Yes' if val else 'No' }}
+                    {% elif col in ('photo_url', 'avatar', 'profile_image', 'image_url') %}
+                      <img src="{{ val }}" alt="" class="w-7 h-7 rounded object-cover">
+                    {% elif col.endswith('status') or col.endswith('state') %}
+                      {% if val in ('active', 'completed', 'success', 'paid', 'published') %}
+                        <span class="badge badge-success">{{ val }}</span>
+                      {% elif val in ('pending', 'processing', 'waiting', 'draft', 'review') %}
+                        <span class="badge badge-warning">{{ val }}</span>
+                      {% else %}
+                        <span class="badge">{{ val }}</span>
+                      {% endif %}
+                    {% elif pg in ('jsonb', 'json') or ov in ('json', 'mono')
+                            or pg.startswith('uuid') or 'timestamp' in pg or pg == 'date' %}
+                      <span class="mono" title="{{ val }}">{{ val }}</span>
+                    {% elif pg in ('integer', 'bigint', 'smallint', 'numeric', 'real', 'double precision') %}
+                      <span class="mono tabular-nums">{{ val }}</span>
+                    {% else %}
+                      {{ val }}
+                    {% endif %}
+                  </td>
+                {% endfor %}
 
-<!-- TopNavBar -->
-<header class="bg-surface/50 dark:bg-surface/50 backdrop-blur-md text-primary dark:text-primary-fixed-dim font-label-caps text-label-caps fixed top-0 right-0 h-topbar-height z-30 border-b border-outline-variant/10 flex justify-between items-center px-margin-desktop w-full md:w-[calc(100%-260px)] md:ml-[260px]">
-<div class="flex items-center gap-4">
-  <div class="flex items-center gap-2 text-on-surface-variant">
-    <span class="hover:text-primary transition-colors cursor-pointer">{{ app.app_name }}</span>
-    <span class="material-symbols-outlined text-[16px]">chevron_right</span>
-    <span class="text-primary font-bold">Content Editor</span>
-  </div>
-</div>
-<div class="flex items-center gap-6">
-  <div class="relative hidden lg:block">
-    <form action="" method="GET">
-      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
-      <input name="q" value="{{ request.args.get('q', '') }}" class="bg-[#050505] border border-outline-variant/30 rounded pl-10 pr-12 py-1.5 text-body-sm text-on-surface focus:border-primary focus:outline-none w-64 transition-colors" placeholder="Search..." type="text"/>
-    </form>
-  </div>
-  <div class="px-2 py-1 bg-surface-variant rounded text-on-surface-variant">{{ current_role }}</div>
-</div>
-</header>
-
-<!-- Main Content Area -->
-<main class="pt-topbar-height md:pl-sidebar-width w-full h-full flex flex-col bg-background relative z-10">
-{% if selected_table %}
-<!-- Toolbar -->
-<div class="px-margin-desktop py-4 flex flex-wrap items-center justify-between gap-4 border-b border-outline-variant/10">
-  <div class="flex items-center gap-3">
-    <div class="font-headline-md text-headline-md text-on-surface">
-      {{ cms_config.get('tables',{}).get(selected_table,{}).get('label', selected_table) }}
-      {% if readonly_table %}<span class="text-error text-[14px] ml-2">Read-only</span>{% endif %}
-    </div>
-    <div class="bg-primary/10 text-primary px-2 py-0.5 rounded font-tabular-nums text-tabular-nums">{{ rows|length }} rows</div>
-  </div>
-  <div class="flex items-center gap-3">
-    {% if can_write %}
-    <button onclick="openCreate()" class="flex items-center gap-2 px-4 py-1.5 bg-primary hover:bg-primary-fixed text-on-primary rounded transition-colors text-body-sm font-medium">
-      <span class="material-symbols-outlined text-[18px]">add</span>
-      New Entry
-    </button>
-    {% endif %}
-  </div>
-</div>
-<!-- Filter/View Bar -->
-<div class="px-margin-desktop py-2 flex items-center justify-between bg-surface-container-lowest border-b border-outline-variant/10">
-  <div class="flex items-center gap-2">
-    <span class="text-label-caps text-on-surface-variant">Table: public.{{ selected_table }}</span>
-  </div>
-  <div class="flex items-center gap-4">
-    <span class="text-label-caps text-on-surface-variant">Showing {{ rows|length }} (Max 500)</span>
-  </div>
-</div>
-<!-- Grid Container -->
-<div class="flex-1 overflow-auto bg-surface-container-lowest">
-  <table class="w-full text-left border-collapse whitespace-nowrap">
-    <thead class="sticky top-0 bg-surface-container-low border-b border-outline-variant/20 z-10 shadow-sm shadow-background">
-      <tr>
-        {% if can_write %}
-        <th class="py-3 px-4 w-12 text-center border-r border-outline-variant/10">
-          <input class="mx-auto cursor-pointer" type="checkbox" id="selectAllRows" onclick="toggleAllRows(this)"/>
-        </th>
-        {% endif %}
-        {% for col in visible_columns %}
-        <th class="py-3 px-4 font-label-caps text-label-caps text-on-surface-variant border-r border-outline-variant/10">
-          {{ table_col_config.get(col,{}).get('label', col) }}
-        </th>
-        {% endfor %}
-        {% if can_write %}
-        <th class="py-3 px-4 w-12 text-center text-on-surface-variant">Actions</th>
-        {% endif %}
-      </tr>
-    </thead>
-    <tbody class="font-tabular-nums text-tabular-nums text-on-surface">
-      {% for row in rows %}
-      <tr class="border-b border-outline-variant/10 table-row-hover cursor-pointer" {% if can_write %}onclick='openEdit({{ row | tojson | safe }})'{% endif %}>
-        {% if can_write %}
-        <td class="py-3 px-4 text-center border-r border-outline-variant/10" onclick="event.stopPropagation()">
-          <input class="mx-auto cursor-pointer row-checkbox" type="checkbox" value="{{ row.id }}"/>
-        </td>
-        {% endif %}
-        {% for col in visible_columns %}
-        {% set val = row[col] %}
-        {% set sm  = schema_by_col.get(col, {}) %}
-        {% set pg  = sm.get('data_type','') %}
-        {% set ov  = table_col_config.get(col,{}).get('type','') %}
-        <td class="py-3 px-4 border-r border-outline-variant/10 text-on-surface-variant max-w-[300px] truncate">
-          {% if val is none or val == '' %}
-            <span class="italic opacity-50">—</span>
-          {% elif ov == 'boolean' or pg == 'boolean' %}
-            <span class="flex items-center gap-1.5 {{ 'text-primary' if val else 'text-error' }}">
-              <div class="w-1.5 h-1.5 rounded-full {{ 'bg-primary' if val else 'bg-error' }}"></div>
-              {{ 'Yes' if val else 'No' }}
-            </span>
-          {% elif pg in ('integer','bigint','smallint','numeric','real','double precision') %}
-            {% if 'price' in col or 'amount' in col or 'balance' in col %}
-              <span class="font-tabular-nums text-primary font-medium">${{ val }}</span>
+                {% if can_write %}
+                  <td class="text-right whitespace-nowrap">
+                    {# A real button, not a row-level onclick. The old grid made the
+                       whole <tr> clickable, which is unreachable by keyboard and
+                       fired on every accidental text selection. #}
+                    <button type="button" class="btn btn-sm"
+                            data-row="{{ row | tojson }}"
+                            onclick="openEdit(JSON.parse(this.dataset.row))">Edit</button>
+                    <form method="POST" class="inline"
+                          action="{{ url_for('backoffice.delete_cms_row', app_id=app._id, table_name=selected_table, row_id=row.id) }}"
+                          onsubmit="return confirm('Delete row #{{ row.id }} permanently?')">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                      <button type="submit" class="btn btn-sm">Delete</button>
+                    </form>
+                  </td>
+                {% endif %}
+              </tr>
             {% else %}
-              <span class="font-tabular-nums">{{ val }}</span>
+              <tr>
+                <td colspan="{{ visible_columns|length + (1 if can_write else 0) }}">
+                  <p class="empty">{{ selected_table }} has no rows yet.</p>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% set pages = (total_count // limit) + (1 if total_count % limit else 0) %}
+      {% if pages > 1 %}
+        <div class="px-5 py-3 border-t border-border flex items-center gap-2">
+          <span class="muted">Page {{ page }} of {{ pages }}</span>
+          <span class="ml-auto flex gap-2">
+            {% if page > 1 %}
+              <a class="btn btn-sm" href="?table={{ selected_table }}&page={{ page - 1 }}{% if search_query %}&q={{ search_query }}{% endif %}">Previous</a>
             {% endif %}
-          {% elif pg == 'jsonb' or pg == 'json' or ov == 'json' %}
-            <span class="font-mono text-[11px] truncate" title="{{ val }}">{{ val }}</span>
-          {% elif ov == 'mono' or pg.startswith('uuid') %}
-            <span class="font-mono text-[12px]">{{ val }}</span>
-          {% elif pg in ('timestamp without time zone','timestamp with time zone','date') %}
-            <span class="font-mono text-[12px]">{{ val }}</span>
-          {% elif col in ('photo_url', 'avatar', 'profile_image', 'image_url') and val %}
-            <div class="w-8 h-8 rounded-full bg-surface-variant overflow-hidden border border-outline-variant/30 flex-shrink-0">
-              <img src="{{ val }}" class="w-full h-full object-cover">
-            </div>
-          {% elif col.endswith('status') or col.endswith('state') %}
-            {% set status_color = 'bg-error/20 text-error border-error/30' %}
-            {% if val in ('active', 'completed', 'success', 'paid') %}
-              {% set status_color = 'bg-primary/20 text-primary border-primary/30' %}
-            {% elif val in ('pending', 'processing', 'waiting', 'draft') %}
-              {% set status_color = 'bg-tertiary/20 text-tertiary border-tertiary/30' %}
+            {% if page < pages %}
+              <a class="btn btn-sm" href="?table={{ selected_table }}&page={{ page + 1 }}{% if search_query %}&q={{ search_query }}{% endif %}">Next</a>
             {% endif %}
-            <span class="px-2 py-0.5 rounded text-label-caps border {{ status_color }}" 
-                  {% if can_write %}onclick="openStatusMenu(event, '{{ row.id }}', '{{ col }}', '{{ val }}')"{% endif %}>
-              {{ val|upper }}
-            </span>
-          {% elif col in ('name', 'title', 'email', 'username') %}
-            <strong class="text-on-surface">{{ val }}</strong>
-          {% else %}
-            <span>{{ val }}</span>
-          {% endif %}
-        </td>
-        {% endfor %}
-        {% if can_write %}
-        <td class="py-3 px-4 text-center text-on-surface-variant" onclick="event.stopPropagation()">
-          <div class="flex justify-end items-center gap-2">
-            <button class="hover:text-primary transition-colors" onclick='openEdit({{ row | tojson | safe }})'><span class="material-symbols-outlined text-[18px]">edit</span></button>
-            <form method="POST" action="/backoffice/app/{{ app._id }}/cms/{{ selected_table }}/delete/{{ row.id }}" onsubmit="return confirm('Delete this row permanently?')">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-              <button type="submit" class="hover:text-error transition-colors"><span class="material-symbols-outlined text-[18px]">delete</span></button>
-            </form>
-          </div>
-        </td>
-        {% endif %}
-      </tr>
-      {% endfor %}
-      
-      {% if not rows %}
-      <tr><td colspan="{{ visible_columns|length + (1 if can_write else 0) }}">
-        <div class="text-center py-20">
-          <div class="text-[32px] opacity-40 mb-2">📭</div>
-          <div class="text-on-surface font-medium">No records</div>
-          <div class="text-on-surface-variant text-sm">{{ selected_table }} has no rows yet.</div>
+          </span>
         </div>
-      </td></tr>
       {% endif %}
-    </tbody>
-  </table>
+    {% endif %}
+  </section>
 </div>
-{% else %}
-<div style="flex:1;display:flex;align-items:center;justify-content:center;">
-  <div class="text-center">
-    <div class="text-[40px] opacity-40 mb-4">🗄️</div>
-    <div class="text-on-surface font-medium text-lg">No tables available</div>
-    <div class="text-on-surface-variant">Connect a tenant database or adjust schema visibility in config.</div>
-  </div>
-</div>
-{% endif %}
-</main>
 
-<!-- Side Drawer (Editor) -->
-<aside class="fixed top-0 right-0 h-full w-[480px] glass-drawer z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col" id="editor-drawer">
-<div class="px-6 py-5 border-b border-outline-variant/20 flex items-center justify-between bg-surface/80 backdrop-blur-md sticky top-0 z-10">
-  <div>
-    <div class="font-label-caps text-label-caps text-on-surface-variant mb-1" id="drawerSubtitle">New Entry</div>
-    <div class="font-headline-sm text-headline-sm text-on-surface" id="drawerTitle">Create Row</div>
+<!-- editor drawer -->
+<div class="drawer-overlay hidden" id="drawer-overlay" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer" data-open="false" hidden
+       role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+  <div class="card-head flex items-center justify-between">
+    <span id="drawer-title">Edit row</span>
+    <button type="button" class="btn btn-ghost btn-sm" onclick="closeDrawer()" aria-label="Close">✕</button>
   </div>
-  <div class="flex items-center gap-2">
-    <button class="p-2 text-on-surface-variant hover:text-on-surface rounded hover:bg-surface-variant/50 transition-colors" onclick="closeDrawer()">
-      <span class="material-symbols-outlined">close</span>
-    </button>
-  </div>
-</div>
-<form id="drawerForm" method="POST" action="/backoffice/app/{{ app._id }}/cms/{{ selected_table }}/create" class="flex flex-col h-full overflow-hidden">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-  <div class="flex-1 overflow-y-auto p-6 space-y-6" id="drawerFields">
-    <!-- Fields will be dynamically injected here for edit, or rendered directly for create -->
-  </div>
-  <div class="p-4 border-t border-outline-variant/20 bg-surface-container/50 backdrop-blur-md flex justify-end gap-3 sticky bottom-0">
-    <button type="button" class="px-4 py-2 border border-outline-variant/50 rounded text-on-surface hover:bg-surface-variant/50 transition-colors text-body-md" onclick="closeDrawer()">Cancel</button>
-    <button type="submit" class="px-4 py-2 bg-primary hover:bg-primary-fixed text-on-primary rounded font-medium transition-colors text-body-md">Save Changes</button>
-  </div>
-</form>
+
+  <form id="drawer-form" method="POST" class="flex-1 min-h-0 flex flex-col">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <div class="flex-1 overflow-y-auto card-pad space-y-4" id="drawer-fields"></div>
+    <div class="card-pad border-t border-border flex justify-end gap-2">
+      <button type="button" class="btn" onclick="closeDrawer()">Cancel</button>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+  </form>
 </aside>
-<div class="fixed inset-0 bg-background/50 backdrop-blur-sm z-40 hidden" id="drawer-overlay" onclick="closeDrawer()"></div>
+{% endif %}
+{% endblock %}
 
+{% block scripts %}
+{% if tables and selected_table %}
 <script>
-  function openDrawer() {
-    const drawer = document.getElementById('editor-drawer');
-    const overlay = document.getElementById('drawer-overlay');
-    drawer.classList.remove('hidden');
-    overlay.classList.remove('hidden');
-    setTimeout(() => {
-      drawer.classList.remove('translate-x-full');
-    }, 10);
-  }
-  function closeDrawer() {
-    const drawer = document.getElementById('editor-drawer');
-    const overlay = document.getElementById('drawer-overlay');
-    drawer.classList.add('translate-x-full');
-    setTimeout(() => {
-      drawer.classList.add('hidden');
-      overlay.classList.add('hidden');
-    }, 300);
-  }
+const schemaByCol      = {{ schema_by_col | tojson }};
+const tableColConfig   = {{ table_col_config | tojson }};
+const visibleCols      = {{ visible_columns | tojson }};
+const roleReadonlyCols = {{ (role_readonly_cols or []) | tojson }};
 
-  // Schema metadata passed from Flask
-  const schemaByCol  = {{ schema_by_col  | tojson | safe }};
-  const tableColConf = {{ table_col_config | tojson | safe }};
-  const appId        = "{{ app._id }}";
-  const tableName    = "{{ selected_table }}";
-  const visibleCols  = {{ visible_columns | tojson | safe }};
-  const roleReadonlyCols = {{ (role_readonly_cols or []) | tojson | safe }};
+const CREATE_URL = {{ url_for('backoffice.create_cms_row', app_id=app._id, table_name=selected_table) | tojson }};
+// The row id is only known client-side, so the save URL comes from a real
+// url_for() with a placeholder rather than a hand-built path.
+const SAVE_URL   = {{ url_for('backoffice.save_cms_row', app_id=app._id, table_name=selected_table, row_id='__ROW_ID__') | tojson }};
+const LOOKUP_URL = {{ url_for('backoffice.lookup_cms_table', app_id=app._id, table_name='__TABLE__') | tojson }};
 
-  function buildFieldsHtml(row) {
-    let html = '';
-    visibleCols.forEach(col => {
-      if (col === 'id' && row) return;
-      const sm    = schemaByCol[col] || {};
-      const pg    = sm.data_type || '';
-      const ov    = (tableColConf[col] || {}).type || '';
-      const label = (tableColConf[col] || {}).label || col;
-      const val   = row ? row[col] : '';
-      const isReadonly = roleReadonlyCols.includes(col);
-      const readonlyAttr = isReadonly ? 'readonly' : '';
-      const disabledAttr = isReadonly ? 'disabled' : '';
+const drawer = document.getElementById('drawer');
+const overlay = document.getElementById('drawer-overlay');
+const form = document.getElementById('drawer-form');
+const fields = document.getElementById('drawer-fields');
+let lastFocused = null;
 
-      html += `<div>`;
-      const fkHint = sm.foreign_table ? `<span class="material-symbols-outlined text-[14px] text-on-surface-variant">link</span>` : '';
-      const lockHint = isReadonly ? `<span class="text-error ml-2" style="font-size:10px;">Read Only</span>` : '';
-      
-      html += `<label class="block font-label-caps text-label-caps text-on-surface-variant mb-2 flex items-center justify-between">
-                 <span>${label} ${lockHint}</span>
-                 ${fkHint}
-               </label>`;
+function openDrawer() {
+  lastFocused = document.activeElement;
+  drawer.hidden = false;
+  overlay.classList.remove('hidden');
+  requestAnimationFrame(() => drawer.setAttribute('data-open', 'true'));
+  // Focus the first control so keyboard users land inside the dialog, not
+  // behind it — the old drawer never moved focus at all.
+  fields.querySelector('input, textarea, select')?.focus();
+}
 
-      if (sm.foreign_table) {
-        html += `<div class="relative relation-picker" data-table="${sm.foreign_table}" data-input-name="${col}">
-                   <select name="${col}" ${disabledAttr} class="w-full bg-[#050505] border border-outline-variant/50 rounded px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none appearance-none transition-colors" data-selected="${val ?? ''}">
-                     <option value="${val ?? ''}">${val ? 'Loading...' : 'None'}</option>
-                   </select>
-                   <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
-                 </div>`;
-      } else if (ov === 'boolean' || pg === 'boolean') {
-        const checked = val === true || val === 't' || val === 'true' ? 'checked' : '';
-        html += `<div class="flex items-center justify-between bg-surface-container-low p-4 rounded border border-outline-variant/20">
-                   <div>
-                     <div class="font-body-md text-on-surface font-medium">${label}</div>
-                   </div>
-                   <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
-                     <input type="checkbox" name="${col}" value="true" ${checked} ${disabledAttr} class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-on-surface border-4 appearance-none cursor-pointer z-10" id="toggle-${col}"/>
-                     <label class="toggle-label block overflow-hidden h-5 rounded-full bg-surface-variant cursor-pointer" for="toggle-${col}"></label>
-                   </div>
-                 </div>`;
-      } else if (pg === 'jsonb' || pg === 'json' || ov === 'json') {
-        const pretty = val ? JSON.stringify(typeof val === 'string' ? JSON.parse(val) : val, null, 2) : '';
-        html += `<textarea name="${col}" class="w-full bg-[#050505] border border-outline-variant/50 rounded px-3 py-2 text-body-sm text-on-surface focus:border-primary focus:outline-none transition-colors font-mono" rows="4" ${readonlyAttr}>${pretty}</textarea>`;
-      } else if (pg === 'text' || (sm.character_maximum_length && sm.character_maximum_length > 255)) {
-        html += `<textarea name="${col}" class="w-full bg-[#050505] border border-outline-variant/50 rounded px-3 py-2 text-body-sm text-on-surface focus:border-primary focus:outline-none transition-colors" rows="3" ${readonlyAttr}>${val ?? ''}</textarea>`;
-      } else if (pg === 'date' || pg.includes('timestamp')) {
-        let valDate = val ?? '';
-        if (valDate && valDate.length > 10 && pg === 'date') valDate = valDate.substring(0, 10);
-        html += `<input type="date" name="${col}" value="${valDate}" ${readonlyAttr} class="w-full bg-[#050505] border border-outline-variant/50 rounded px-3 py-2 text-tabular-nums font-tabular-nums text-on-surface focus:border-primary focus:outline-none transition-colors [&::-webkit-calendar-picker-indicator]:filter-[invert(1)]"/>`;
-      } else {
-        html += `<input type="text" name="${col}" value="${val ?? ''}" ${readonlyAttr} class="w-full bg-[#050505] border border-outline-variant/50 rounded px-3 py-2 text-body-md text-on-surface focus:border-primary focus:outline-none transition-colors"/>`;
+function closeDrawer() {
+  drawer.setAttribute('data-open', 'false');
+  overlay.classList.add('hidden');
+  setTimeout(() => { drawer.hidden = true; }, 200);
+  lastFocused?.focus();
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !drawer.hidden) closeDrawer();
+});
+
+// ---------------------------------------------------------------- fields --
+// Every control is built with createElement and assigned via .value/.textContent.
+// The previous drawer concatenated tenant column values into an HTML string, so
+// a single row containing `"><script>` executed script in the admin's session
+// on edit. Never reintroduce template-string HTML here.
+function buildFields(row) {
+  fields.replaceChildren();
+
+  visibleCols.forEach(col => {
+    if (col === 'id' && row) return;
+
+    const meta     = schemaByCol[col] || {};
+    const config   = tableColConfig[col] || {};
+    const pgType   = meta.data_type || '';
+    const override = config.type || '';
+    const value    = row ? row[col] : '';
+    const readonly = roleReadonlyCols.includes(col);
+
+    const wrap = document.createElement('div');
+
+    const label = document.createElement('label');
+    label.className = 'label';
+    label.htmlFor = 'f-' + col;
+    label.textContent = config.label || col;
+    if (readonly) {
+      const tag = document.createElement('span');
+      tag.className = 'badge ml-2';
+      tag.textContent = 'read only';
+      label.append(' ', tag);
+    }
+    wrap.append(label);
+
+    let control;
+
+    if (meta.foreign_table) {
+      control = document.createElement('select');
+      control.className = 'select';
+      control.dataset.foreignTable = meta.foreign_table;
+      control.dataset.selected = value ?? '';
+      control.append(new Option('Loading…', value ?? ''));
+
+    } else if (override === 'boolean' || pgType === 'boolean') {
+      control = document.createElement('input');
+      control.type = 'checkbox';
+      control.value = 'true';
+      control.checked = value === true || value === 't' || value === 'true';
+
+    } else if (pgType === 'jsonb' || pgType === 'json' || override === 'json') {
+      control = document.createElement('textarea');
+      control.className = 'textarea';
+      control.rows = 5;
+      try {
+        const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+        control.value = value ? JSON.stringify(parsed, null, 2) : '';
+      } catch (e) {
+        control.value = value ?? '';   // malformed JSON stays editable as text
       }
-      html += `</div>`;
-    });
-    return html;
-  }
 
-  function openCreate() {
-    const form = document.getElementById('drawerForm');
-    form.action = `/backoffice/app/${appId}/cms/${tableName}/create`;
-    document.getElementById('drawerSubtitle').textContent = 'New Entry';
-    document.getElementById('drawerTitle').textContent = `Create ${tableName}`;
-    
-    document.getElementById('drawerFields').innerHTML = buildFieldsHtml(null);
-    openDrawer();
-    initRelationPickers();
-  }
+    } else if (pgType === 'text' || meta.character_maximum_length > 255) {
+      control = document.createElement('textarea');
+      control.className = 'textarea kh';
+      control.rows = 4;
+      control.value = value ?? '';
 
-  function openEdit(row) {
-    const form = document.getElementById('drawerForm');
-    form.action = `/backoffice/app/${appId}/cms/${tableName}/save/${row.id}`;
-    document.getElementById('drawerSubtitle').textContent = `Editing Entry`;
-    document.getElementById('drawerTitle').textContent = `Row #${row.id}`;
-    
-    document.getElementById('drawerFields').innerHTML = buildFieldsHtml(row);
-    openDrawer();
-    initRelationPickers();
-  }
+    } else if (pgType === 'date' || pgType.includes('timestamp')) {
+      control = document.createElement('input');
+      control.className = 'input';
+      control.type = 'date';
+      const v = value ?? '';
+      control.value = v.length > 10 ? v.slice(0, 10) : v;
 
-  function initRelationPickers() {
-    document.querySelectorAll('.relation-picker').forEach(picker => {
-      const ft = picker.getAttribute('data-table');
-      const sel = picker.querySelector('select');
-      const selectedVal = sel.getAttribute('data-selected');
-      
-      fetch(`/backoffice/app/${appId}/cms/api/lookup?table=${ft}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.error) {
-             sel.innerHTML = `<option value="">Error loading</option>`;
-             return;
-          }
-          sel.innerHTML = `<option value="">None</option>` + data.map(opt => {
-            const isSel = (opt.value == selectedVal) ? 'selected' : '';
-            return `<option value="${opt.value}" ${isSel}>${opt.label}</option>`;
-          }).join('');
-        })
-        .catch(() => sel.innerHTML = `<option value="">Error</option>`);
-    });
-  }
+    } else {
+      control = document.createElement('input');
+      control.className = 'input kh';
+      control.type = 'text';
+      control.value = value ?? '';
+    }
+
+    control.id = 'f-' + col;
+    control.name = col;
+    if (readonly) control.disabled = true;
+    wrap.append(control);
+    fields.append(wrap);
+  });
+
+  loadRelations();
+}
+
+function loadRelations() {
+  fields.querySelectorAll('select[data-foreign-table]').forEach(select => {
+    const selected = select.dataset.selected;
+
+    fetch(LOOKUP_URL.replace('__TABLE__', encodeURIComponent(select.dataset.foreignTable)))
+      .then(r => r.json())
+      .then(data => {
+        select.replaceChildren(new Option('None', ''));
+        if (data.error) { select.append(new Option('Could not load options', '')); return; }
+        // The endpoint returns {id, label} — the old code read opt.value and
+        // rendered every option blank.
+        data.forEach(opt => {
+          const o = new Option(opt.label, opt.id);
+          o.selected = String(opt.id) === String(selected);
+          select.append(o);
+        });
+      })
+      .catch(() => select.replaceChildren(new Option('Could not load options', '')));
+  });
+}
+
+function openCreate() {
+  form.action = CREATE_URL;
+  document.getElementById('drawer-title').textContent = 'New row';
+  buildFields(null);
+  openDrawer();
+}
+
+function openEdit(row) {
+  form.action = SAVE_URL.replace('__ROW_ID__', row.id);
+  document.getElementById('drawer-title').textContent = 'Edit row #' + row.id;
+  buildFields(row);
+  openDrawer();
+}
 </script>
-</body>
-</html>
+{% endif %}
+{% endblock %}

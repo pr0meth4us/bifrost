@@ -1,313 +1,104 @@
-<!DOCTYPE html>
-<html class="dark" lang="en"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Onboarding - Valhalla Console</title>
-<!-- Material Symbols -->
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-<!-- Tailwind CSS -->
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<!-- Tailwind Config -->
-<script id="tailwind-config">
-        tailwind.config = {
-          darkMode: "class",
-          theme: {
-            extend: {
-              "colors": {
-                      "secondary-fixed": "#d4e4fa", "primary": "#c0c1ff", "secondary": "#b9c8de", "surface-bright": "#37393f",
-                      "inverse-on-surface": "#2e3036", "background": "#111318", "inverse-surface": "#e2e2e9",
-                      "on-primary": "#1000a9", "on-tertiary-fixed-variant": "#703700", "surface-variant": "#33353a",
-                      "on-error": "#690005", "on-background": "#e2e2e9", "on-surface": "#e2e2e9",
-                      "on-primary-container": "#0d0096", "inverse-primary": "#494bd6", "surface-dim": "#111318",
-                      "on-secondary-container": "#a7b6cc", "on-tertiary-container": "#452000", "primary-fixed-dim": "#c0c1ff",
-                      "error": "#ffb4ab", "tertiary-fixed-dim": "#ffb783", "on-primary-fixed-variant": "#2f2ebe",
-                      "surface-container-highest": "#33353a", "secondary-container": "#39485a", "on-primary-fixed": "#07006c",
-                      "surface-tint": "#c0c1ff", "surface-container": "#1e1f25", "surface-container-lowest": "#0c0e13",
-                      "on-tertiary-fixed": "#301400", "on-secondary": "#233143", "outline": "#908fa0",
-                      "secondary-fixed-dim": "#b9c8de", "error-container": "#93000a", "tertiary-fixed": "#ffdcc5",
-                      "outline-variant": "#464554", "surface": "#111318", "surface-container-low": "#1a1b21",
-                      "surface-container-high": "#282a2f", "tertiary-container": "#d97721", "on-error-container": "#ffdad6",
-                      "tertiary": "#ffb783", "on-tertiary": "#4f2500", "primary-fixed": "#e1e0ff",
-                      "primary-container": "#8083ff", "on-secondary-fixed-variant": "#39485a", "on-surface-variant": "#c7c4d7",
-                      "on-secondary-fixed": "#0d1c2d"
-              },
-              "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
-              "spacing": { "margin-desktop": "32px", "topbar-height": "64px", "margin-mobile": "16px", "unit": "4px", "gutter": "16px", "sidebar-width": "260px" },
-              "fontFamily": {
-                      "headline-sm": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "headline-md": ["Plus Jakarta Sans"],
-                      "display-lg": ["Plus Jakarta Sans"], "body-sm": ["Plus Jakarta Sans"], "tabular-nums": ["Plus Jakarta Sans"],
-                      "label-caps": ["Plus Jakarta Sans"]
-              },
-              "fontSize": {
-                      "headline-sm": ["18px", { "lineHeight": "1.4", "fontWeight": "600" }],
-                      "body-md": ["14px", { "lineHeight": "1.6", "fontWeight": "400" }],
-                      "headline-md": ["24px", { "lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "600" }],
-                      "display-lg": ["36px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
-                      "body-sm": ["13px", { "lineHeight": "1.5", "fontWeight": "400" }],
-                      "tabular-nums": ["14px", { "fontWeight": "500" }],
-                      "label-caps": ["11px", { "lineHeight": "1.0", "letterSpacing": "0.1em", "fontWeight": "600" }]
-              }
-            }
-          }
-        }
-    </script>
-<style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
-        
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #111318; color: #e2e2e9; }
-        .glass-panel { background-color: rgba(30, 31, 37, 0.4); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.10); }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #464554; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #908fa0; }
-        
-        .alert-info { background: rgba(0,113,227,0.1); border: 1px solid rgba(0,113,227,0.2); color: #c0c1ff; padding: 16px 20px; border-radius: 12px; margin-bottom: 24px; font-weight: 500; font-size: 14px; display: flex; gap: 12px; align-items: flex-start; }
-    </style>
-{% include 'backoffice/_khmer_font.html' %}
-</head>
-<body class="bg-background text-on-background min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden font-body-md text-body-md selection:bg-inverse-primary/30">
-<!-- Atmospheric Glow -->
-<div class="absolute inset-0 pointer-events-none z-0 overflow-hidden flex justify-center items-center">
-<div class="w-[800px] h-[800px] bg-inverse-primary/10 rounded-full blur-[120px] opacity-50 translate-y-[-20%]"></div>
-</div>
-<!-- Wizard Container -->
-<main class="w-full max-w-4xl z-10 flex flex-col gap-8">
-<!-- Header & Progress Tracker -->
-<header class="flex flex-col gap-6 items-center w-full">
-<div class="flex items-center gap-3">
-<span class="material-symbols-outlined text-primary text-[28px]" data-weight="fill" style="font-variation-settings: 'FILL' 1;">hub</span>
-<h1 class="font-headline-md text-headline-md text-on-background tracking-tight">Valhalla Console</h1>
-</div>
-<!-- Progress Steps -->
-<div class="flex items-center w-full max-w-2xl mt-4">
-<!-- Step 1 (Completed) -->
-<div class="flex flex-col items-center gap-2 flex-1 relative">
-<div class="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center border border-primary/30 z-10">
-<span class="material-symbols-outlined text-sm">check</span>
-</div>
-<span class="font-label-caps text-label-caps text-primary text-center uppercase tracking-wider">Connect Database</span>
-<div class="absolute top-4 left-[50%] w-full h-[1px] bg-primary/30 z-0"></div>
-</div>
-<!-- Step 2 (Active) -->
-<div class="flex flex-col items-center gap-2 flex-1 relative">
-<div class="w-8 h-8 rounded-full bg-inverse-primary text-on-background flex items-center justify-center shadow-[0_0_15px_rgba(73,75,214,0.4)] z-10">
-<span class="font-tabular-nums text-tabular-nums">2</span>
-</div>
-<span class="font-label-caps text-label-caps text-on-background text-center uppercase tracking-wider">Smart Detection</span>
-<div class="absolute top-4 left-[50%] w-full h-[1px] bg-outline-variant/30 z-0"></div>
-</div>
-<!-- Step 3 (Pending) -->
-<div class="flex flex-col items-center gap-2 flex-1 relative">
-<div class="w-8 h-8 rounded-full bg-surface-container-highest text-on-surface-variant flex items-center justify-center border border-outline-variant/30 z-10">
-<span class="font-tabular-nums text-tabular-nums">3</span>
-</div>
-<span class="font-label-caps text-label-caps text-on-surface-variant text-center uppercase tracking-wider">Invite Team</span>
-</div>
-</div>
-</header>
-<!-- Main Content Card -->
-<section class="glass-panel rounded-xl shadow-2xl flex flex-col w-full overflow-hidden">
-<!-- Card Header -->
-<div class="px-8 py-6 border-b border-outline-variant/10">
-<h2 class="font-headline-sm text-headline-sm text-on-surface mb-2">Review Smart Detection</h2>
-<p class="font-body-md text-body-md text-on-surface-variant">We found {{ all_tables|length }} tables. We hid {{ smart_config.hidden_tables|length if smart_config.hidden_tables else 0 }} system tables and suggested friendlier names based on schema patterns. Review below.</p>
-</div>
+{% extends "backoffice/base.html" %}
 
-{% if all_tables|length == 0 %}
-<!-- Zero-Tables Starter Template Panel (Standalone Forms) -->
-<div class="p-8 space-y-6 bg-surface-container-lowest/70 border-b border-outline-variant/10 text-center">
-    <div class="w-14 h-14 rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center justify-center mx-auto">
-        <span class="material-symbols-outlined text-3xl">database</span>
-    </div>
-    <div class="space-y-2 max-w-lg mx-auto">
-        <h3 class="font-headline-sm text-lg font-bold text-on-surface">Fresh Empty Database Detected</h3>
-        <p class="text-xs md:text-sm text-on-surface-variant leading-relaxed">
-            Your connected database contains 0 tables. Choose a pre-built starter template below to bootstrap your database tables with 1 click:
+{% block title %}Set up content{% endblock %}
+{% block page_title %}Set up content · {{ app.app_name }}{% endblock %}
+
+{% block content %}
+<div class="main-pad max-w-4xl space-y-4">
+
+  {% if all_tables|length == 0 %}
+    <div class="card card-pad space-y-4">
+      <div>
+        <h2 class="font-semibold mb-1">This database is empty</h2>
+        <p class="muted">
+          No tables were found. Pick a starter schema to create a working set of
+          tables, or create your own and reload this page.
         </p>
-    </div>
+      </div>
 
-    <!-- Starter Template Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto text-left pt-2">
-        <form method="POST" action="{{ url_for('backoffice.bootstrap_schema', app_id=app._id) }}" class="glass-panel p-5 rounded-xl border border-primary/30 hover:border-primary transition-all flex flex-col justify-between space-y-4 group">
+      {# Two sibling forms, deliberately not nested — nesting them inside the
+         outer config form is what previously stopped these cards rendering. #}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {% set starters = [
+          ('exam_prep', 'Exam preparation',
+           'Users, tracks, questions, choices, payments and entitlements.'),
+          ('ecommerce', 'Storefront',
+           'Customers, products, orders, payments and access grants.'),
+        ] %}
+        {% for value, name, description in starters %}
+          <form method="POST" class="card card-pad flex flex-col gap-3"
+                action="{{ url_for('backoffice.bootstrap_schema', app_id=app._id) }}"
+                onsubmit="return confirm('Create the {{ name }} tables in this database?');">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-            <input type="hidden" name="template" value="exam_prep"/>
-            <div class="space-y-2">
-                <div class="flex items-center gap-2 text-primary font-bold text-sm md:text-base">
-                    <span class="material-symbols-outlined text-xl">school</span>
-                    Ministry Exam Prep Schema
-                </div>
-                <p class="text-xs text-on-surface-variant leading-relaxed">
-                    Creates standard tables: <code class="text-primary font-mono font-semibold">questions</code>, <code class="text-primary font-mono font-semibold">choices</code>, <code class="text-primary font-mono font-semibold">tracks</code>, <code class="text-primary font-mono font-semibold">users</code>, <code class="text-primary font-mono font-semibold">payments</code>, and <code class="text-primary font-mono font-semibold">entitlements</code>.
-                </p>
+            <input type="hidden" name="template" value="{{ value }}"/>
+            <div>
+              <div class="font-semibold">{{ name }}</div>
+              <p class="muted text-[12px]">{{ description }}</p>
             </div>
-            <button type="submit" class="w-full py-2.5 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary font-bold text-xs border border-primary/30 transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer">
-                <span class="material-symbols-outlined text-sm">rocket_launch</span>
-                Apply Exam Prep Schema
-            </button>
-        </form>
-
-        <form method="POST" action="{{ url_for('backoffice.bootstrap_schema', app_id=app._id) }}" class="glass-panel p-5 rounded-xl border border-outline-variant/30 hover:border-outline-variant transition-all flex flex-col justify-between space-y-4 group">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-            <input type="hidden" name="template" value="ecommerce"/>
-            <div class="space-y-2">
-                <div class="flex items-center gap-2 text-on-surface font-bold text-sm md:text-base">
-                    <span class="material-symbols-outlined text-xl">shopping_cart</span>
-                    E-Commerce &amp; LMS Schema
-                </div>
-                <p class="text-xs text-on-surface-variant leading-relaxed">
-                    Creates standard tables: <code class="text-primary font-mono font-semibold">customers</code>, <code class="text-primary font-mono font-semibold">products</code>, <code class="text-primary font-mono font-semibold">orders</code>, <code class="text-primary font-mono font-semibold">payments</code>, and <code class="text-primary font-mono font-semibold">access_grants</code>.
-                </p>
-            </div>
-            <button type="submit" class="w-full py-2.5 rounded-lg bg-surface-variant hover:bg-surface-container-high text-on-surface font-bold text-xs border border-outline-variant/30 transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer">
-                <span class="material-symbols-outlined text-sm">add_box</span>
-                Apply Commerce Schema
-            </button>
-        </form>
-    </div>
-</div>
-{% endif %}
-
-<form method="POST" action="{{ url_for('backoffice.cms_onboarding', app_id=app._id) }}">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-<input type="hidden" name="cms_config_json" value="{{ smart_config | tojson | forceescape }}">
-
-
-<!-- Table List -->
-<div class="flex flex-col bg-surface-container-lowest/50 max-h-[400px] overflow-y-auto p-4 gap-2">
-
-<div class="grid grid-cols-12 gap-4 px-4 py-2 border-b border-outline-variant/10 text-on-surface-variant font-label-caps text-label-caps uppercase tracking-wider">
-<div class="col-span-1 flex items-center">Include</div>
-<div class="col-span-4 flex items-center">Table Name</div>
-<div class="col-span-2 flex items-center justify-end">Columns</div>
-<div class="col-span-5 flex items-center pl-4">Suggested Label</div>
-</div>
-
-{% for t in all_tables %}
-<div class="grid grid-cols-12 gap-4 px-4 py-3 rounded-lg hover:bg-surface-variant/30 transition-colors border border-transparent hover:border-outline-variant/20 items-center group {% if t in smart_config.hidden_tables %}opacity-50{% endif %}">
-<div class="col-span-1 flex items-center">
-<input type="checkbox" {% if t not in smart_config.hidden_tables %}checked{% endif %} class="w-4 h-4 rounded-sm bg-surface-container border-outline-variant/50 text-inverse-primary focus:ring-inverse-primary focus:ring-offset-background cursor-pointer transition-all" onclick="return false;" />
-</div>
-<div class="col-span-4 flex items-center gap-3">
-<span class="material-symbols-outlined text-outline text-sm">table</span>
-<span class="font-tabular-nums text-tabular-nums text-on-surface">public.{{ t }}</span>
-</div>
-<div class="col-span-2 flex items-center justify-end text-on-surface-variant font-tabular-nums text-tabular-nums">
-{{ table_schemas[t]|length }}
-</div>
-<div class="col-span-5 flex flex-wrap items-center gap-2 pl-4">
-{% if t in smart_config.hidden_tables %}
-<span class="inline-flex items-center gap-1 px-2 py-1 bg-surface-variant border border-outline-variant/30 text-on-surface-variant rounded-DEFAULT font-label-caps text-label-caps whitespace-nowrap">
-<span class="material-symbols-outlined text-[12px]">settings</span>
-    Hidden
-</span>
-{% else %}
-<span class="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 border border-primary/20 text-primary rounded-DEFAULT font-label-caps text-label-caps whitespace-nowrap">
-<span class="material-symbols-outlined text-[12px]">auto_awesome</span>
-    {{ smart_config.tables[t].label if t in smart_config.tables else t }}
-</span>
-{% endif %}
-</div>
-</div>
-{% endfor %}
-
-</div>
-<!-- Actions Footer -->
-<div class="px-8 py-5 border-t border-outline-variant/10 bg-surface/30 flex justify-between items-center">
-<div class="flex items-center gap-3">
-<button type="submit" name="action" value="customize" class="flex items-center gap-2 px-4 py-2 rounded-DEFAULT border border-outline-variant/30 text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface transition-all font-body-sm text-body-sm cursor-pointer">
-<span class="material-symbols-outlined text-sm">edit</span>
-    Customize everything
-</button>
-<button type="button" onclick="openJsonModal()" class="flex items-center gap-2 px-4 py-2 rounded-DEFAULT border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-all font-body-sm text-body-sm font-semibold cursor-pointer">
-<span class="font-mono font-bold text-sm">{ }</span>
-    Raw JSON Editor
-</button>
-</div>
-<div class="flex items-center gap-4">
-<button type="submit" name="action" value="continue" class="flex items-center gap-2 px-6 py-2 rounded-DEFAULT bg-inverse-primary text-on-background hover:bg-inverse-primary/90 hover:shadow-[0_0_15px_rgba(73,75,214,0.4)] transition-all font-body-sm text-body-sm font-semibold cursor-pointer">
-    Confirm &amp; Continue
-    <span class="material-symbols-outlined text-sm">arrow_forward</span>
-</button>
-</div>
-</div>
-</form>
-</section>
-</main>
-
-<!-- Raw JSON Editor Modal -->
-<div id="jsonModal" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.6); backdrop-filter:blur(10px); align-items:center; justify-content:center; padding:20px;">
-  <div style="background:var(--bg2, #1c1c1e); border:1px solid rgba(255,255,255,0.1); border-radius:16px; width:100%; max-width:800px; max-height:85vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.6); color:#f5f5f7;">
-    <div style="padding:16px 24px; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center;">
-      <div style="font-weight:700; font-size:16px; display:flex; align-items:center; gap:8px;">
-        <span style="font-family:monospace; color:#494bd6; font-weight:800;">{ }</span> Raw Schema Configuration JSON
-      </div>
-      <button type="button" onclick="closeJsonModal()" style="background:none; border:none; color:#98989d; font-size:22px; cursor:pointer;">&times;</button>
-    </div>
-    <div style="padding:20px; flex:1; display:flex; flex-direction:column; gap:12px; overflow:hidden;">
-      <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#98989d;">
-        <span>Edit or paste raw <code style="font-family:monospace; color:#8083ff; font-weight:600;">cms_config</code> JSON below. Changes apply directly to MongoDB.</span>
-        <span id="jsonStatus" style="font-weight:700; color:#30d158;">✓ Valid JSON</span>
-      </div>
-      <textarea id="jsonEditorArea" style="width:100%; flex:1; min-height:360px; font-family:'JetBrains Mono', Monaco, monospace; font-size:13px; line-height:1.5; padding:16px; background:#121316; color:#e2e2e9; border:1px solid rgba(255,255,255,0.1); border-radius:10px; outline:none; resize:none;" oninput="validateJsonInput()"></textarea>
-    </div>
-    <div style="padding:16px 24px; border-top:1px solid rgba(255,255,255,0.1); background:#121316; display:flex; justify-content:space-between; align-items:center;">
-      <button type="button" onclick="copyJsonText()" style="padding:8px 14px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#1c1c1e; font-size:12px; font-weight:600; cursor:pointer; color:#f5f5f7;">Copy JSON</button>
-      <div style="display:flex; gap:10px;">
-        <button type="button" onclick="closeJsonModal()" style="padding:8px 16px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#1c1c1e; font-size:13px; font-weight:600; cursor:pointer; color:#f5f5f7;">Cancel</button>
-        <button type="button" onclick="applyAndSubmitJson()" style="padding:8px 20px; border-radius:6px; background:#494bd6; color:white; border:none; font-size:13px; font-weight:700; cursor:pointer;">Apply JSON</button>
+            <button class="btn btn-primary mt-auto" type="submit">Create these tables</button>
+          </form>
+        {% endfor %}
       </div>
     </div>
-  </div>
+
+  {% else %}
+    <div class="card">
+      <div class="card-head">Review what we detected</div>
+      <div class="card-pad">
+        <p class="muted">
+          Found {{ all_tables|length }} tables.
+          {{ smart_config.hidden_tables|length if smart_config.hidden_tables else 0 }} look like
+          system tables and were hidden; the rest were given readable names.
+          All of this can be changed later under Schema.
+        </p>
+      </div>
+
+      <form method="POST" action="{{ url_for('backoffice.cms_onboarding', app_id=app._id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input type="hidden" name="cms_config_json" value="{{ smart_config | tojson | forceescape }}">
+
+        <div class="table-scroll max-h-[420px]">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Table</th>
+                <th class="text-right">Columns</th>
+                <th>Shown as</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in all_tables %}
+                <tr>
+                  <td class="mono">public.{{ t }}</td>
+                  <td class="text-right tabular-nums">{{ table_schemas[t]|length }}</td>
+                  <td>
+                    {% if t in (smart_config.hidden_tables or []) %}
+                      <span class="badge">Hidden</span>
+                    {% else %}
+                      <span class="badge badge-accent">
+                        {{ smart_config.tables[t].label if t in smart_config.tables else t }}
+                      </span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card-pad border-t border-border flex flex-wrap gap-2 justify-between">
+          <span class="flex gap-2">
+            <button class="btn" type="submit" name="action" value="customize">Customise first</button>
+            <button class="btn" type="button" onclick="openJsonModal()">Edit raw JSON</button>
+          </span>
+          <button class="btn btn-primary" type="submit" name="action" value="continue">
+            Confirm and continue
+          </button>
+        </div>
+      </form>
+    </div>
+
+    {% include 'backoffice/_json_editor.html' %}
+  {% endif %}
 </div>
-
-<script>
-  function openJsonModal() {
-    const rawInput = document.querySelector('input[name="cms_config_json"]');
-    try {
-      const parsed = JSON.parse(rawInput.value || '{}');
-      document.getElementById('jsonEditorArea').value = JSON.stringify(parsed, null, 2);
-    } catch(e) {
-      document.getElementById('jsonEditorArea').value = rawInput.value;
-    }
-    document.getElementById('jsonModal').style.display = 'flex';
-    validateJsonInput();
-  }
-
-  function closeJsonModal() {
-    document.getElementById('jsonModal').style.display = 'none';
-  }
-
-  function validateJsonInput() {
-    const txt = document.getElementById('jsonEditorArea').value;
-    const status = document.getElementById('jsonStatus');
-    try {
-      JSON.parse(txt);
-      status.innerText = '✓ Valid JSON';
-      status.style.color = '#30d158';
-      return true;
-    } catch(e) {
-      status.innerText = '✗ Syntax Error: ' + e.message;
-      status.style.color = '#ff453a';
-      return false;
-    }
-  }
-
-  function copyJsonText() {
-    const txt = document.getElementById('jsonEditorArea').value;
-    navigator.clipboard.writeText(txt);
-    alert('Raw JSON copied to clipboard!');
-  }
-
-  function applyAndSubmitJson() {
-    if(!validateJsonInput()) {
-      alert('Please fix JSON syntax errors before applying.');
-      return;
-    }
-    const txt = document.getElementById('jsonEditorArea').value;
-    document.querySelector('input[name="cms_config_json"]').value = txt;
-    closeJsonModal();
-    alert('JSON configuration updated! Click "Confirm & Continue" or "Customize Everything" to save.');
-  }
-</script>
-</body></html>
-
+{% endblock %}

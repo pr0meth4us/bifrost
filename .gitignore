@@ -7,3 +7,5 @@ __pycache__/
 .DS_Store
 .devswarm-temp/
 prolong/
+scratch/
+.claude/settings.local.json

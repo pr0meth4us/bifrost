@@ -1,417 +1,368 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Manage {{ app.app_name }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Plus Jakarta Sans', sans-serif; }</style>
+{% extends "backoffice/base.html" %}
+{% from "backoffice/_role_options.html" import role_options %}
 
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-</head>
-<body class="bg-slate-50 min-h-screen">
-<nav class="bg-white border-b border-slate-200 px-6 py-4 mb-8">
-    <div class="max-w-7xl mx-auto flex items-center justify-between">
-        <div class="flex items-center space-x-4">
-            <a href="{{ url_for('backoffice.dashboard') }}" class="text-slate-500 hover:text-slate-900 font-bold">← Back</a>
-            <div class="h-6 w-px bg-slate-200"></div>
-            <h1 class="text-xl font-bold text-slate-900">{{ app.app_name }}</h1>
+{% block title %}Users &amp; settings{% endblock %}
+{% block page_title %}{{ app.app_name }}{% endblock %}
 
-            <span class="px-2 py-1 text-xs font-bold rounded-lg bg-slate-100 text-slate-600 uppercase">
-                YOU ARE: {{ current_role }}
-            </span>
-        </div>
-        {% if session['is_heimdall'] %}
-        <a href="{{ url_for('backoffice.global_users') }}" class="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-2 rounded-lg hover:bg-indigo-100">
-            HEIMDALL VISION
-        </a>
+{% block head %}
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+{% endblock %}
+
+{% block content %}
+{% set can_edit = current_role in ('admin', 'super_admin', 'owner', 'heimdall', 'pr0meth4us') %}
+{% set is_disabled = not can_edit %}
+{% set owner_level = current_role in ('owner', 'heimdall', 'pr0meth4us') %}
+{% set senior = current_role in ('super_admin', 'owner', 'heimdall', 'pr0meth4us') %}
+
+<div class="main-pad" x-data="{ tab: 'users', showSecrets: false }">
+
+  {# Real tabs: role="tab" + aria-selected, arrow keys work because the buttons
+     stay in DOM order. The old version was two styled buttons with no semantics. #}
+  <div class="flex gap-1 mb-4 border-b border-border" role="tablist">
+    <button type="button" role="tab" :aria-selected="tab === 'users'"
+            class="px-3 py-2 border-b-2 font-medium"
+            :class="tab === 'users' ? 'border-accent text-accent' : 'border-transparent muted'"
+            @click="tab = 'users'">Users</button>
+    <button type="button" role="tab" :aria-selected="tab === 'settings'"
+            class="px-3 py-2 border-b-2 font-medium"
+            :class="tab === 'settings' ? 'border-accent text-accent' : 'border-transparent muted'"
+            @click="tab = 'settings'">Configuration</button>
+  </div>
+
+  <!-- ------------------------------------------------------------ users -->
+  <div x-show="tab === 'users'" class="space-y-4">
+
+    <form method="POST" action="{{ url_for('backoffice.add_user_to_app', app_id=app._id) }}"
+          class="card card-pad flex flex-wrap gap-3 items-end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+      <div class="flex-1 min-w-56">
+        <label class="label" for="add-email">Add user by email</label>
+        <input class="input" id="add-email" name="email" type="email" required
+               placeholder="person@example.com">
+      </div>
+      <div class="w-56">
+        <label class="label" for="add-role">Role</label>
+        <select class="select" id="add-role" name="role">
+          {{ role_options(current_role, 'premium_user') }}
+        </select>
+      </div>
+      <div class="w-36">
+        <label class="label" for="add-duration">Expires</label>
+        <select class="select" id="add-duration" name="duration">
+          <option value="1m" selected>1 month</option>
+          <option value="1y">1 year</option>
+          <option value="lifetime">Never</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" type="submit">Add</button>
+    </form>
+
+    <div class="card table-scroll">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Identity</th><th>Role</th><th>Expires</th><th class="text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+            <tr>
+              <td>
+                <div class="font-medium">{{ u.display_name or 'No name' }}</div>
+                <div class="mono muted">{{ u.email }}</div>
+              </td>
+              <td>
+                <span class="badge {% if u.role in ('owner', 'super_admin', 'admin') %}badge-accent
+                                   {% elif u.role == 'developer' %}badge-warning
+                                   {% elif u.role == 'banned' %}badge-danger{% endif %}">{{ u.role }}</span>
+              </td>
+              <td class="muted">
+                {{ u.expires_at.strftime('%d %b %Y') if u.expires_at else 'Never' }}
+              </td>
+              <td class="text-right">
+                {# You may only manage someone below your own rank. Cosmetic —
+                   user_routes.py enforces the same thing on the POST. #}
+                {% set ranks = {'guest':0,'user':0,'premium_user':0,'developer':1,'content_manager':1,
+                                'operations':1,'admin':2,'super_admin':3,'owner':4,'heimdall':5} %}
+                {% if ranks.get(current_role, 0) > ranks.get(u.role, 0) or current_role in ('heimdall', 'pr0meth4us') %}
+                  <button type="button" class="btn btn-sm"
+                          @click="$dispatch('manage-user', {
+                            id: '{{ u.account_id }}',
+                            name: {{ (u.display_name or u.email)|tojson }},
+                            role: '{{ u.role }}' })">Manage</button>
+                {% else %}
+                  <span class="muted text-[12px]">Locked</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4"><p class="empty">No users yet.</p></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- --------------------------------------------------------- settings -->
+  <div x-show="tab === 'settings'" x-cloak class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+    <form method="POST" action="{{ url_for('backoffice.update_app_settings', app_id=app._id) }}"
+          class="lg:col-span-2 card">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+      <div class="card-head flex items-center justify-between">
+        <span>Application configuration</span>
+        {% if can_edit %}
+          <span class="badge badge-success">Editable</span>
+        {% else %}
+          <span class="badge">Read only</span>
         {% endif %}
-    </div>
-</nav>
+      </div>
 
-<div class="max-w-7xl mx-auto px-6 pb-12" x-data="{ activeTab: 'users', showSecrets: false, editConfig: false }">
-
-    {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-    <div class="mb-6 space-y-2">
-        {% for category, message in messages %}
-        <div class="p-4 rounded-xl text-sm font-bold border {{ 'bg-red-50 text-red-700' if category == 'danger' else 'bg-green-50 text-green-700' }}">
-            {{ message }}
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-    {% endwith %}
-
-    <div class="flex justify-between items-center mb-8">
-        <div class="flex space-x-1 bg-slate-200 p-1 rounded-xl w-fit">
-            <button @click="activeTab = 'users'" :class="activeTab === 'users' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="px-6 py-2 rounded-lg text-sm font-bold transition-all">Users</button>
-            <button @click="activeTab = 'settings'" :class="activeTab === 'settings' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'" class="px-6 py-2 rounded-lg text-sm font-bold transition-all">Configuration</button>
-        </div>
-        <div class="flex space-x-2">
-            <a href="{{ url_for('backoffice.view_cms_grid') }}" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-md">
-                🗃️ Content Editor
-            </a>
-            <a href="{{ url_for('backoffice.view_manual_payments') }}" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-md">
-                💳 Payment Queue
-            </a>
+      <div class="card-pad space-y-5">
+        <div>
+          <div class="label">Current owner</div>
+          <div>{{ owner.display_name if owner else 'None' }}</div>
         </div>
 
-    </div>
-
-    <div x-show="activeTab === 'users'" class="space-y-6">
-
-        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-            <form action="{{ url_for('backoffice.add_user_to_app', app_id=app._id) }}" method="POST" class="flex flex-col md:flex-row gap-4 items-center">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="email" name="email" placeholder="Add User by Email..." class="flex-grow w-full md:w-auto p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 font-medium" required>
-
-                <select name="role" class="p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-sm text-slate-700">
-                    <option value="guest">Guest</option>
-                    <option value="user">User</option>
-                    <option value="premium_user" selected>Premium</option>
-
-                    {% if current_role in ['admin', 'super_admin', 'owner', 'heimdall'] %}
-                    <optgroup label="Console staff">
-                        <option value="content_manager">Content Manager</option>
-                        <option value="operations">Operations / Billing</option>
-                    </optgroup>
-                    {% endif %}
-
-                    {% if current_role in ['super_admin', 'owner', 'heimdall'] %}
-                    <option value="admin">App Admin</option>
-                    {% endif %}
-
-                    {% if current_role in ['owner', 'heimdall'] %}
-                    <option value="super_admin">App Super Admin</option>
-                    <option value="owner" class="text-indigo-600">Owner (Transfer)</option>
-                    {% endif %}
-                </select>
-
-                <select name="duration" class="p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-sm text-slate-700">
-                    <option value="1m" selected>1 Mo</option>
-                    <option value="1y">1 Yr</option>
-                    <option value="lifetime">Forever</option>
-                </select>
-                <button type="submit" class="bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-6 rounded-xl transition shadow-lg">Add</button>
-            </form>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="label" for="s-name">Application name</label>
+            <input class="input" id="s-name" name="app_name" type="text"
+                   value="{{ app.app_name }}" {{ 'disabled' if is_disabled }}>
+          </div>
+          <div>
+            <label class="label" for="s-web">Frontend URL</label>
+            <input class="input" id="s-web" name="web_url" type="url"
+                   value="{{ app.app_web_url }}" {{ 'disabled' if is_disabled }}>
+          </div>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <table class="min-w-full divide-y divide-slate-100">
-                <thead class="bg-slate-50">
-                <tr>
-                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">Identity</th>
-                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">Role</th>
-                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">Expiry</th>
-                    <th class="px-6 py-4 text-right text-xs font-bold text-slate-400 uppercase">Actions</th>
-                </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100 bg-white">
-                {% for user in users %}
-                <tr class="hover:bg-slate-50 transition-colors">
-                    <td class="px-6 py-4">
-                        <div class="font-bold text-slate-900">{{ user.display_name or 'No Name' }}</div>
-                        <div class="text-xs text-slate-500 font-mono">{{ user.email }}</div>
-                    </td>
-                    <td class="px-6 py-4">
-                        <span class="px-2.5 py-1 text-xs font-bold rounded-md
-                            {% if user.role == 'owner' %}bg-indigo-100 text-indigo-700
-                            {% elif user.role == 'super_admin' %}bg-purple-100 text-purple-700
-                            {% elif user.role == 'admin' %}bg-blue-100 text-blue-700
-                            {% else %}bg-slate-100 text-slate-600{% endif %}">
-                             {{ user.role }}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 text-sm text-slate-500">{{ user.expires_at.strftime('%b %d, %Y') if user.expires_at else 'Lifetime' }}</td>
-                    <td class="px-6 py-4 text-right">
-                        {% set ranks = {'guest':0,'user':0,'premium_user':0,'admin':1,'super_admin':2,'owner':3,'heimdall':4} %}
-                        {% set my_rank = ranks.get(current_role, 0) %}
-                        {% set user_rank = ranks.get(user.role, 0) %}
-
-                        {% if my_rank > user_rank or current_role == 'heimdall' %}
-                        <button @click="$dispatch('open-user-modal', {id: '{{ user.account_id }}', name: '{{ user.display_name }}', role: '{{ user.role }}'})"
-                                 class="text-indigo-600 hover:text-indigo-900 font-bold text-sm bg-indigo-50 px-4 py-2 rounded-lg">
-                            Manage
-                        </button>
-                        {% else %}
-                        <span class="text-xs text-slate-300 font-bold">Locked</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-                </tbody>
-            </table>
+        <div>
+          <label class="label" for="s-callback">Callback URL</label>
+          <input class="input" id="s-callback" name="callback_url" type="url"
+                 value="{{ app.app_callback_url }}" {{ 'disabled' if is_disabled }}>
         </div>
-    </div>
 
-    <div x-show="activeTab === 'settings'" style="display: none;" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div class="lg:col-span-2 space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative">
-                <div class="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
-                    <h3 class="font-bold text-slate-900">App Configuration</h3>
-                    {% if current_role in ['super_admin', 'owner', 'heimdall', 'admin'] %}
-                    <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-md">Editable ({{ current_role | upper }})</span>
-                    {% else %}
-                    <span class="text-xs font-bold text-red-400 bg-red-50 px-2 py-1 rounded">Locked (Read Only)</span>
-                    {% endif %}
-                </div>
+        <div>
+          <label class="label" for="s-bot">Telegram bot token</label>
+          <input class="input mono" id="s-bot" name="telegram_bot_token" type="text"
+                 value="{{ app.telegram_bot_token or '' }}" {{ 'disabled' if is_disabled }}>
+        </div>
 
-                <form action="{{ url_for('backoffice.update_app_settings', app_id=app._id) }}" method="POST" class="space-y-5">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
-                        <label class="block text-[10px] font-bold text-indigo-400 uppercase mb-0.5">Current Owner</label>
-                        <div class="text-sm font-bold text-indigo-900">{{ owner.display_name if owner else 'None' }}</div>
-                    </div>
+        <div>
+          <label class="label" for="s-qr">Payment QR URL</label>
+          <input class="input" id="s-qr" name="qr_url" type="url"
+                 value="{{ app.app_qr_url }}" {{ 'disabled' if is_disabled }}>
+        </div>
 
-                    {% set is_disabled = current_role not in ['super_admin', 'owner', 'heimdall', 'admin'] %}
+        <fieldset class="border-t border-border pt-5"
+                  x-data="{ dbMode: '{{ app.db_mode or ('custom' if app.db_connection else 'managed') }}' }">
+          <legend class="label">Database hosting</legend>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label class="card card-pad flex items-center gap-3 cursor-pointer"
+                   :class="dbMode === 'managed' && 'border-accent'">
+              <input type="radio" name="db_mode" value="managed" x-model="dbMode"
+                     {{ 'disabled' if is_disabled }}>
+              <span>
+                <span class="block font-medium">Managed Bifrost DB</span>
+                <span class="block muted text-[12px]">Hosted for you, no setup</span>
+              </span>
+            </label>
+            <label class="card card-pad flex items-center gap-3 cursor-pointer"
+                   :class="dbMode === 'custom' && 'border-accent'">
+              <input type="radio" name="db_mode" value="custom" x-model="dbMode"
+                     {{ 'disabled' if is_disabled }}>
+              <span>
+                <span class="block font-medium">Your own database</span>
+                <span class="block muted text-[12px]">Bring a PostgreSQL / Supabase URL</span>
+              </span>
+            </label>
 
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">App Name</label>
-                            <input {{ 'disabled' if is_disabled else '' }} type="text" name="app_name" value="{{ app.app_name }}" class="w-full text-sm p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 disabled:opacity-50">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Frontend URL</label>
-                            <input {{ 'disabled' if is_disabled else '' }} type="url" name="web_url" value="{{ app.app_web_url }}" class="w-full text-sm p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 disabled:opacity-50">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Callback URL</label>
-                        <input {{ 'disabled' if is_disabled else '' }} type="url" name="callback_url" value="{{ app.app_callback_url }}" class="w-full text-sm p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 disabled:opacity-50">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Bot Token</label>
-                        <input {{ 'disabled' if is_disabled else '' }} type="text" name="telegram_bot_token" value="{{ app.telegram_bot_token or '' }}" class="w-full text-sm p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 disabled:opacity-50 font-mono">
-                    </div>
-                    <!-- Database Hosting Mode Selector -->
-                    <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-                        <label class="block text-xs font-bold text-slate-700 uppercase">Database Hosting Architecture</label>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" x-data="{ dbMode: '{{ app.db_mode if app.db_mode else ("custom" if app.db_connection else "managed") }}' }">
-                            <label class="flex items-center gap-3 p-3 bg-white border rounded-lg cursor-pointer transition-colors" :class="dbMode === 'managed' ? 'border-indigo-600 ring-2 ring-indigo-100' : 'border-slate-200'">
-                                <input type="radio" name="db_mode" value="managed" x-model="dbMode" {{ 'disabled' if is_disabled else '' }} class="w-4 h-4 text-indigo-600">
-                                <div>
-                                    <div class="text-xs font-bold text-slate-900">Managed Bifrost DB</div>
-                                    <div class="text-[10px] text-slate-500">Auto-hosted, zero setup required</div>
-                                </div>
-                            </label>
-                            <label class="flex items-center gap-3 p-3 bg-white border rounded-lg cursor-pointer transition-colors" :class="dbMode === 'custom' ? 'border-indigo-600 ring-2 ring-indigo-100' : 'border-slate-200'">
-                                <input type="radio" name="db_mode" value="custom" x-model="dbMode" {{ 'disabled' if is_disabled else '' }} class="w-4 h-4 text-indigo-600">
-                                <div>
-                                    <div class="text-xs font-bold text-slate-900">Connect Custom DB</div>
-                                    <div class="text-[10px] text-slate-500">Bring your own PostgreSQL / Supabase URL</div>
-                                </div>
-                            </label>
-                            <div x-show="dbMode === 'custom'" class="sm:col-span-2 pt-2">
-                                <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Custom Connection String</label>
-                                <input {{ 'disabled' if is_disabled else '' }} type="text" name="db_connection" value="{{ app.db_connection or '' }}" placeholder="postgresql://user:password@host:5432/db" class="w-full text-sm p-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-indigo-600 disabled:opacity-50 font-mono">
-                                <p class="mt-1 text-[10px] text-slate-400">Bifrost acts as a proxy for this database. Provide a connection string with restricted privileges.</p>
-                            </div>
-                        </div>
-                    </div>
-
-                                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Payment QR URL</label>
-                        <input {{ 'disabled' if is_disabled else '' }} type="url" name="qr_url" value="{{ app.app_qr_url }}" class="w-full text-sm p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 disabled:opacity-50">
-                    </div>
-
-                    <!-- Service Toggles -->
-                    <div class="border-t border-slate-100 pt-5">
-                        <h4 class="text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-4">Enabled Services</h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <label class="flex items-start gap-3 p-3.5 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-                                <input {{ 'disabled' if is_disabled else '' }} type="checkbox" name="service_sso" value="1" {% if app.enabled_services is not defined or app.enabled_services.sso %}checked{% endif %} class="mt-0.5 w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500">
-                                <div>
-                                    <div class="text-xs font-bold text-slate-800">OAuth SSO Login</div>
-                                    <div class="text-[10px] text-slate-400 leading-normal">Google, GitHub, Microsoft, Apple, Facebook</div>
-                                </div>
-                            </label>
-
-                            <label class="flex items-start gap-3 p-3.5 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-                                <input {{ 'disabled' if is_disabled else '' }} type="checkbox" name="service_phone_otp" value="1" {% if app.enabled_services is not defined or app.enabled_services.phone_otp %}checked{% endif %} class="mt-0.5 w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500">
-                                <div>
-                                    <div class="text-xs font-bold text-slate-800">Phone SMS OTP</div>
-                                    <div class="text-[10px] text-slate-400 leading-normal">Passwordless verification via Twilio</div>
-                                </div>
-                            </label>
-
-                            <label class="flex items-start gap-3 p-3.5 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-                                <input {{ 'disabled' if is_disabled else '' }} type="checkbox" name="service_email_otp" value="1" {% if app.enabled_services is not defined or app.enabled_services.email_otp %}checked{% endif %} class="mt-0.5 w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500">
-                                <div>
-                                    <div class="text-xs font-bold text-slate-800">Email OTP</div>
-                                    <div class="text-[10px] text-slate-400 leading-normal">SMTP passwordless reset codes</div>
-                                </div>
-                            </label>
-
-                            <label class="flex items-start gap-3 p-3.5 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-                                <input {{ 'disabled' if is_disabled else '' }} type="checkbox" name="service_secrets_vault" value="1" {% if app.enabled_services is not defined or app.enabled_services.secrets_vault %}checked{% endif %} class="mt-0.5 w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500">
-                                <div>
-                                    <div class="text-xs font-bold text-slate-800">Secrets Vault</div>
-                                    <div class="text-[10px] text-slate-400 leading-normal">Dynamic credentials load via SDK</div>
-                                </div>
-                            </label>
-
-                            <label class="flex items-start gap-3 p-3.5 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-                                <input {{ 'disabled' if is_disabled else '' }} type="checkbox" name="service_payment_bot" value="1" {% if app.enabled_services is not defined or app.enabled_services.payment_bot %}checked{% endif %} class="mt-0.5 w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500">
-                                <div>
-                                    <div class="text-xs font-bold text-slate-800">Payment Verification Bot</div>
-                                    <div class="text-[10px] text-slate-400 leading-normal">Dynamic Telegram webhook billing bot</div>
-                                </div>
-                            </label>
-
-                            <label class="flex items-start gap-3 p-3.5 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
-                                <input {{ 'disabled' if is_disabled else '' }} type="checkbox" name="service_heimdall_monitor" value="1" {% if app.enabled_services is not defined or app.enabled_services.heimdall_monitor %}checked{% endif %} class="mt-0.5 w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500">
-                                <div>
-                                    <div class="text-xs font-bold text-slate-800">Heimdall AI Monitor</div>
-                                    <div class="text-[10px] text-slate-400 leading-normal">GCP/Vertex metrics & request logs</div>
-                                </div>
-                            </label>
-                        </div>
-                    </div>
-
-                    {% if not is_disabled %}
-                    <div class="pt-4 border-t border-slate-100">
-                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl text-sm shadow-lg transition-colors">Save Changes</button>
-                    </div>
-                    {% endif %}
-
-                </form>
+            <div x-show="dbMode === 'custom'" x-cloak class="sm:col-span-2">
+              <label class="label" for="s-db">Connection string</label>
+              <input class="input mono" id="s-db" name="db_connection" type="text"
+                     value="{{ app.db_connection or '' }}" {{ 'disabled' if is_disabled }}
+                     placeholder="postgresql://user:password@host:5432/db"
+                     aria-describedby="s-db-hint">
+              <p class="hint" id="s-db-hint">
+                Bifrost proxies this database. Use a role with only the privileges it needs.
+              </p>
             </div>
-        </div>
+          </div>
+        </fieldset>
 
-        <div class="space-y-6">
-            {% if current_role in ['owner', 'heimdall'] %}
-            <div class="bg-slate-900 text-white p-6 rounded-2xl shadow-lg border border-slate-800">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="font-bold text-white">API Credentials</h3>
-                    <button @click="showSecrets = !showSecrets" class="text-white/60 hover:text-white p-2 bg-white/5 rounded-lg">
-                         Show
-                    </button>
-                </div>
-                <div class="space-y-4">
-                    <div>
-                        <label class="text-xs font-bold text-slate-500 uppercase block mb-1">Client ID</label>
-                        <code class="block bg-black/30 p-3 rounded-xl border border-white/5 text-xs font-mono break-all text-slate-300" x-text="showSecrets ? '{{ app.client_id }}' : '••••••••••••••••••••'"></code>
-                    </div>
-                    <div>
-                        <label class="text-xs font-bold text-slate-500 uppercase block mb-1">Webhook Secret</label>
-                        <code class="block bg-black/30 p-3 rounded-xl border border-white/5 text-xs font-mono break-all text-amber-400" x-text="showSecrets ? '{{ app.webhook_secret }}' : '••••••••••••••••••••'"></code>
-                    </div>
-                </div>
-                <div class="mt-6 pt-6 border-t border-white/10">
-                    <form action="{{ url_for('backoffice.rotate_secret', app_id=app._id) }}" method="POST" onsubmit="return confirm('Strictly Warning: This will break your app immediately. Proceed?');">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <button type="submit" class="w-full bg-red-900/30 border border-red-500/50 text-red-400 font-bold py-2.5 px-4 rounded-xl hover:bg-red-600 hover:text-white transition text-sm">
-                            Rotate Secret
-                        </button>
+        <fieldset class="border-t border-border pt-5">
+          <legend class="label">Enabled services</legend>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {# `enabled_services is not defined` keeps old app documents, written
+               before this field existed, defaulting to everything on. #}
+            {% set services = [
+              ('service_sso',              'sso',              'OAuth SSO login',   'Google, GitHub, Microsoft, Apple, Facebook'),
+              ('service_phone_otp',        'phone_otp',        'Phone SMS OTP',     'Passwordless verification via Twilio'),
+              ('service_email_otp',        'email_otp',        'Email OTP',         'SMTP passwordless reset codes'),
+              ('service_secrets_vault',    'secrets_vault',    'Secrets vault',     'Credentials loaded dynamically by the SDK'),
+              ('service_payment_bot',      'payment_bot',      'Payment bot',       'Telegram billing and receipt webhook'),
+              ('service_heimdall_monitor', 'heimdall_monitor', 'Heimdall monitor',  'GCP / Vertex metrics and request logs'),
+            ] %}
+            {% for field, key, label, description in services %}
+              <label class="flex items-start gap-2.5 p-3 rounded bg-surface-2 cursor-pointer">
+                <input type="checkbox" name="{{ field }}" value="1" class="mt-1"
+                       {{ 'disabled' if is_disabled }}
+                       {% if app.enabled_services is not defined or app.enabled_services[key] %}checked{% endif %}>
+                <span>
+                  <span class="block font-medium">{{ label }}</span>
+                  <span class="block muted text-[12px]">{{ description }}</span>
+                </span>
+              </label>
+            {% endfor %}
+          </div>
+        </fieldset>
+
+        {% if can_edit %}
+          <div class="border-t border-border pt-5">
+            <button class="btn btn-primary" type="submit">Save changes</button>
+          </div>
+        {% endif %}
+      </div>
+    </form>
+
+    <div class="space-y-4">
+      {% if owner_level %}
+        <div class="card">
+          <div class="card-head flex items-center justify-between">
+            <span>API credentials</span>
+            <button type="button" class="btn btn-sm" @click="showSecrets = !showSecrets"
+                    :aria-pressed="showSecrets" x-text="showSecrets ? 'Hide' : 'Show'">Show</button>
+          </div>
+          <div class="card-pad space-y-4">
+            <div>
+              <div class="label">Client ID</div>
+              <code class="mono block p-2.5 rounded bg-surface-2 break-all"
+                    x-text="showSecrets ? {{ app.client_id|tojson }} : '••••••••••••••••'"></code>
+            </div>
+            <div>
+              <div class="label">Webhook secret</div>
+              <code class="mono block p-2.5 rounded bg-surface-2 break-all"
+                    x-text="showSecrets ? {{ app.webhook_secret|tojson }} : '••••••••••••••••'"></code>
+            </div>
+
+            <div class="danger-zone card-pad">
+              <div class="font-semibold text-danger mb-1">Rotate webhook secret</div>
+              <p class="muted text-[12px] mb-3">
+                The application stops accepting webhooks until the new secret is deployed.
+              </p>
+              <form method="POST" action="{{ url_for('backoffice.rotate_secret', app_id=app._id) }}"
+                    onsubmit="return confirm('Rotate the webhook secret? Webhook delivery breaks until the new secret is deployed.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button class="btn btn-danger w-full" type="submit">Rotate secret</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="card card-pad">
+          <div class="font-medium mb-1">Credentials hidden</div>
+          <p class="muted text-[12px]">Only the application owner can view secrets.</p>
+        </div>
+      {% endif %}
+
+      {% if senior %}
+        <div class="card">
+          <div class="card-head">API keys</div>
+          <div class="card-pad space-y-4">
+            {% if app.api_keys %}
+              <ul class="space-y-1.5">
+                {% for key_name, key_value in app.api_keys.items() %}
+                  <li class="flex items-center justify-between gap-2 p-2.5 rounded bg-surface-2">
+                    <span class="min-w-0">
+                      <span class="block mono truncate">{{ key_name }}</span>
+                      <code class="mono muted"
+                            x-text="showSecrets ? {{ key_value|tojson }} : '••••••••••••'"></code>
+                    </span>
+                    <form method="POST" action="{{ url_for('backoffice.delete_api_key', app_id=app._id) }}"
+                          onsubmit="return confirm('Revoke {{ key_name }}? Anything using it stops working immediately.');">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                      <input type="hidden" name="key_name" value="{{ key_name }}">
+                      <button class="btn btn-sm" type="submit">Revoke</button>
                     </form>
-                </div>
-            </div>
-
+                  </li>
+                {% endfor %}
+              </ul>
             {% else %}
-            <div class="bg-slate-100 p-6 rounded-2xl border border-slate-200 text-center">
-                <div class="text-3xl mb-2">🔒</div>
-                <h3 class="font-bold text-slate-400">Restricted Area</h3>
-                <p class="text-xs text-slate-400 mt-1">Secrets are only visible to the App Owner.</p>
-            </div>
+              <p class="muted">No API keys configured.</p>
             {% endif %}
 
-            <!-- API Keys Manager -->
-            {% if current_role in ['super_admin', 'owner', 'heimdall'] %}
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="font-bold text-slate-900">API Keys Manager</h3>
-                </div>
-                
-                <div class="space-y-3 mb-6">
-                    {% if app.api_keys %}
-                        {% for key_name, key_value in app.api_keys.items() %}
-                        <div class="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl">
-                            <div>
-                                <span class="block text-xs font-bold text-indigo-600 mb-0.5">{{ key_name }}</span>
-                                <code class="text-xs font-mono text-slate-500" x-text="showSecrets ? '{{ key_value }}' : '••••••••••••••••'"></code>
-                            </div>
-                            <form action="{{ url_for('backoffice.delete_api_key', app_id=app._id) }}" method="POST" onsubmit="return confirm('Revoke this key?');">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                <input type="hidden" name="key_name" value="{{ key_name }}">
-                                <button type="submit" class="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors">Revoke</button>
-                            </form>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        <p class="text-xs text-slate-400 font-bold">No API keys configured.</p>
-                    {% endif %}
-                </div>
-
-                <form action="{{ url_for('backoffice.add_api_key', app_id=app._id) }}" method="POST" class="space-y-3 pt-4 border-t border-slate-100">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <div>
-                        <input type="text" name="key_name" placeholder="Key Name (e.g. GEMINI_API_KEY)" class="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 font-bold" required>
-                    </div>
-                    <div>
-                        <input type="password" name="key_value" placeholder="Paste your API Key here..." class="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-600 font-mono" required>
-                    </div>
-                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-sm">Add / Update Key</button>
-                </form>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-
-    <div x-data="{ open: false, userId: '', userName: '', userRole: '' }"
-         @open-user-modal.window="open = true; userId = $event.detail.id; userName = $event.detail.name; userRole = $event.detail.role"
-         x-show="open" style="display: none;"
-         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
-         x-transition.opacity>
-
-        <div @click.away="open = false" class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 relative">
-            <h3 class="text-xl font-bold text-slate-900 mb-6">Manage User</h3>
-            <form :action="'/backoffice/app/{{ app._id }}/user/' + userId + '/update'" method="POST" class="space-y-5">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Role</label>
-                    <select name="role" x-model="userRole" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700">
-                        <option value="guest">Guest</option>
-                        <option value="user">User</option>
-                        <option value="premium_user">Premium</option>
-
-                        {% if current_role in ['admin', 'super_admin', 'owner', 'heimdall'] %}
-                        <optgroup label="Console staff">
-                            <option value="content_manager">Content Manager</option>
-                            <option value="operations">Operations / Billing</option>
-                        </optgroup>
-                        {% endif %}
-
-                        {% if current_role in ['super_admin', 'owner', 'heimdall'] %}
-                        <option value="admin">App Admin</option>
-                        {% endif %}
-
-                        {% if current_role in ['owner', 'heimdall'] %}
-                        <option value="super_admin">App Super Admin</option>
-                        <option value="owner">Owner</option>
-                        {% endif %}
-
-                        <option value="banned">Banned</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Expiry</label>
-                    <select name="duration" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700">
-                        <option value="">No Change</option>
-                        <option value="1m">1 Month</option>
-                        <option value="1y">1 Year</option>
-                        <option value="lifetime">Lifetime</option>
-                    </select>
-                </div>
-                <div class="pt-4 flex gap-3 border-t border-slate-100">
-                    <button type="submit" name="action" value="update" class="flex-1 bg-indigo-600 text-white font-bold py-3 rounded-xl">Save</button>
-                    <button type="submit" name="action" value="remove" class="bg-red-50 text-red-600 font-bold py-3 px-4 rounded-xl">Remove</button>
-                </div>
+            <form method="POST" action="{{ url_for('backoffice.add_api_key', app_id=app._id) }}"
+                  class="space-y-3 border-t border-border pt-4">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <div>
+                <label class="label" for="k-name">Key name</label>
+                <input class="input mono" id="k-name" name="key_name" type="text" required
+                       placeholder="GEMINI_API_KEY">
+              </div>
+              <div>
+                <label class="label" for="k-value">Value</label>
+                <input class="input mono" id="k-value" name="key_value" type="password" required
+                       autocomplete="off" placeholder="Paste the key">
+              </div>
+              <button class="btn btn-primary w-full" type="submit">Add or update key</button>
             </form>
+          </div>
         </div>
+      {% endif %}
     </div>
+  </div>
+
+  <!-- ----------------------------------------------------- manage dialog -->
+  <div x-data="{ open: false, userId: '', userName: '', userRole: '' }"
+       @manage-user.window="open = true; userId = $event.detail.id;
+                            userName = $event.detail.name; userRole = $event.detail.role"
+       @keydown.escape.window="open = false"
+       x-show="open" x-cloak x-transition.opacity
+       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+       role="dialog" aria-modal="true" aria-labelledby="manage-title">
+
+    <div class="card w-full max-w-md" @click.outside="open = false">
+      <div class="card-head flex items-center justify-between">
+        <span id="manage-title">Manage <span x-text="userName"></span></span>
+        <button type="button" class="btn btn-ghost btn-sm" @click="open = false" aria-label="Close">✕</button>
+      </div>
+
+      {# The user id is only known client-side, so the URL is built from a real
+         url_for() with a placeholder rather than hand-assembled from string
+         fragments — the route can move without breaking this. #}
+      <form method="POST" class="card-pad space-y-4"
+            :action="{{ url_for('backoffice.update_user_role', app_id=app._id, user_id='__USER_ID__')|tojson }}.replace('__USER_ID__', userId)">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+        <div>
+          <label class="label" for="m-role">Role</label>
+          {# x-model sets the current value, so the macro's `selected` is omitted
+             here on purpose — Alpine would overwrite it anyway. #}
+          <select class="select" id="m-role" name="role" x-model="userRole">
+            {{ role_options(current_role) }}
+          </select>
+        </div>
+
+        <div>
+          <label class="label" for="m-duration">Expiry</label>
+          <select class="select" id="m-duration" name="duration">
+            <option value="">Leave unchanged</option>
+            <option value="1m">1 month</option>
+            <option value="1y">1 year</option>
+            <option value="lifetime">Never</option>
+          </select>
+        </div>
+
+        <div class="flex gap-2 border-t border-border pt-4">
+          <button class="btn btn-primary flex-1" type="submit" name="action" value="update">Save</button>
+          <button class="btn btn-danger" type="submit" name="action" value="remove"
+                  onclick="return confirm('Remove this user from the application?');">Remove</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
-</body>
-</html>
+{% endblock %}

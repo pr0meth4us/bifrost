@@ -1,67 +1,55 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Audit Log | {{ app.app_name }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Plus Jakarta Sans', sans-serif; }</style>
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-{% include 'backoffice/_khmer_font.html' %}
-</head>
-<body class="bg-slate-900 text-slate-100 min-h-screen">
-<nav class="bg-slate-950 border-b border-slate-800 px-6 py-4">
-    <div class="max-w-7xl mx-auto flex items-center justify-between">
-        <div class="flex items-center space-x-4">
-            <a href="{{ url_for('backoffice.view_app') }}" class="text-slate-400 hover:text-white font-bold">← Back to App</a>
+{% extends "backoffice/base.html" %}
+{% set khmer = true %}{# before/after diffs contain tenant content #}
 
-            <div class="h-6 w-px bg-slate-800"></div>
-            <h1 class="text-xl font-bold">Audit Log</h1>
-            <span class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-800 text-indigo-300 border border-slate-700 uppercase">Role: {{ current_role }}</span>
+{% block title %}Audit log{% endblock %}
+{% block page_title %}Audit log · {{ app.app_name }}{% endblock %}
+
+{% block content %}
+<div class="main-pad space-y-4">
+
+  <form method="GET" class="card card-pad flex flex-wrap items-end gap-3">
+    <div class="w-48">
+      <label class="label" for="f-table">Table</label>
+      <input class="input" id="f-table" name="table" value="{{ filter_table }}" placeholder="Any">
+    </div>
+    <div class="w-56">
+      <label class="label" for="f-actor">Actor</label>
+      <input class="input" id="f-actor" name="actor" value="{{ filter_actor }}" placeholder="Any">
+    </div>
+    <button class="btn btn-primary" type="submit">Filter</button>
+    <a class="btn btn-ghost" href="{{ url_for('backoffice.view_audit_log', app_id=app._id) }}">Clear</a>
+  </form>
+
+  <div class="space-y-2">
+    {% for e in entries %}
+      {# <details> rather than a JS accordion: it is keyboard- and
+         screen-reader-correct for free, and Ctrl-F finds collapsed text. #}
+      <details class="card overflow-hidden">
+        <summary class="px-4 py-3 cursor-pointer flex flex-wrap items-center gap-3 hover:bg-surface-2">
+          {% set destructive = e.action in ('DELETE', 'REFUND', 'SUSPEND') %}
+          {% set additive = e.action in ('APPROVE', 'CREATE') %}
+          <span class="badge {% if destructive %}badge-danger{% elif additive %}badge-success{% endif %}">
+            {{ e.action }}
+          </span>
+          <span class="mono">{{ e.table }}#{{ e.row_id }}</span>
+          <span class="text-[12px] muted">by {{ e.acting_user }}</span>
+          <span class="ml-auto mono muted">{{ e.timestamp }}</span>
+        </summary>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border-t border-border">
+          <div>
+            <div class="label">Before</div>
+            <pre class="mono kh whitespace-pre-wrap overflow-x-auto p-3 rounded bg-surface-2">{{ e.before | tojson(indent=2) if e.before else '—' }}</pre>
+          </div>
+          <div>
+            <div class="label">After</div>
+            <pre class="mono kh whitespace-pre-wrap overflow-x-auto p-3 rounded bg-surface-2">{{ e.after | tojson(indent=2) if e.after else '—' }}</pre>
+          </div>
         </div>
-        <a href="{{ url_for('backoffice.logout') }}" class="text-sm font-bold text-slate-400 hover:text-white">Logout</a>
-    </div>
-</nav>
-
-<div class="max-w-7xl mx-auto px-6 py-8">
-    <form method="GET" class="flex flex-wrap gap-3 mb-8">
-        <input name="table" value="{{ filter_table }}" placeholder="Filter by table…"
-               class="p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs font-medium outline-none focus:border-indigo-500">
-        <input name="actor" value="{{ filter_actor }}" placeholder="Filter by actor id…"
-               class="p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs font-medium outline-none focus:border-indigo-500">
-        <button class="px-5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold uppercase tracking-wide">Filter</button>
-        <a href="{{ url_for('backoffice.view_audit_log', app_id=app._id) }}"
-           class="px-5 py-3 text-xs font-bold text-slate-400 hover:text-white">Clear</a>
-    </form>
-
-    <div class="space-y-3">
-        {% for e in entries %}
-            <details class="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden">
-                <summary class="p-4 cursor-pointer flex flex-wrap items-center gap-3 hover:bg-slate-900/60">
-                    <span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase
-                        {% if e.action in ('DELETE', 'REFUND', 'SUSPEND') %}bg-red-950 text-red-400 border border-red-800
-                        {% elif e.action in ('APPROVE', 'CREATE') %}bg-emerald-950 text-emerald-400 border border-emerald-800
-                        {% else %}bg-slate-800 text-slate-300 border border-slate-700{% endif %}">{{ e.action }}</span>
-                    <span class="font-mono text-xs text-slate-300">{{ e.table }}#{{ e.row_id }}</span>
-                    <span class="text-xs text-slate-500">by {{ e.acting_user }}</span>
-                    <span class="ml-auto text-[11px] font-mono text-slate-500">{{ e.timestamp }}</span>
-                </summary>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border-t border-slate-800 text-xs">
-                    <div>
-                        <div class="font-bold text-slate-400 uppercase text-[10px] mb-2">Before</div>
-                        <pre class="bg-slate-900 p-3 rounded-xl overflow-x-auto text-red-300/80 whitespace-pre-wrap kh">{{ e.before | tojson(indent=2) if e.before else '—' }}</pre>
-                    </div>
-                    <div>
-                        <div class="font-bold text-slate-400 uppercase text-[10px] mb-2">After</div>
-                        <pre class="bg-slate-900 p-3 rounded-xl overflow-x-auto text-emerald-300/80 whitespace-pre-wrap kh">{{ e.after | tojson(indent=2) if e.after else '—' }}</pre>
-                    </div>
-                </div>
-            </details>
-        {% else %}
-            <div class="text-center py-20 text-slate-500 font-medium">No audit entries match this filter.</div>
-        {% endfor %}
-    </div>
+      </details>
+    {% else %}
+      <p class="empty">No audit entries match this filter.</p>
+    {% endfor %}
+  </div>
 </div>
-</body>
-</html>
+{% endblock %}

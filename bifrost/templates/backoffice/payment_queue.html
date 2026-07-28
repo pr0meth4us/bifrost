@@ -1,255 +1,219 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Payment Queue | {{ app.app_name }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.75);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-        }
-    </style>
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-{% include 'backoffice/_khmer_font.html' %}
-</head>
-<body class="bg-slate-900 text-slate-100 min-h-screen">
-<nav class="bg-slate-950 border-b border-slate-800 px-6 py-4">
-    <div class="max-w-7xl mx-auto flex items-center justify-between">
-        <div class="flex items-center space-x-4">
-            <a href="{{ url_for('backoffice.view_app') }}" class="text-slate-400 hover:text-white font-bold transition-colors">← Back to App</a>
+{% extends "backoffice/base.html" %}
+{% set khmer = true %}{# payer names come from the tenant database #}
 
-            <div class="h-6 w-px bg-slate-800"></div>
-            <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400">{{ app.app_name }} Backoffice</h1>
-            <span class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-800 text-indigo-300 border border-slate-700 uppercase">
-                Role: {{ current_role }}
+{% block title %}Payments{% endblock %}
+{% block page_title %}Payments · {{ app.app_name }}{% endblock %}
+
+{% block head %}
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="main-pad space-y-4" x-data="{ selected: null, zoom: false }">
+
+  <p class="muted">
+    Check each bank receipt against the transaction reference before approving.
+    Approving grants access immediately and notifies the application.
+  </p>
+
+  <div class="flex flex-wrap gap-1" role="tablist" aria-label="Filter by status">
+    {% for value, label in [('pending', 'Pending'), ('approved', 'Approved'),
+                            ('rejected', 'Rejected'), ('refunded', 'Refunded')] %}
+      <a class="btn btn-sm {% if status_filter == value %}btn-primary{% endif %}"
+         href="?status={{ value }}"
+         {% if status_filter == value %}aria-current="page"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+    <!-- queue -->
+    <div class="lg:col-span-5 card flex flex-col max-h-[70vh]">
+      <div class="card-head flex items-center justify-between">
+        <span>Queue</span>
+        <span class="badge">{{ payments|length }}</span>
+      </div>
+
+      <div class="flex-1 overflow-y-auto">
+        {% for p in payments %}
+          {# The whole row is a <button> so it is reachable by keyboard — the
+             previous version was a div with @click and no tab stop, which made
+             this screen unusable without a mouse. #}
+          <button type="button"
+                  class="w-full text-left px-4 py-3 border-b border-border flex justify-between gap-3 hover:bg-surface-2"
+                  :class="selected && selected.id === {{ p.id }} && 'bg-surface-2'"
+                  :aria-pressed="selected && selected.id === {{ p.id }}"
+                  @click="selected = {{ p|tojson }}">
+            <span class="min-w-0">
+              <span class="block font-medium truncate">{{ p.email or 'Unknown user' }}</span>
+              <span class="block mono muted truncate">{{ p.txn_ref }}</span>
+              <span class="block muted text-[12px]">{{ p.amount }} {{ p.currency or 'USD' }}</span>
             </span>
-        </div>
-        <a href="{{ url_for('backoffice.logout') }}" class="text-sm font-bold text-slate-400 hover:text-white transition-colors">Logout</a>
-    </div>
-</nav>
+            <span class="flex flex-col items-end gap-1 shrink-0">
+              <span class="badge {% if p.status == 'approved' %}badge-success
+                                 {% elif p.status == 'rejected' %}badge-danger
+                                 {% elif p.status == 'refunded' %}badge-warning
+                                 {% else %}badge-accent{% endif %}">{{ p.status }}</span>
 
-<div class="max-w-7xl mx-auto px-6 py-8" x-data="{ selectedPayment: null, zoomReceipt: false }">
-    <div class="flex justify-between items-center mb-8">
-        <div>
-            <h2 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">Payment Validation Queue</h2>
-            <p class="text-xs text-slate-400 mt-1">Verify incoming KHQR bank receipt uploads against manual statements.</p>
-        </div>
-        
-        <!-- Status Filter Tabs -->
-        <div class="flex bg-slate-950 p-1.5 rounded-xl border border-slate-800">
-            <a href="?status=pending" class="px-5 py-2 rounded-lg text-xs font-bold transition-all {% if status_filter == 'pending' %}bg-indigo-600 text-white shadow-lg{% else %}text-slate-400 hover:text-white{% endif %}">Pending</a>
-            <a href="?status=approved" class="px-5 py-2 rounded-lg text-xs font-bold transition-all {% if status_filter == 'approved' %}bg-indigo-600 text-white shadow-lg{% else %}text-slate-400 hover:text-white{% endif %}">Approved</a>
-            <a href="?status=rejected" class="px-5 py-2 rounded-lg text-xs font-bold transition-all {% if status_filter == 'rejected' %}bg-indigo-600 text-white shadow-lg{% else %}text-slate-400 hover:text-white{% endif %}">Rejected</a>
-            <a href="?status=refunded" class="px-5 py-2 rounded-lg text-xs font-bold transition-all {% if status_filter == 'refunded' %}bg-indigo-600 text-white shadow-lg{% else %}text-slate-400 hover:text-white{% endif %}">Refunded</a>
-        </div>
+              {% if p.sla_state in ('ok', 'warn', 'breach') %}
+                <span class="badge {% if p.sla_state == 'breach' %}badge-danger
+                                   {% elif p.sla_state == 'warn' %}badge-warning{% endif %}"
+                      title="Waiting {{ p.age_hours }}h against a {{ sla_hours }}h SLA">
+                  {{ p.age_hours }}h{% if p.sla_state == 'breach' %} overdue{% endif %}
+                </span>
+              {% elif p.sla_state == 'unknown' %}
+                <span class="badge" title="This row has no created_at timestamp">age n/a</span>
+              {% endif %}
+            </span>
+          </button>
+        {% else %}
+          <p class="empty m-4">No payments in this state.</p>
+        {% endfor %}
+      </div>
     </div>
 
-    <!-- Main Workspace Split Screen -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        <!-- Left Side: Interactive Payments List -->
-        <div class="lg:col-span-5 bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden flex flex-col h-[650px] shadow-2xl">
-            <div class="p-4 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
-                <span class="text-xs font-extrabold text-slate-400 tracking-wider uppercase">Incoming Queue</span>
-                <span class="px-2 py-0.5 rounded bg-indigo-900/50 border border-indigo-700 text-indigo-300 text-[10px] font-bold">{{ payments|length }} Total</span>
+    <!-- detail -->
+    <div class="lg:col-span-7">
+      <template x-if="!selected">
+        <p class="empty">Select a payment to review its receipt and act on it.</p>
+      </template>
+
+      <template x-if="selected">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          <div class="card flex flex-col">
+            <div class="card-head">Receipt</div>
+            <div class="card-pad flex-1 flex items-center justify-center">
+              <template x-if="selected.receipt_url">
+                <button type="button" class="cursor-zoom-in" @click="zoom = true"
+                        aria-label="Enlarge receipt image">
+                  <img :src="selected.receipt_url" alt="Uploaded bank receipt"
+                       class="max-h-[420px] w-auto object-contain rounded">
+                </button>
+              </template>
+              <template x-if="!selected.receipt_url">
+                <p class="empty">No receipt image was uploaded.</p>
+              </template>
             </div>
-            
-            <div class="flex-grow overflow-y-auto divide-y divide-slate-800">
-                {% if payments %}
-                    {% for p in payments %}
-                        <div @click="selectedPayment = {{ p|tojson|safe }}" 
-                             :class="selectedPayment && selectedPayment.id === {{ p.id }} ? 'bg-slate-900 border-l-4 border-indigo-500' : 'hover:bg-slate-900/50'"
-                             class="p-4 cursor-pointer transition-all flex justify-between items-start border-l-4 border-transparent">
-                            <div class="space-y-1">
-                                <div class="font-bold text-sm text-slate-100">{{ p.email or 'Unknown User' }}</div>
-                                <div class="text-[11px] font-mono text-slate-400">Ref: {{ p.txn_ref }}</div>
-                                <div class="text-[10px] text-slate-500">Amount: ${{ p.amount }} {{ p.currency or 'USD' }}</div>
-                            </div>
-                            <div class="flex flex-col items-end gap-2">
-                                <span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide
-                                    {% if p.status == 'approved' %}bg-emerald-950 text-emerald-400 border border-emerald-800
-                                    {% elif p.status == 'rejected' %}bg-red-950 text-red-400 border border-red-800
-                                    {% elif p.status == 'refunded' %}bg-amber-950 text-amber-400 border border-amber-800
-                                    {% else %}bg-indigo-950 text-indigo-400 border border-indigo-800{% endif %}">
-                                    {{ p.status }}
-                                </span>
-                                {% if p.sla_state in ('ok', 'warn', 'breach') %}
-                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold tabular-nums
-                                        {% if p.sla_state == 'breach' %}bg-red-950 text-red-300 border border-red-700
-                                        {% elif p.sla_state == 'warn' %}bg-amber-950 text-amber-300 border border-amber-700
-                                        {% else %}text-slate-500{% endif %}"
-                                        title="Waiting {{ p.age_hours }}h against a {{ sla_hours }}h SLA">
-                                        {% if p.sla_state == 'breach' %}⚠ {% endif %}{{ p.age_hours }}h
-                                    </span>
-                                {% elif p.sla_state == 'unknown' %}
-                                    <span class="text-[10px] font-semibold text-slate-600" title="payments.created_at is missing">age n/a</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="text-center py-20 text-slate-500 font-medium">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto text-slate-600 mb-3">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0110 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0114 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />
-                        </svg>
-                        No payments found in this state.
-                    </div>
-                {% endif %}
+          </div>
+
+          <div class="card flex flex-col">
+            <div class="card-head" x-text="selected.email"></div>
+            <div class="card-pad space-y-3 flex-1">
+              <div>
+                <div class="label">Transaction reference</div>
+                <div class="mono" x-text="selected.txn_ref"></div>
+              </div>
+              <div>
+                <div class="label">Amount</div>
+                <div x-text="selected.amount + ' ' + (selected.currency || 'USD')"></div>
+              </div>
+              <div>
+                <div class="label">Status</div>
+                <span class="badge"
+                      :class="{ 'badge-success': selected.status === 'approved',
+                                'badge-danger':  selected.status === 'rejected',
+                                'badge-warning': selected.status === 'refunded',
+                                'badge-accent':  selected.status === 'pending' }"
+                      x-text="selected.status"></span>
+              </div>
             </div>
+
+            <div class="card-pad border-t border-border space-y-4">
+
+              <div x-show="selected.status === 'pending' || selected.status === 'unclaimed'"
+                   class="space-y-4">
+                <form method="POST" class="space-y-2"
+                      :action="{{ url_for('backoffice.approve_payment', app_id=app._id, payment_id='__ID__')|tojson }}.replace('__ID__', selected.id)">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                  <div>
+                    <label class="label" for="track">Grant access to</label>
+                    <select class="select" id="track" name="track_id" required>
+                      <option value="">Select a track</option>
+                      {% for t in tracks %}
+                        <option value="{{ t.id }}">{{ t.ministry }} — {{ t.name }}</option>
+                      {% endfor %}
+                    </select>
+                    {% if not tracks %}
+                      <p class="hint text-warning">
+                        No active tracks found in the tenant database — nothing can be granted yet.
+                      </p>
+                    {% endif %}
+                  </div>
+                  <button class="btn btn-primary w-full" type="submit"
+                          {% if not can_approve %}disabled{% endif %}>Approve payment</button>
+                </form>
+
+                <form method="POST" class="space-y-2 border-t border-border pt-4"
+                      :action="{{ url_for('backoffice.reject_payment', app_id=app._id, payment_id='__ID__')|tojson }}.replace('__ID__', selected.id)">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                  <div>
+                    <label class="label" for="reject-reason">Rejection reason</label>
+                    <select class="select" id="reject-reason" name="reason_code" required>
+                      <option value="">Select a reason</option>
+                      {% for code in reject_reasons %}
+                        <option value="{{ code }}">{{ code.replace('_', ' ')|title }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <input class="input" name="reason_text"
+                         placeholder="Notes (required when the reason is 'other')">
+                  <button class="btn btn-danger w-full" type="submit"
+                          {% if not can_approve %}disabled{% endif %}>Reject payment</button>
+                </form>
+              </div>
+
+              <div x-show="selected.status === 'approved'">
+                <form method="POST" class="space-y-2"
+                      :action="{{ url_for('backoffice.refund_payment', app_id=app._id, payment_id='__ID__')|tojson }}.replace('__ID__', selected.id)"
+                      onsubmit="return confirm('Issue this refund? Access is revoked immediately.');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                  <div class="alert alert-warning">
+                    <strong>Warning:</strong>
+                    <span>Refunding revokes the user's access to
+                      <span x-text="'track #' + (selected.exam_track_id || '(auto-detected)')"></span>
+                      immediately.</span>
+                  </div>
+                  <div>
+                    <label class="label" for="refund-reason">Refund reason</label>
+                    <select class="select" id="refund-reason" name="reason_code" required>
+                      <option value="">Select a reason</option>
+                      {% for code in refund_reasons %}
+                        <option value="{{ code }}">{{ code.replace('_', ' ')|title }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <input class="input" name="reason_text" placeholder="Notes">
+                  <button class="btn btn-danger w-full" type="submit"
+                          {% if not can_approve %}disabled{% endif %}>Issue refund</button>
+                </form>
+              </div>
+
+              <p x-show="selected.status === 'rejected' || selected.status === 'refunded'" class="muted">
+                This payment has been processed. No further action is available here.
+              </p>
+
+              {% if not can_approve %}
+                <p class="muted text-[12px]">
+                  Your role can view this queue but not act on it.
+                </p>
+              {% endif %}
+            </div>
+          </div>
         </div>
-
-        <!-- Right Side: Split Screen Workspace -->
-        <div class="lg:col-span-7 space-y-6">
-            <template x-if="selectedPayment">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 h-[650px]">
-                    
-                    <!-- Workspace Left: Receipt Preview Panel -->
-                    <div class="bg-slate-950 rounded-2xl border border-slate-800 p-4 flex flex-col justify-between shadow-2xl relative">
-                        <div class="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider">Receipt Document</div>
-                        
-                        <div class="flex-grow flex items-center justify-center bg-slate-900 rounded-xl overflow-hidden cursor-zoom-in relative group" @click="zoomReceipt = true">
-                            <img :src="selectedPayment.receipt_url || 'https://via.placeholder.com/300x500?text=No+Receipt+Image'" 
-                                 class="max-h-[480px] w-auto object-contain transition-transform group-hover:scale-105 duration-300">
-                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs font-bold">
-                                🔍 Click to Expand
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Workspace Right: Form Validation Action Block -->
-                    <div class="bg-slate-950 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between shadow-2xl">
-                        <div class="space-y-6">
-                            <div class="border-b border-slate-800 pb-4">
-                                <span class="text-[10px] font-extrabold text-indigo-400 uppercase tracking-widest block mb-1">Transaction Metadata</span>
-                                <h3 class="text-lg font-bold text-white" x-text="selectedPayment.email"></h3>
-                            </div>
-
-                            <div class="space-y-4 text-sm">
-                                <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
-                                    <div class="text-[10px] font-bold text-slate-400 uppercase">Transaction Reference</div>
-                                    <div class="font-mono font-bold text-indigo-300 mt-0.5 text-base" x-text="selectedPayment.txn_ref"></div>
-                                </div>
-
-                                <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
-                                    <div class="text-[10px] font-bold text-slate-400 uppercase">Amount & Currency</div>
-                                    <div class="font-bold text-white mt-0.5 text-base" x-text="'$' + selectedPayment.amount + ' USD'"></div>
-                                </div>
-
-                                <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
-                                    <div class="text-[10px] font-bold text-slate-400 uppercase">Current Status</div>
-                                    <div class="font-bold mt-1">
-                                        <span x-text="selectedPayment.status.toUpperCase()" 
-                                              :class="{
-                                                 'bg-emerald-950 text-emerald-400 border border-emerald-800': selectedPayment.status === 'approved',
-                                                 'bg-red-950 text-red-400 border border-red-800': selectedPayment.status === 'rejected',
-                                                 'bg-amber-950 text-amber-400 border border-amber-800': selectedPayment.status === 'refunded',
-                                                 'bg-indigo-950 text-indigo-400 border border-indigo-800': selectedPayment.status === 'pending'
-                                              }"
-                                              class="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide"></span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Action Forms based on Status -->
-                        <div class="space-y-4 pt-6 border-t border-slate-800">
-                            <!-- Pending Actions: Approve or Reject -->
-                            <div x-show="selectedPayment.status === 'pending' || selectedPayment.status === 'unclaimed'" class="space-y-4">
-                                <form :action="'/backoffice/app/{{ app._id }}/payments/' + selectedPayment.id + '/approve'" method="POST" class="space-y-3">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                    <div>
-                                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1.5">Grant Entitlement Track</label>
-                                        <select name="track_id" required class="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl outline-none font-bold text-xs text-slate-300">
-                                            <option value="">— select a track —</option>
-                                            {% for t in tracks %}
-                                                <option value="{{ t.id }}">{{ t.ministry }} — {{ t.name }}</option>
-                                            {% endfor %}
-                                        </select>
-                                        {% if not tracks %}
-                                            <p class="text-[10px] text-amber-400 mt-1.5 font-semibold">No active exam tracks found in the tenant database.</p>
-                                        {% endif %}
-                                    </div>
-                                    <button type="submit" {% if not can_approve %}disabled{% endif %} class="w-full py-3.5 bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 disabled:opacity-40 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl transition shadow-lg shadow-indigo-950/50">
-                                        Verify &amp; Approve
-                                    </button>
-                                </form>
-
-                                <form :action="'/backoffice/app/{{ app._id }}/payments/' + selectedPayment.id + '/reject'" method="POST" class="flex gap-2">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                    <select name="reason_code" required class="p-3 bg-slate-900 border border-slate-800 rounded-xl outline-none text-xs font-bold text-slate-300">
-                                        <option value="">Reason…</option>
-                                        {% for code in reject_reasons %}
-                                            <option value="{{ code }}">{{ code.replace('_', ' ')|title }}</option>
-                                        {% endfor %}
-                                    </select>
-                                    <input type="text" name="reason_text" placeholder="Notes (required for 'other')" class="flex-grow p-3 bg-slate-900 border border-slate-800 text-slate-100 placeholder-slate-500 rounded-xl outline-none text-xs focus:border-red-500 font-medium">
-                                    <button type="submit" {% if not can_approve %}disabled{% endif %} class="bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white font-bold px-5 rounded-xl text-xs transition">
-                                        Reject
-                                    </button>
-                                </form>
-                            </div>
-
-                            <!-- Approved Actions: Allow Refund -->
-                            <div x-show="selectedPayment.status === 'approved'">
-                                <form :action="'/backoffice/app/{{ app._id }}/payments/' + selectedPayment.id + '/refund'" method="POST" class="space-y-3">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                    <div class="text-[11px] font-bold text-amber-400 bg-amber-950/20 border border-amber-800/40 p-3 rounded-lg leading-normal">
-                                        ⚠️ Refunding immediately revokes access to the track this payment unlocked
-                                        (<span x-text="'track #' + (selectedPayment.exam_track_id || 'auto-detected')"></span>).
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <select name="reason_code" required class="p-3 bg-slate-900 border border-slate-800 rounded-xl outline-none text-xs font-bold text-slate-300">
-                                            <option value="">Reason…</option>
-                                            {% for code in refund_reasons %}
-                                                <option value="{{ code }}">{{ code.replace('_', ' ')|title }}</option>
-                                            {% endfor %}
-                                        </select>
-                                        <input type="text" name="reason_text" placeholder="Notes…" class="flex-grow p-3 bg-slate-900 border border-slate-800 text-slate-100 placeholder-slate-500 rounded-xl outline-none text-xs focus:border-amber-500 font-medium">
-                                        <button type="submit" {% if not can_approve %}disabled{% endif %} class="bg-amber-600 hover:bg-amber-700 disabled:opacity-40 text-slate-900 font-extrabold px-5 rounded-xl text-xs transition">
-                                            Issue Refund
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-
-                            <!-- Rejected/Refunded: Show History -->
-                            <div x-show="selectedPayment.status === 'rejected' || selectedPayment.status === 'refunded'" class="p-3 bg-slate-900 rounded-xl text-xs text-slate-400 border border-slate-800 font-medium leading-relaxed">
-                                This transaction has been processed. No further actions can be taken via the console.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </template>
-
-            <!-- Workspace Placeholder when No Payment Selected -->
-            <template x-if="!selectedPayment">
-                <div class="bg-slate-950 rounded-3xl border border-slate-800 border-dashed h-[650px] flex flex-col items-center justify-center text-slate-500 shadow-2xl">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-16 h-16 text-slate-700 mb-4 animate-pulse">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
-                    </svg>
-                    <span class="text-sm font-bold text-slate-400">Select a payment from the queue</span>
-                    <span class="text-xs text-slate-600 mt-1">Select a row to zoom the receipt and execute approvals.</span>
-                </div>
-            </template>
-        </div>
+      </template>
     </div>
+  </div>
 
-    <!-- Zoom Receipt Modal Overlay -->
-    <div x-show="zoomReceipt" 
-         x-transition.opacity
-         class="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 cursor-zoom-out" 
-         @click="zoomReceipt = false"
-         style="display: none;">
-        <template x-if="selectedPayment">
-            <img :src="selectedPayment.receipt_url" class="max-h-full max-w-full object-contain rounded-lg">
-        </template>
-        <button class="absolute top-6 right-6 text-white text-3xl font-light hover:text-slate-300">&times;</button>
-    </div>
+  <div x-show="zoom" x-cloak x-transition.opacity @click="zoom = false"
+       @keydown.escape.window="zoom = false"
+       class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 cursor-zoom-out"
+       role="dialog" aria-modal="true" aria-label="Receipt image, enlarged">
+    <template x-if="selected">
+      <img :src="selected.receipt_url" alt="Uploaded bank receipt"
+           class="max-h-full max-w-full object-contain rounded">
+    </template>
+    <button type="button" class="btn btn-sm absolute top-4 right-4" aria-label="Close">✕</button>
+  </div>
 </div>
-</body>
-</html>
+{% endblock %}

@@ -1,0 +1,23 @@
+{# Flash messages, one implementation. Every page previously rolled its own,
+   with four different colour vocabularies and no assistive-tech announcement.
+
+   role="status" (not "alert") because these render on load rather than
+   interrupting a task — screen readers announce them politely. The category
+   word is printed, so the meaning does not depend on colour alone. #}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {# Padding lives here, not in the layout, so a page with no messages gets no
+       stray gap above its content. #}
+    <div class="space-y-2 px-5 pt-5" role="status" aria-live="polite">
+      {% for category, message in messages %}
+        {% set variant = {'success': 'success', 'danger': 'danger', 'error': 'danger',
+                          'warning': 'warning'}.get(category, '') %}
+        <div class="alert {% if variant %}alert-{{ variant }}{% endif %}">
+          <strong class="shrink-0">{{ {'success': 'Done', 'danger': 'Error', 'error': 'Error',
+                                       'warning': 'Warning'}.get(category, 'Note') }}:</strong>
+          <span>{{ message }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}

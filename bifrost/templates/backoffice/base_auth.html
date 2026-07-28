@@ -1,0 +1,54 @@
+{# Sign-in, MFA and password-reset screens. Same tokens as base.html, but no
+   sidebar and no topbar — there is nothing to navigate to before you're in,
+   and a nav full of dead links is worse than no nav.
+
+   Separate file rather than an `if bare` branch inside base.html: Jinja allows
+   a block name only once per template, and faking it with unbalanced tags
+   across an if/else is the kind of cleverness someone decodes at 3am. #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+{% include 'backoffice/_head.html' %}
+<title>{% block title %}Sign in{% endblock %}{{ ' · ' ~ tenant_app.app_name if tenant_app }}</title>
+{% block head %}{% endblock %}
+</head>
+
+<body>
+<main id="main" class="min-h-screen flex flex-col items-center justify-center p-6">
+  <div class="w-full max-w-sm">
+
+    <div class="flex items-center gap-2.5 mb-6">
+      {% if tenant_app and tenant_app.app_logo_url %}
+        <img src="{{ tenant_app.app_logo_url }}" alt=""
+             class="w-8 h-8 rounded object-contain shrink-0">
+      {% else %}
+        <div class="w-8 h-8 rounded bg-accent text-accent-fg grid place-items-center font-bold shrink-0"
+             aria-hidden="true">{{ tenant_app.app_name[0]|upper if tenant_app else '·' }}</div>
+      {% endif %}
+      <div class="min-w-0">
+        <div class="font-semibold leading-tight truncate">
+          {{ tenant_app.app_name if tenant_app else 'Console' }}
+        </div>
+        <div class="text-[11px] muted leading-tight">Sign in</div>
+      </div>
+
+      <button type="button" class="btn btn-ghost btn-sm ml-auto" onclick="toggleTheme()"
+              aria-label="Switch between light and dark theme">
+        <span aria-hidden="true">◐</span>
+      </button>
+    </div>
+
+    {% include 'backoffice/_flash.html' %}
+
+    <div class="card card-pad">
+      {% block content %}{% endblock %}
+    </div>
+
+    {% block below_card %}{% endblock %}
+  </div>
+</main>
+
+{% include 'backoffice/_chrome_js.html' %}
+{% block scripts %}{% endblock %}
+</body>
+</html>

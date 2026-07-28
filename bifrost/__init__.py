@@ -194,10 +194,14 @@ def create_app(config_class):
 
     @app.route('/')
     def index():
-        from flask import g, redirect, url_for
+        # No marketing home page: the root IS the console. Signed in → straight to
+        # your apps, otherwise sign in.
+        from flask import g, redirect, url_for, session
         if hasattr(g, 'tenant_app_id'):
             return redirect(url_for('backoffice.view_app', app_id=g.tenant_app_id))
-        return render_template('index.html')
+        if session.get('backoffice_user'):
+            return redirect(url_for('backoffice.dashboard'))
+        return redirect(url_for('backoffice.login'))
 
     @app.route('/favicon.ico')
     def favicon():

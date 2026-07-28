@@ -1,0 +1,314 @@
+/* ============================================================================
+   Valhalla Console — design system
+   ----------------------------------------------------------------------------
+   ONE token set and ONE component layer for every backoffice page. Before this
+   file the console shipped five unrelated design languages (light Tailwind,
+   dark Tailwind, glassmorphism, Material-3, hand-rolled Apple) because every
+   template was a standalone <!DOCTYPE html> with its own fonts and its own nav.
+
+   Rules for anyone adding a page:
+     1. Extend backoffice/base.html. Never write a fresh <html> document.
+     2. Reach for a component class here first. Add a NEW component here when
+        you use the same cluster of utilities three times — not on the first.
+     3. Colours come from the semantic tokens below, never from a raw hex or a
+        Tailwind palette name (`bg-surface`, not `bg-white`/`bg-slate-900`).
+        That is the whole reason light and dark both work for free.
+
+   Familiarity over flourish: system fonts, one accent, square-ish corners,
+   no glow, no glass. Non-technical tenants use these screens daily.
+   ========================================================================== */
+
+/* ---------------------------------------------------------------- tokens -- */
+/* Channel triplets, not hex, so Tailwind's <alpha-value> works: bg-accent/10 */
+:root {
+  color-scheme: light;
+
+  --c-bg: 247 247 248;          /* app background   */
+  --c-surface: 255 255 255;     /* cards, panels    */
+  --c-surface-2: 242 242 244;   /* inset, thead, hover */
+  --c-border: 219 219 224;
+  --c-border-strong: 190 190 198;
+
+  --c-fg: 24 24 27;             /* primary text     */
+  --c-fg-muted: 95 95 105;      /* secondary text — 5.2:1 on --c-bg */
+  --c-fg-subtle: 130 130 140;   /* tertiary — decorative/large only */
+
+  --c-accent: 37 99 235;        /* the single accent */
+  --c-accent-fg: 255 255 255;
+  --c-accent-weak: 219 234 254;
+
+  --c-success: 21 128 61;
+  --c-warning: 180 83 9;
+  --c-danger: 190 40 40;
+
+  --radius: 6px;
+  --radius-lg: 10px;
+  --sidebar-w: 248px;
+  --topbar-h: 56px;
+
+  /* System stack: zero network cost, and already familiar on every OS. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+               "Liberation Mono", monospace;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --c-bg: 16 17 20;
+  --c-surface: 25 26 31;
+  --c-surface-2: 35 36 42;
+  --c-border: 51 52 60;
+  --c-border-strong: 74 76 86;
+
+  --c-fg: 237 237 240;
+  --c-fg-muted: 163 163 173;    /* 6.1:1 on --c-bg */
+  --c-fg-subtle: 125 125 136;
+
+  --c-accent: 96 150 255;       /* lifted for AA on dark surfaces */
+  --c-accent-fg: 12 14 20;
+  --c-accent-weak: 30 44 74;
+
+  --c-success: 74 195 118;
+  --c-warning: 226 155 60;
+  --c-danger: 245 110 110;
+}
+
+/* ------------------------------------------------------------------ base -- */
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: var(--font-sans);
+  background: rgb(var(--c-bg));
+  color: rgb(var(--c-fg));
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* One visible focus ring for the whole console. Keyboard users are the reason
+   this is :focus-visible and not :focus — it must not fire on mouse clicks. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid rgb(var(--c-accent));
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+::selection { background: rgb(var(--c-accent) / .25); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Keyboard users land here first; visible only once focused. */
+.skip-link {
+  position: absolute; left: 8px; top: -48px; z-index: 200;
+  padding: 8px 14px; border-radius: var(--radius);
+  background: rgb(var(--c-accent)); color: rgb(var(--c-accent-fg));
+  font-weight: 600; transition: top .15s;
+}
+.skip-link:focus { top: 8px; }
+
+/* --------------------------------------------------------------- buttons -- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 34px; padding: 0 12px;
+  border: 1px solid rgb(var(--c-border-strong));
+  border-radius: var(--radius);
+  background: rgb(var(--c-surface));
+  color: rgb(var(--c-fg));
+  font: inherit; font-weight: 500; white-space: nowrap;
+  cursor: pointer; transition: background .12s, border-color .12s;
+}
+.btn:hover { background: rgb(var(--c-surface-2)); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.btn-primary {
+  background: rgb(var(--c-accent));
+  border-color: rgb(var(--c-accent));
+  color: rgb(var(--c-accent-fg));
+}
+.btn-primary:hover { background: rgb(var(--c-accent) / .88); }
+
+.btn-danger {
+  background: rgb(var(--c-danger));
+  border-color: rgb(var(--c-danger));
+  color: #fff;
+}
+.btn-danger:hover { background: rgb(var(--c-danger) / .88); }
+
+.btn-ghost { background: transparent; border-color: transparent; color: rgb(var(--c-fg-muted)); }
+.btn-ghost:hover { background: rgb(var(--c-surface-2)); color: rgb(var(--c-fg)); }
+
+.btn-sm { height: 28px; padding: 0 9px; font-size: 12px; }
+
+/* ---------------------------------------------------------------- inputs -- */
+.input, .select, .textarea {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid rgb(var(--c-border-strong));
+  border-radius: var(--radius);
+  background: rgb(var(--c-surface));
+  color: rgb(var(--c-fg));
+  font: inherit;
+}
+.input::placeholder, .textarea::placeholder { color: rgb(var(--c-fg-subtle)); }
+.input:disabled, .select:disabled, .textarea:disabled {
+  background: rgb(var(--c-surface-2)); color: rgb(var(--c-fg-muted)); cursor: not-allowed;
+}
+.textarea { font-family: var(--font-mono); resize: vertical; }
+
+.label {
+  display: block; margin-bottom: 5px;
+  font-size: 12px; font-weight: 600; color: rgb(var(--c-fg-muted));
+}
+.hint { margin-top: 5px; font-size: 12px; color: rgb(var(--c-fg-muted)); }
+
+/* --------------------------------------------------------------- surface -- */
+.card {
+  background: rgb(var(--c-surface));
+  border: 1px solid rgb(var(--c-border));
+  border-radius: var(--radius-lg);
+}
+.card-pad { padding: 20px; }
+.card-head {
+  padding: 14px 20px;
+  border-bottom: 1px solid rgb(var(--c-border));
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- tables -- */
+.table { width: 100%; border-collapse: collapse; }
+.table th {
+  position: sticky; top: 0; z-index: 1;
+  padding: 9px 12px; text-align: left;
+  background: rgb(var(--c-surface-2));
+  border-bottom: 1px solid rgb(var(--c-border));
+  font-size: 12px; font-weight: 600; color: rgb(var(--c-fg-muted));
+  white-space: nowrap;
+}
+.table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid rgb(var(--c-border));
+  vertical-align: top;
+}
+.table tbody tr:hover { background: rgb(var(--c-surface-2) / .6); }
+
+/* Any wide table must scroll inside this, never the page body. */
+.table-scroll { overflow: auto; }
+
+/* --------------------------------------------------------------- badges --- */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 999px;
+  background: rgb(var(--c-surface-2));
+  color: rgb(var(--c-fg-muted));
+  font-size: 11px; font-weight: 600;
+  border: 1px solid rgb(var(--c-border));
+}
+.badge-success { background: rgb(var(--c-success) / .12); color: rgb(var(--c-success)); border-color: rgb(var(--c-success) / .3); }
+.badge-warning { background: rgb(var(--c-warning) / .12); color: rgb(var(--c-warning)); border-color: rgb(var(--c-warning) / .3); }
+.badge-danger  { background: rgb(var(--c-danger) / .12);  color: rgb(var(--c-danger));  border-color: rgb(var(--c-danger) / .3); }
+.badge-accent  { background: rgb(var(--c-accent) / .12);  color: rgb(var(--c-accent));  border-color: rgb(var(--c-accent) / .3); }
+
+/* --------------------------------------------------------------- alerts --- */
+/* Colour is never the only signal — each variant also carries a text label in
+   the template, so this reads correctly for colour-blind users too. */
+.alert {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 11px 14px; border-radius: var(--radius);
+  border: 1px solid rgb(var(--c-border));
+  background: rgb(var(--c-surface));
+  font-size: 13px;
+}
+.alert-success { border-color: rgb(var(--c-success) / .35); background: rgb(var(--c-success) / .08); color: rgb(var(--c-success)); }
+.alert-warning { border-color: rgb(var(--c-warning) / .35); background: rgb(var(--c-warning) / .08); color: rgb(var(--c-warning)); }
+.alert-danger  { border-color: rgb(var(--c-danger)  / .35); background: rgb(var(--c-danger)  / .08); color: rgb(var(--c-danger)); }
+
+/* ----------------------------------------------------------------- shell -- */
+.shell { display: flex; min-height: 100vh; }
+
+.sidebar {
+  position: fixed; inset: 0 auto 0 0; z-index: 40;
+  width: var(--sidebar-w);
+  display: flex; flex-direction: column;
+  background: rgb(var(--c-surface));
+  border-right: 1px solid rgb(var(--c-border));
+}
+
+.nav-link {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 14px; margin: 1px 8px;
+  border-radius: var(--radius);
+  color: rgb(var(--c-fg-muted));
+  text-decoration: none; font-weight: 500;
+}
+.nav-link:hover { background: rgb(var(--c-surface-2)); color: rgb(var(--c-fg)); }
+.nav-link[aria-current="page"] {
+  background: rgb(var(--c-accent) / .12);
+  color: rgb(var(--c-accent));
+  font-weight: 600;
+}
+.nav-section {
+  padding: 16px 14px 5px; margin: 0 8px;
+  font-size: 11px; font-weight: 600; letter-spacing: .05em;
+  text-transform: uppercase; color: rgb(var(--c-fg-subtle));
+}
+
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  height: var(--topbar-h); flex: none;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 0 20px;
+  background: rgb(var(--c-surface));
+  border-bottom: 1px solid rgb(var(--c-border));
+}
+
+.main {
+  flex: 1; min-width: 0;               /* min-width:0 or wide tables blow out the flex row */
+  margin-left: var(--sidebar-w);
+  display: flex; flex-direction: column;
+}
+.main-pad { padding: 24px 20px; }
+
+/* Below the sidebar breakpoint the nav collapses behind the topbar toggle. */
+@media (max-width: 900px) {
+  .sidebar { transform: translateX(-100%); transition: transform .18s; }
+  .sidebar[data-open="true"] { transform: none; box-shadow: 0 0 0 100vmax rgb(0 0 0 / .4); }
+  .main { margin-left: 0; }
+}
+@media (min-width: 901px) {
+  .sidebar-toggle { display: none; }
+}
+
+/* ------------------------------------------------------------------ misc -- */
+/* Alpine sets x-cloak on elements that must stay hidden until it boots.
+   Without this rule every modal flashes open on page load. */
+[x-cloak] { display: none !important; }
+
+/* The `hidden` attribute is only a UA rule (`display: none`), so ANY author
+   rule that sets display beats it — `.nav-link { display: flex }` silently
+   defeated `el.hidden = true` in the docs filter. Make the attribute win. */
+[hidden] { display: none !important; }
+
+.mono { font-family: var(--font-mono); font-size: 12.5px; }
+.muted { color: rgb(var(--c-fg-muted)); }
+.page-title { font-size: 18px; font-weight: 650; letter-spacing: -.01em; }
+
+.empty {
+  padding: 56px 20px; text-align: center;
+  color: rgb(var(--c-fg-muted));
+  border: 1px dashed rgb(var(--c-border-strong));
+  border-radius: var(--radius-lg);
+}
+
+/* Only for genuinely destructive controls — raw SQL, secret rotation. */
+.danger-zone {
+  border: 1px solid rgb(var(--c-danger) / .4);
+  border-radius: var(--radius-lg);
+  background: rgb(var(--c-danger) / .05);
+}
