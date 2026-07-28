@@ -114,7 +114,7 @@ def fetch_ai_metrics(dynamic_configs):
                 "alignment_period": {"seconds": 86400},
                 "per_series_aligner": monitoring_v3.Aggregation.Aligner.ALIGN_SUM,
                 "cross_series_reducer": monitoring_v3.Aggregation.Reducer.REDUCE_SUM,
-                "group_by_fields": ["metric.labels.type"],
+                "group_by_fields": ["metric.labels.type", "resource.labels.model_user_id"],
             })
 
             def safe_list(filter_str, agg=None):
@@ -136,6 +136,10 @@ def fetch_ai_metrics(dynamic_configs):
             )
             for ts in token_series:
                 token_type = ts.metric.labels.get("type", "")
+                model_id = ts.resource.labels.get("model_user_id", "unknown")
+                if not model_id or model_id == "":
+                    model_id = "unknown"
+
                 for pt in ts.points:
                     day_offset = int((end_secs - pt.interval.end_time.timestamp()) / 86400)
                     idx = 29 - day_offset
@@ -145,6 +149,10 @@ def fetch_ai_metrics(dynamic_configs):
                             result["input_by_day"][idx] += val
                         elif token_type == "output":
                             result["output_by_day"][idx] += val
+                        
+                        result["models"][model_id] = result["models"].get(model_id, 0) + val
+                        key = f"{model_id}_{token_type}"
+                        result[key] = result.get(key, 0) + val
 
             req_agg = monitoring_v3.Aggregation({
                 "alignment_period": {"seconds": 86400},
@@ -180,22 +188,7 @@ def fetch_ai_metrics(dynamic_configs):
                         result["models"]["vision-ocr-pages"] = result["models"].get("vision-ocr-pages", 0) + val
             # ------------------------------
 
-            model_agg = monitoring_v3.Aggregation({
-                "alignment_period": {"seconds": 30 * 86400},
-                "per_series_aligner": monitoring_v3.Aggregation.Aligner.ALIGN_SUM,
-                "cross_series_reducer": monitoring_v3.Aggregation.Reducer.REDUCE_SUM,
-                "group_by_fields": ["resource.labels.model_user_id"],
-            })
-            for ts in safe_list(
-                'metric.type="aiplatform.googleapis.com/publisher/online_serving/token_count"',
-                agg=model_agg
-            ):
-                model_id = ts.resource.labels.get("model_user_id", "unknown")
-                if not model_id or model_id == "":
-                    model_id = "unknown"
-                for pt in ts.points:
-                    val = int(pt.value.int64_value or pt.value.double_value or 0)
-                    result["models"][model_id] = result["models"].get(model_id, 0) + val
+            # Redundant model aggregation removed as it is now calculated above
 
         except Exception as e:
             logger.error(f"Error querying project: {e}")
@@ -223,7 +216,17 @@ def fetch_ai_metrics(dynamic_configs):
         total_req = sum(data["requests_by_day"])
         vision_pages = data["models"].get("vision-ocr-pages", 0)
         
-        cost = (total_in / 1_000_000) * PRICING["input"] + (total_out / 1_000_000) * PRICING["output"]
+        cost = 0
+        for model in data["models"].keys():
+            if model == "vision-ocr-pages":
+                continue
+            m_in = data.get(f"{model}_input", 0)
+            m_out = data.get(f"{model}_output", 0)
+            if "pro" in model.lower():
+                cost += (m_in / 1_000_000) * PRICING.get("pro_input", 1.25) + (m_out / 1_000_000) * PRICING.get("pro_output", 3.75)
+            else:
+                cost += (m_in / 1_000_000) * PRICING.get("input", 0.075) + (m_out / 1_000_000) * PRICING.get("output", 0.30)
+        
         cost += (vision_pages / 1000) * 1.50  # Vision OCR Document Text Detection is ~$1.50 per 1000 pages
 
         projects_data.append({

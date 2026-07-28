@@ -1,11 +1,24 @@
 # bifrost/backoffice/user_routes.py
 from flask import request, redirect, url_for, flash
 from bson import ObjectId
-from . import backoffice_bp, get_db, login_required, get_current_role_in_app
+from . import backoffice_bp, get_db, login_required, requires, get_current_role_in_app
 from ..services.email_service import send_invite_email
 
+# Who may hand out which role. Console staff roles (content_manager, operations)
+# rank between paying users and admins: they can be created by an admin, and an
+# admin can still manage them.
+ROLE_RANKS = {
+    'guest': 0, 'user': 0, 'premium_user': 0,
+    'content_manager': 1, 'operations': 1, 'billing_agent': 1,
+    'admin': 2, 'super_admin': 3, 'owner': 4, 'heimdall': 5,
+}
+ASSIGNABLE_BY_ADMIN = ['content_manager', 'operations', 'billing_agent',
+                       'premium_user', 'user', 'guest']
+ASSIGNABLE_BY_SUPER_ADMIN = ['admin'] + ASSIGNABLE_BY_ADMIN
+
+
 @backoffice_bp.route('/app/<app_id>/add', methods=['POST'])
-@login_required
+@requires("manage:users")
 def add_user_to_app(app_id):
     db = get_db()
     target_role = request.form.get('role')
@@ -16,9 +29,9 @@ def add_user_to_app(app_id):
     allowed = False
     if my_role == 'heimdall' or my_role == 'owner':
         allowed = True
-    elif my_role == 'super_admin' and target_role in ['admin', 'premium_user', 'user', 'guest']:
+    elif my_role == 'super_admin' and target_role in ASSIGNABLE_BY_SUPER_ADMIN:
         allowed = True
-    elif my_role == 'admin' and target_role in ['premium_user', 'user', 'guest']:
+    elif my_role == 'admin' and target_role in ASSIGNABLE_BY_ADMIN:
         allowed = True
 
     if not allowed:
@@ -46,7 +59,7 @@ def add_user_to_app(app_id):
 
 
 @backoffice_bp.route('/app/<app_id>/user/<user_id>/update', methods=['POST'])
-@login_required
+@requires("manage:users")
 def update_user_role(app_id, user_id):
     db = get_db()
     action = request.form.get('action')
@@ -54,7 +67,7 @@ def update_user_role(app_id, user_id):
     my_role = get_current_role_in_app(app_id)
     target_role_current = db.get_user_role_for_app(user_id, app_id)
 
-    ranks = {'guest': 0, 'user': 0, 'premium_user': 0, 'admin': 1, 'super_admin': 2, 'owner': 3, 'heimdall': 4}
+    ranks = ROLE_RANKS
     my_rank = ranks.get(my_role, 0)
     target_rank = ranks.get(target_role_current, 0)
 

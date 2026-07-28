@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -49,7 +50,19 @@ class Config:
     TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN')
     TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER')
 
+    # --- ADMIN SESSION POLICY (SOW 4.6) ---
+    # Console sessions are deliberately shorter-lived than end-user sessions.
+    # Idle timeout and max length are enforced in bifrost/backoffice/__init__.py.
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=8)
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'true').lower() != 'false'
+
     # --- PLATFORM DATA LOCKS (CMS) ---
+    # Platform-level floor only. A tenant may lock MORE tables via
+    # `platform_locked_tables` on its app document; see locked_tables_for() in
+    # backoffice/tenant_routes.py. The two are unioned, never overridden, so nothing
+    # here can be unlocked by config.
     PLATFORM_LOCKED_TABLES = {
         'finance-bot': ['transactions', 'user_balances', 'ledger', 'bank_accounts'],
         'savvify': ['transactions', 'user_balances', 'ledger', 'bank_accounts']
