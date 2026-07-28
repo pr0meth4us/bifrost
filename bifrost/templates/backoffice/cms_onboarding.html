@@ -107,9 +107,6 @@
 </header>
 <!-- Main Content Card -->
 <section class="glass-panel rounded-xl shadow-2xl flex flex-col w-full overflow-hidden">
-<form method="POST" action="{{ url_for('backoffice.cms_onboarding', app_id=app._id) }}">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-<input type="hidden" name="cms_config_json" value="{{ smart_config | tojson | forceescape }}">
 <!-- Card Header -->
 <div class="px-8 py-6 border-b border-outline-variant/10">
 <h2 class="font-headline-sm text-headline-sm text-on-surface mb-2">Review Smart Detection</h2>
@@ -117,7 +114,7 @@
 </div>
 
 {% if all_tables|length == 0 %}
-<!-- Zero-Tables Starter Template Panel -->
+<!-- Zero-Tables Starter Template Panel (Standalone Forms) -->
 <div class="p-8 space-y-6 bg-surface-container-lowest/70 border-b border-outline-variant/10 text-center">
     <div class="w-14 h-14 rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center justify-center mx-auto">
         <span class="material-symbols-outlined text-3xl">database</span>
@@ -143,7 +140,7 @@
                     Creates standard tables: <code class="text-primary font-mono font-semibold">questions</code>, <code class="text-primary font-mono font-semibold">choices</code>, <code class="text-primary font-mono font-semibold">tracks</code>, <code class="text-primary font-mono font-semibold">users</code>, <code class="text-primary font-mono font-semibold">payments</code>, and <code class="text-primary font-mono font-semibold">entitlements</code>.
                 </p>
             </div>
-            <button type="submit" class="w-full py-2.5 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary font-bold text-xs border border-primary/30 transition-all flex items-center justify-center gap-2 shadow-md">
+            <button type="submit" class="w-full py-2.5 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary font-bold text-xs border border-primary/30 transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer">
                 <span class="material-symbols-outlined text-sm">rocket_launch</span>
                 Apply Exam Prep Schema
             </button>
@@ -161,7 +158,7 @@
                     Creates standard tables: <code class="text-primary font-mono font-semibold">customers</code>, <code class="text-primary font-mono font-semibold">products</code>, <code class="text-primary font-mono font-semibold">orders</code>, <code class="text-primary font-mono font-semibold">payments</code>, and <code class="text-primary font-mono font-semibold">access_grants</code>.
                 </p>
             </div>
-            <button type="submit" class="w-full py-2.5 rounded-lg bg-surface-variant hover:bg-surface-container-high text-on-surface font-bold text-xs border border-outline-variant/30 transition-all flex items-center justify-center gap-2 shadow-md">
+            <button type="submit" class="w-full py-2.5 rounded-lg bg-surface-variant hover:bg-surface-container-high text-on-surface font-bold text-xs border border-outline-variant/30 transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer">
                 <span class="material-symbols-outlined text-sm">add_box</span>
                 Apply Commerce Schema
             </button>
@@ -169,6 +166,11 @@
     </div>
 </div>
 {% endif %}
+
+<form method="POST" action="{{ url_for('backoffice.cms_onboarding', app_id=app._id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+<input type="hidden" name="cms_config_json" value="{{ smart_config | tojson | forceescape }}">
+
 
 <!-- Table List -->
 <div class="flex flex-col bg-surface-container-lowest/50 max-h-[400px] overflow-y-auto p-4 gap-2">
