@@ -803,7 +803,143 @@ def cms_onboarding(app_id):
         current_role=current_role
     )
 
+@backoffice_bp.route('/app/<app_id>/cms/bootstrap-schema', methods=['POST'])
+@login_required
+def bootstrap_schema(app_id):
+    db = get_db()
+    if not check_permission(app_id, "write:config"):
+        flash("Unauthorized.", "danger")
+        return redirect(url_for('backoffice.dashboard'))
+
+    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
+    if not app:
+        flash("Application not found.", "danger")
+        return redirect(url_for('backoffice.dashboard'))
+
+    db_conn_str = get_tenant_db_conn_str(app)
+    if not db_conn_str:
+        flash("Tenant DB connection not configured.", "warning")
+        return redirect(url_for('backoffice.view_app', app_id=app_id))
+
+    template_type = request.form.get('template', 'exam_prep')
+
+    EXAM_PREP_DDL = """
+    CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        display_name VARCHAR(255),
+        role VARCHAR(50) DEFAULT 'user',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS tracks (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        grade_level VARCHAR(50),
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS questions (
+        id SERIAL PRIMARY KEY,
+        track_id INTEGER REFERENCES tracks(id),
+        question_text TEXT NOT NULL,
+        explanation_km TEXT,
+        explanation_en TEXT,
+        source_ref VARCHAR(255),
+        status VARCHAR(50) DEFAULT 'draft',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS choices (
+        id SERIAL PRIMARY KEY,
+        question_id INTEGER REFERENCES questions(id) ON DELETE CASCADE,
+        choice_text TEXT NOT NULL,
+        is_correct BOOLEAN DEFAULT FALSE,
+        explanation_km TEXT,
+        explanation_en TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS payments (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        amount NUMERIC(10,2) NOT NULL,
+        txn_ref VARCHAR(255) UNIQUE,
+        receipt_url TEXT,
+        status VARCHAR(50) DEFAULT 'pending',
+        rejection_reason VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS entitlements (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        exam_track_id INTEGER REFERENCES tracks(id),
+        status VARCHAR(50) DEFAULT 'active',
+        expires_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """
+
+    ECOMMERCE_DDL = """
+    CREATE TABLE IF NOT EXISTS customers (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        name VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS products (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        price NUMERIC(10,2) NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE
+    );
+
+    CREATE TABLE IF NOT EXISTS orders (
+        id SERIAL PRIMARY KEY,
+        customer_id INTEGER REFERENCES customers(id),
+        total NUMERIC(10,2) NOT NULL,
+        state VARCHAR(50) DEFAULT 'awaiting_review',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS payments (
+        id SERIAL PRIMARY KEY,
+        order_id INTEGER REFERENCES orders(id),
+        amount NUMERIC(10,2) NOT NULL,
+        txn_ref VARCHAR(255) UNIQUE,
+        status VARCHAR(50) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS access_grants (
+        id SERIAL PRIMARY KEY,
+        customer_id INTEGER REFERENCES customers(id),
+        plan_id VARCHAR(255),
+        status VARCHAR(50) DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """
+
+    ddl_to_run = EXAM_PREP_DDL if template_type == 'exam_prep' else ECOMMERCE_DDL
+
+    try:
+        from ..utils.tenant_db import get_tenant_db
+        with get_tenant_db(db_conn_str) as conn:
+            with conn.cursor() as cur:
+                cur.execute(ddl_to_run)
+            conn.commit()
+        flash("✨ Database tables created successfully!", "success")
+    except Exception as e:
+        flash(f"Error creating database schema: {e}", "danger")
+
+    return redirect(url_for('backoffice.cms_onboarding', app_id=app_id))
+
+
 @backoffice_bp.route('/app/<app_id>/cms/rbac', methods=['GET', 'POST'])
+
 @login_required
 def cms_rbac(app_id):
     db = get_db()
