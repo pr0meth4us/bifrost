@@ -19,6 +19,7 @@ operator runbook in `docs/console-onboarding.md`.
 - `assert`-based SQL identifier guards replaced with `safe_ident()` raising `ValueError` (asserts vanish under `python -O`).
 
 ### Added
+- **Prolong Application Bootstrap Script (`scripts/bootstrap_prolong.py`)**: Created automated script to register Ministry Exam Prep (`ministry_exam_prep`) in Bifrost Control Plane MongoDB, configure default `cms_config.payment_queue` schemas, and generate `bifrost_bootstrap.json` credentials for client adoption.
 - **Unified Claude Artifact-styled Documentation Portal (`/docs`)**: Redesigned `bifrost/templates/docs.html` into a single, sectionized, external-facing documentation hub styled with Claude Artifact aesthetics (dark mode, glassmorphism panels, `Plus Jakarta Sans` typography, and JetBrains Mono code blocks). Covers Part I: Getting Started & SDK, Part II: Secrets Vault & Services API, Part III: Webhook HMAC Signatures, Part IV: 3-Step CMS Onboarding Wizard, and Part V: Console Operator's Manual & Money Path rules.
 - **Payment state machine** enforced server-side: `FREE → PENDING → PREMIUM | REJECTED`, `PREMIUM → REFUNDED`, with `SELECT … FOR UPDATE`, mandatory reason codes, and actor/timestamp/reason on every transition.
 - **Duplicate `txn_ref` rejection** inside the approving transaction, surfacing the earlier payment; duplicate-receipt detection by checksum (or URL where the column is absent).
