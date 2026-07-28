@@ -1,0 +1,116 @@
+{# Raw JSON editor for the CMS config, shared by cms_config.html and
+   cms_onboarding.html. It shipped as two copies that had already begun to
+   drift — the validator only existed in one of them.
+
+   The caller provides a hidden <input name="cms_config_json"> somewhere on the
+   page; this reads from and writes back to that field. #}
+<div id="jsonModal" class="fixed inset-0 z-50 hidden items-center justify-center p-5 bg-black/60"
+     role="dialog" aria-modal="true" aria-labelledby="jsonModalTitle">
+  <div class="card w-full max-w-3xl max-h-[85vh] flex flex-col">
+    <div class="card-head flex items-center justify-between">
+      <span id="jsonModalTitle">Raw configuration JSON</span>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="closeJsonModal()"
+              aria-label="Close">✕</button>
+    </div>
+
+    <div class="card-pad flex-1 min-h-0 flex flex-col gap-2">
+      <label class="sr-only" for="jsonEditorArea">Configuration JSON</label>
+      <textarea id="jsonEditorArea" class="textarea flex-1 min-h-[360px]" spellcheck="false"
+                oninput="validateJsonInput()" aria-describedby="jsonStatus"></textarea>
+      <p id="jsonStatus" class="hint" role="status" aria-live="polite"></p>
+    </div>
+
+    <div class="card-pad border-t border-border flex flex-wrap gap-2 justify-between">
+      <button type="button" class="btn" onclick="copyJsonText()">Copy</button>
+      <span class="flex gap-2">
+        <button type="button" class="btn" onclick="closeJsonModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="applyAndSubmitJson()">Apply</button>
+      </span>
+    </div>
+  </div>
+</div>
+
+<script>
+function jsonConfigInput() {
+  return document.querySelector('input[name="cms_config_json"]');
+}
+
+function openJsonModal() {
+  const raw = jsonConfigInput();
+  const area = document.getElementById('jsonEditorArea');
+  try {
+    area.value = JSON.stringify(JSON.parse(raw.value || '{}'), null, 2);
+  } catch (e) {
+    area.value = raw.value;   // keep malformed text so it can be repaired
+  }
+  const modal = document.getElementById('jsonModal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  validateJsonInput();
+  area.focus();
+}
+
+function closeJsonModal() {
+  const modal = document.getElementById('jsonModal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeJsonModal();
+});
+
+// Catches the two mistakes people actually make, on top of plain syntax:
+// the pre-rename `widget` key, and `type: "toggle"` instead of `"boolean"`.
+// Both parse fine as JSON and then silently do nothing at render time.
+function validateJsonInput() {
+  const status = document.getElementById('jsonStatus');
+  try {
+    const parsed = JSON.parse(document.getElementById('jsonEditorArea').value);
+
+    for (const [group, tables] of Object.entries(parsed.table_groups || {})) {
+      if (!Array.isArray(tables)) {
+        throw new Error(`table_groups["${group}"] must be an array, e.g. {"Content": ["questions"]}`);
+      }
+    }
+
+    for (const [table, config] of Object.entries(parsed.tables || {})) {
+      for (const [column, columnConfig] of Object.entries(config.columns || {})) {
+        if ('widget' in columnConfig) {
+          throw new Error(`tables.${table}.columns.${column} uses "widget" — use "type" instead.`);
+        }
+        if (columnConfig.type === 'toggle') {
+          throw new Error(`tables.${table}.columns.${column} uses type "toggle" — use "boolean" instead.`);
+        }
+      }
+    }
+
+    status.textContent = 'Valid configuration.';
+    status.className = 'hint text-success';
+    return true;
+  } catch (e) {
+    status.textContent = e.message;
+    status.className = 'hint text-danger';
+    return false;
+  }
+}
+
+async function copyJsonText() {
+  const status = document.getElementById('jsonStatus');
+  try {
+    await navigator.clipboard.writeText(document.getElementById('jsonEditorArea').value);
+    status.textContent = 'Copied to clipboard.';
+    status.className = 'hint text-success';
+  } catch (e) {
+    status.textContent = 'Could not copy — select the text and copy manually.';
+    status.className = 'hint text-danger';
+  }
+}
+
+function applyAndSubmitJson() {
+  if (!validateJsonInput()) return;   // the inline status already says why
+  jsonConfigInput().value = document.getElementById('jsonEditorArea').value;
+  closeJsonModal();
+  document.dispatchEvent(new CustomEvent('json-config-applied'));
+}
+</script>

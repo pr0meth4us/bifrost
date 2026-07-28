@@ -51,20 +51,31 @@ def resolve_app_doc(db, app_id_or_slug=None):
     return None
 
 def get_current_role_in_app(app_id_or_slug):
-    """Returns: owner, super_admin, admin, or None/heimdall/pr0meth4us"""
+    """Returns: owner, super_admin, admin, developer, or None/heimdall/pr0meth4us
+
+    Memoised per request. check_permission() calls this on every single check and
+    the sidebar now asks about half a dozen permissions per render, so without the
+    cache one page load would cost a Mongo round-trip per menu item.
+    """
     if session.get('is_heimdall'):
         return 'heimdall'
     if session.get('is_pr0meth4us'):
         return 'pr0meth4us'
 
-    db = get_db()
     user_id = session.get('backoffice_user')
     if not user_id: return None
 
-    app = resolve_app_doc(db, app_id_or_slug)
-    if not app: return None
+    from flask import g
+    cache = g.setdefault('_role_cache', {})
+    key = str(app_id_or_slug)
+    if key in cache:
+        return cache[key]
 
-    return db.get_user_role_for_app(user_id, str(app['_id']))
+    db = get_db()
+    app = resolve_app_doc(db, app_id_or_slug)
+    role = db.get_user_role_for_app(user_id, str(app['_id'])) if app else None
+    cache[key] = role
+    return role
 
 
 
@@ -102,13 +113,23 @@ ROLE_PERMISSIONS = {
     "billing_agent": {
         "read:config", "audit:view",
     } | _PAYMENTS | _SUPPORT,
+    # Developer: raw SQL against the tenant database, and nothing else. Deliberately
+    # NOT a superset of admin — a developer running migrations has no business
+    # approving payments or reading secrets, and an owner should be able to hand
+    # this out to a contractor without also handing over the money path.
+    # db:execute is the most dangerous permission in the system (DROP TABLE is one
+    # keystroke), so it is never bundled into another role — it must be assigned.
+    "developer": {
+        "read:config", "audit:view", "db:execute",
+    } | _CONTENT,
     "member": {"read:config"},
     "user": {"read:config"},
     "viewer": {"read:config"},
 }
 
 # Roles that may sign in to the console at all.
-CONSOLE_ROLES = ("owner", "super_admin", "admin", "content_manager", "operations", "billing_agent")
+CONSOLE_ROLES = ("owner", "super_admin", "admin", "content_manager", "operations",
+                 "billing_agent", "developer")
 
 def check_permission(app_id, permission_or_level):
     """
@@ -201,4 +222,21 @@ def heimdall_required(f):
             return redirect(url_for('backoffice.dashboard'))
         return f(*args, **kwargs)
     return decorated_function
-from . import auth_routes, app_routes, heimdall_routes, user_routes, tenant_routes
+@backoffice_bp.app_context_processor
+def _inject_rbac():
+    """Gives the shared sidebar the real permission matrix instead of a duplicate.
+
+    `can()` is check_permission() — so a menu that drifts from what the routes
+    actually allow is impossible. Still cosmetic: the routes do the enforcing.
+    """
+    def can(app_id, permission):
+        try:
+            return check_permission(app_id, permission)
+        except Exception:
+            return False
+
+    return {"can": can}
+
+
+from . import (auth_routes, app_routes, heimdall_routes, user_routes, tenant_routes,
+               devtools_routes)

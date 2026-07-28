@@ -1,583 +1,320 @@
+{# Public documentation. Uses the same tokens as the console via
+   backoffice/_head.html — the head partial is the design system's head, not a
+   console-only file, so a reader moving between docs and console sees one
+   product rather than two.
+
+   Deliberately no highlight.js: it was two CDN requests for a stylesheet that
+   only worked on a dark background, and these blocks are short enough to read
+   in plain mono. Add it back only if the code samples grow a lot longer. #}
 <!DOCTYPE html>
-<html class="dark" lang="en">
+<html lang="en">
 <head>
-    <meta charset="utf-8"/>
-    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <title>Bifrost Documentation — API Reference &amp; Operator's Manual</title>
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+{% include 'backoffice/_head.html' %}
+<title>Bifrost documentation · API reference and operator's manual</title>
+<style>
+  .docs { display: grid; grid-template-columns: 280px minmax(0, 1fr); align-items: start; }
+  @media (max-width: 1000px) { .docs { grid-template-columns: minmax(0, 1fr); } }
 
-    <!-- Google Fonts & Icons -->
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  .toc {
+    position: sticky; top: 0; align-self: start;
+    height: 100vh; overflow-y: auto;
+    border-right: 1px solid rgb(var(--c-border));
+    background: rgb(var(--c-surface));
+    padding-bottom: 32px;
+  }
+  @media (max-width: 1000px) { .toc { position: static; height: auto; border-right: 0;
+                                      border-bottom: 1px solid rgb(var(--c-border)); } }
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
-    <script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        "primary": "#c0c1ff",
-                        "on-primary": "#1000a9",
-                        "primary-container": "#3233c8",
-                        "brand": "#c6613f",
-                        "brand-hover": "#e06c48",
-                        "background": "#0b0c10",
-                        "surface": "#12141c",
-                        "surface-container": "#181a24",
-                        "surface-container-high": "#222533",
-                        "surface-variant": "#2b2e3e",
-                        "on-background": "#f0f2f8",
-                        "on-surface": "#e6e8f0",
-                        "on-surface-variant": "#a2a6be",
-                        "outline": "#4a4e66",
-                        "outline-variant": "#2a2d3d",
-                        "border-subtle": "rgba(255, 255, 255, 0.12)",
-                        "success": "#62d294",
-                        "warning": "#ffb783",
-                        "danger": "#ff8e8e"
-                    },
-                    fontFamily: {
-                        sans: ['Plus Jakarta Sans', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'Menlo', 'Monaco', 'monospace']
-                    }
-                }
-            }
-        }
-    </script>
+  .doc-body { padding: 32px 28px 96px; max-width: 860px; }
+  .doc-section { scroll-margin-top: 24px; padding-top: 40px; }
+  .doc-section + .doc-section { border-top: 1px solid rgb(var(--c-border)); }
 
-    <!-- Syntax Highlighting -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <script>document.addEventListener('DOMContentLoaded', () => { hljs.highlightAll(); });</script>
+  .doc-body h2 { font-size: 24px; font-weight: 650; letter-spacing: -.02em; margin-bottom: 6px; }
+  .doc-body h3 {
+    font-size: 17px; font-weight: 620; margin: 32px 0 8px;
+    scroll-margin-top: 24px;
+  }
+  .doc-body p { margin-bottom: 12px; color: rgb(var(--c-fg-muted)); }
+  .doc-body p strong, .doc-body li strong { color: rgb(var(--c-fg)); font-weight: 600; }
+  .doc-body ul { margin: 0 0 12px 18px; color: rgb(var(--c-fg-muted)); }
+  .doc-body li { margin-bottom: 5px; list-style: disc; }
 
-    <style>
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background-color: #0b0c10;
-            color: #f0f2f8;
-            font-size: 0.95rem; /* 15.2px readable font size */
-            line-height: 1.7;
-            scroll-behavior: smooth;
-        }
+  .doc-body code {
+    font-family: var(--font-mono); font-size: .9em;
+    padding: 1px 5px; border-radius: 4px;
+    background: rgb(var(--c-surface-2)); color: rgb(var(--c-fg));
+  }
+  .doc-body pre {
+    font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6;
+    padding: 14px 16px; margin-bottom: 14px;
+    border: 1px solid rgb(var(--c-border)); border-radius: var(--radius);
+    background: rgb(var(--c-surface-2));
+    overflow-x: auto;                     /* code scrolls, the page never does */
+  }
+  .doc-body pre code { background: none; padding: 0; }
 
-        /* High Contrast Glassmorphism Claude Artifact Styling */
-        .glass-panel {
-            background-color: rgba(22, 24, 33, 0.85);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 14px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-        }
-        
-        .glass-panel-subtle {
-            background-color: rgba(26, 29, 40, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
-        }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0b0c10;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #2b2e3e;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #4a4e66;
-        }
-
-        /* Code Blocks */
-        pre code.hljs {
-            background: #12141c !important;
-            padding: 1.25rem !important;
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.9rem;
-            line-height: 1.6;
-        }
-
-        /* Table Styling */
-        .doc-table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            border-radius: 10px;
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .doc-table th {
-            background-color: rgba(34, 37, 51, 0.9);
-            color: #c0c1ff;
-            font-weight: 700;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            padding: 14px 18px;
-            text-align: left;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .doc-table td {
-            padding: 14px 18px;
-            font-size: 0.9rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-            background-color: rgba(18, 20, 28, 0.4);
-        }
-        .doc-table tr:last-child td {
-            border-bottom: none;
-        }
-        .doc-table tr:hover td {
-            background-color: rgba(255, 255, 255, 0.04);
-        }
-
-        /* Method Badges */
-        .badge-get { background: rgba(98, 210, 148, 0.2); color: #62d294; border: 1px solid rgba(98, 210, 148, 0.4); font-weight: 700; }
-        .badge-post { background: rgba(192, 193, 255, 0.2); color: #c0c1ff; border: 1px solid rgba(192, 193, 255, 0.4); font-weight: 700; }
-        .badge-put { background: rgba(255, 183, 131, 0.2); color: #ffb783; border: 1px solid rgba(255, 183, 131, 0.4); font-weight: 700; }
-        .badge-delete { background: rgba(255, 142, 142, 0.2); color: #ff8e8e; border: 1px solid rgba(255, 142, 142, 0.4); font-weight: 700; }
-
-        /* Smooth TOC Highlight */
-        .toc-item.active {
-            color: #c0c1ff;
-            background-color: rgba(192, 193, 255, 0.12);
-            border-left: 3px solid #c0c1ff;
-            font-weight: 700;
-        }
-    </style>
+  .part-label {
+    font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: rgb(var(--c-accent));
+  }
+  .endpoint {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 9px 12px; margin-bottom: 10px;
+    border: 1px solid rgb(var(--c-border)); border-radius: var(--radius);
+    background: rgb(var(--c-surface));
+  }
+  .method {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+    padding: 2px 7px; border-radius: 4px;
+    background: rgb(var(--c-accent) / .14); color: rgb(var(--c-accent));
+  }
+</style>
 </head>
-<body class="min-h-screen flex flex-col text-on-background selection:bg-primary/30">
 
-    <!-- Top Navigation Header -->
-    <header class="sticky top-0 z-50 bg-background/90 backdrop-blur-md border-b border-border-subtle px-6 py-4 flex items-center justify-between">
-        <div class="flex items-center gap-4">
-            <a href="/" class="flex items-center gap-3 group">
-                <div class="w-10 h-10 rounded-xl bg-brand/20 border border-brand/40 flex items-center justify-center text-brand group-hover:scale-105 transition-transform shadow-md">
-                    <!-- SVG Hub Icon Fallback -->
-                    <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3c0 .35.06.69.17 1L5.59 9.59A3.001 3.001 0 0 0 2 12a3 3 0 0 0 3 3c.69 0 1.33-.23 1.84-.63l3.75 3.75c-.11.31-.17.65-.17 1a3 3 0 0 0 6 0c0-.35-.06-.69-.17-1l3.75-3.75c.51.4 1.15.63 1.84.63a3 3 0 0 0 3-3 3 3 0 0 0-3-3c-.69 0-1.33.23-1.84.63L14.83 6.17c.11-.31.17-.65.17-1a3 3 0 0 0-3-3zm0 2a1 1 0 0 1 1 1 1 1 0 0 1-1 1 1 1 0 0 1-1-1 1 1 1 0 0 1 1-1zM5 11a1 1 0 0 1 1 1 1 1 0 0 1-1 1 1 1 0 0 1-1-1 1 1 0 0 1 1-1zm14 0a1 1 0 0 1 1 1 1 1 0 0 1-1 1 1 1 0 0 1-1-1 1 1 0 0 1 1-1zm-7 7a1 1 0 0 1 1 1 1 1 0 0 1-1 1 1 1 0 0 1-1-1 1 1 0 0 1 1-1z"/></svg>
-                </div>
-                <div class="flex flex-col">
-                    <span class="font-extrabold text-lg tracking-tight text-on-background">Bifrost Control Plane</span>
-                    <span class="text-xs text-on-surface-variant font-medium">External Developer &amp; Operator Portal</span>
-                </div>
-            </a>
-            <span class="text-border-subtle">|</span>
-            <span class="px-3 py-1 rounded-full text-xs font-mono bg-primary/15 text-primary border border-primary/30 font-semibold">v{{ version if version else '1.0.0' }}</span>
-            <span class="px-3 py-1 rounded-full text-xs font-sans bg-surface-variant/60 text-on-surface-variant border border-outline-variant/40 hidden md:inline-block">Edition 1.0 — 2026-07-28 Release</span>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<div class="docs">
+
+  <nav class="toc" aria-label="Table of contents">
+    <div class="flex items-center gap-2.5 px-4 h-[--topbar-h] border-b border-border">
+      <div class="w-7 h-7 rounded bg-accent text-accent-fg grid place-items-center font-bold shrink-0"
+           aria-hidden="true">V</div>
+      <div class="min-w-0">
+        <div class="font-semibold leading-tight">Bifrost docs</div>
+        <div class="text-[11px] muted leading-tight">
+          {% if version %}v{{ version }}{% if date %} · {{ date }}{% endif %}{% else %}Reference manual{% endif %}
         </div>
-        <div class="flex items-center gap-4">
-            <div class="relative hidden sm:block">
-                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-base">search</span>
-                <input id="docSearch" type="text" placeholder="Search documentation..." class="bg-surface-container border border-outline-variant/50 rounded-xl pl-10 pr-4 py-2 text-sm w-72 text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary/60 transition-colors" onkeyup="filterDocs()"/>
-            </div>
-            <a href="{{ url_for('changelog_page') }}" class="text-xs md:text-sm font-semibold text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-surface-variant/40">
-                <span class="material-symbols-outlined text-base">history</span> Changelog
-            </a>
-            <a href="{{ url_for('backoffice.login') }}" class="px-4 py-2 rounded-xl bg-brand hover:bg-brand-hover text-white text-xs md:text-sm font-bold transition-all flex items-center gap-2 shadow-lg shadow-brand/20">
-                <span class="material-symbols-outlined text-base">login</span> Console Login
-            </a>
-        </div>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm ml-auto" onclick="toggleTheme()"
+              aria-label="Switch between light and dark theme">
+        <span aria-hidden="true">◐</span>
+      </button>
+    </div>
+
+    <div class="p-3">
+      <label class="sr-only" for="docSearch">Search documentation</label>
+      <input class="input" id="docSearch" type="search" placeholder="Filter sections"
+             oninput="filterDocs()">
+    </div>
+
+    <div id="tocLinks">
+      {% set toc = [
+        ('Part I · Getting started', [
+          ('part1-overview',  '01 Platform architecture'),
+          ('part1-sdk',       '02 Python SDK and injection'),
+          ('part1-config',    '03 Direct HTTP config endpoint'),
+          ('part1-services',  '04 Service segmentation'),
+        ]),
+        ('Part II · Vault and auth', [
+          ('part2-vault',     '05 Secrets vault'),
+          ('part2-otp',       '06 Phone and email OTP'),
+          ('part2-sso',       '07 Hosted SSO and reset'),
+          ('part2-roles',     '08 Accounts and roles API'),
+        ]),
+        ('Part III · Webhooks', [
+          ('part3-architecture', '09 Dispatch system'),
+          ('part3-signature',    '10 HMAC-SHA256 verification'),
+          ('part3-payloads',     '11 Event payloads'),
+        ]),
+        ('Part IV · Data plane', [
+          ('part4-proxy',   '12 Database proxy'),
+          ('part4-wizard',  '13 Setup wizard'),
+          ('part4-schema',  '14 Queue schema mapping'),
+        ]),
+        ('Part V · Operator manual', [
+          ('part5-rbac',         '15 Roles and permissions'),
+          ('part5-queue',        '16 Payment queue and SLA'),
+          ('part5-statemachine', '17 Approval state machine'),
+          ('part5-publish',      '18 Publish quality gate'),
+          ('part5-audit',        '19 Audit trail'),
+          ('part5-safeguards',   '20 Core guarantees'),
+        ]),
+        ('Part VI · SQL Studio', [
+          ('part6-studio',    '21 Running raw SQL'),
+          ('part6-developer', '22 The developer role'),
+          ('part6-safety',    '23 What protects you'),
+        ]),
+      ] %}
+      {% for group, items in toc %}
+        <div class="nav-section toc-group">{{ group }}</div>
+        {% for anchor, label in items %}
+          <a class="nav-link toc-link" href="#{{ anchor }}" data-target="{{ anchor }}">{{ label }}</a>
+        {% endfor %}
+      {% endfor %}
+    </div>
+  </nav>
+
+  <main id="main" class="doc-body">
+
+    <header class="mb-8">
+      <div class="part-label">Client and staff reference</div>
+      <h1 class="text-3xl font-bold tracking-tight mt-1 mb-3">
+        Bifrost identity, secrets and control plane
+      </h1>
+      <p>
+        Bifrost is a central control plane for application registration, credentials,
+        a secrets vault and identity — while proxying administrative operations live
+        to independent tenant databases. This manual covers onboarding, the SDK,
+        API endpoints, webhook verification and the console operator's manual.
+      </p>
     </header>
 
-    <!-- Main Container with Sidebar + Content -->
-    <div class="flex-1 flex w-full max-w-[1650px] mx-auto">
+    <!-- ================================================== Part I -->
+    <section class="doc-section" id="part1-overview">
+      <div class="part-label">Part I</div>
+      <h2>Getting started and app bootstrapping</h2>
 
-        <!-- Left Sidebar Table of Contents -->
-        <aside class="w-80 shrink-0 border-r border-border-subtle hidden lg:block sticky top-[73px] h-[calc(100vh-73px)] overflow-y-auto p-5 space-y-6 bg-surface/30">
-            <div class="text-xs font-bold text-on-surface-variant uppercase tracking-widest px-3">Documentation Index</div>
-            
-            <nav class="space-y-5 text-sm font-medium">
-                <!-- Part I -->
-                <div>
-                    <div class="px-3 py-1 font-bold text-primary uppercase text-xs tracking-wider">Part I · Getting Started</div>
-                    <ul class="mt-1.5 space-y-1">
-                        <li><a href="#part1-overview" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">01 Platform Overview</a></li>
-                        <li><a href="#part1-sdk" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">02 Python SDK &amp; Injection</a></li>
-                        <li><a href="#part1-config" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">03 Direct HTTP Config Endpoint</a></li>
-                        <li><a href="#part1-services" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">04 Service Segmentation</a></li>
-                    </ul>
-                </div>
+      <h3>01 · Platform architecture</h3>
+      <p>
+        Bifrost separates the <strong>control plane</strong> — MongoDB, holding application
+        secrets, webhook tokens, domain mappings and staff roles — from the
+        <strong>tenant data plane</strong>, independent PostgreSQL or Supabase databases
+        holding end-user records, transactions and content. The console stores no
+        customer data of its own.
+      </p>
+<pre><code>+-----------------------------------+
+|      Bifrost control plane        |
+|  - App registry (client IDs)      |
+|  - Webhook secrets (HMAC keys)    |
+|  - Vault secrets (encrypted)      |
+|  - MongoDB (central storage)      |
++-----------------+-----------------+
+                  |
+                  |  proxies writes live
+                  v
++-----------------------------------+
+|        Tenant data plane          |
+|  - PostgreSQL / Supabase tables   |
+|  - users, payments, entitlements  |
++-----------------------------------+</code></pre>
 
-                <!-- Part II -->
-                <div>
-                    <div class="px-3 py-1 font-bold text-primary uppercase text-xs tracking-wider">Part II · Secrets &amp; Services API</div>
-                    <ul class="mt-1.5 space-y-1">
-                        <li><a href="#part2-vault" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">05 Secrets Vault Endpoint</a></li>
-                        <li><a href="#part2-otp" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">06 Phone &amp; Email OTP Verification</a></li>
-                        <li><a href="#part2-sso" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">07 Hosted SSO &amp; Password Reset</a></li>
-                        <li><a href="#part2-roles" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">08 Account Management &amp; Roles</a></li>
-                    </ul>
-                </div>
+      <h3 id="part1-sdk">02 · Python SDK and environment injection</h3>
+      <p>
+        Python clients use the <code>bifrost_client</code> SDK to bootstrap secrets into
+        <code>os.environ</code> at boot, or <code>bifrost_ai</code> for Vertex AI and Cloud
+        Vision client factories.
+      </p>
+<pre><code>from bifrost_client import BifrostClient
 
-                <!-- Part III -->
-                <div>
-                    <div class="px-3 py-1 font-bold text-primary uppercase text-xs tracking-wider">Part III · Webhook Integration</div>
-                    <ul class="mt-1.5 space-y-1">
-                        <li><a href="#part3-architecture" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">09 Webhook Dispatch System</a></li>
-                        <li><a href="#part3-signature" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">10 HMAC-SHA256 Verification</a></li>
-                        <li><a href="#part3-payloads" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">11 Webhook Event Payloads</a></li>
-                    </ul>
-                </div>
-
-                <!-- Part IV -->
-                <div>
-                    <div class="px-3 py-1 font-bold text-primary uppercase text-xs tracking-wider">Part IV · CMS Onboarding &amp; Setup</div>
-                    <ul class="mt-1.5 space-y-1">
-                        <li><a href="#part4-proxy" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">12 Database Proxy Architecture</a></li>
-                        <li><a href="#part4-wizard" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">13 The 3-Step Setup Wizard</a></li>
-                        <li><a href="#part4-schema" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">14 Schema Mapping (`payment_queue`)</a></li>
-                    </ul>
-                </div>
-
-                <!-- Part V -->
-                <div>
-                    <div class="px-3 py-1 font-bold text-primary uppercase text-xs tracking-wider">Part V · Console Operator's Manual</div>
-                    <ul class="mt-1.5 space-y-1">
-                        <li><a href="#part5-rbac" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">15 Console Roles &amp; Matrix</a></li>
-                        <li><a href="#part5-queue" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">16 Payment Queue &amp; SLA Clock</a></li>
-                        <li><a href="#part5-statemachine" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">17 Approval State Machine</a></li>
-                        <li><a href="#part5-publish" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">18 Publish Quality Gatekeeper</a></li>
-                        <li><a href="#part5-audit" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">19 Audit Trail &amp; Suspensions</a></li>
-                        <li><a href="#part5-safeguards" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">20 Core Guarantees</a></li>
-                    </ul>
-                </div>
-            </nav>
-        </aside>
-
-        <!-- Main Documentation Content Body -->
-        <main class="flex-1 p-6 md:p-12 space-y-16 max-w-5xl">
-
-            <!-- Hero Introduction -->
-            <section class="glass-panel p-8 md:p-10 space-y-5">
-                <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand/15 text-brand border border-brand/30 text-xs font-bold">
-                    <span class="material-symbols-outlined text-base">verified</span>
-                    Official Client &amp; Staff Reference Manual
-                </div>
-                <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-on-background">Bifrost Identity, Secrets &amp; Control Plane</h1>
-                <p class="text-base md:text-lg text-on-surface-variant max-w-3xl leading-relaxed font-normal">
-                    Bifrost acts as a central control plane managing application registration, credentials, secrets vault, and identity authentication, while proxying administrative operations live to independent tenant database planes. This document covers client app onboarding, SDK initialization, API endpoints, webhook signature verification, and the Console Operator's Manual.
-                </p>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 pt-4">
-                    <div class="glass-panel-subtle p-5 flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-xl bg-primary/15 text-primary flex items-center justify-center font-bold">
-                            <span class="material-symbols-outlined text-2xl">key</span>
-                        </div>
-                        <div>
-                            <div class="text-sm font-bold text-on-surface">Client SDK &amp; Vault</div>
-                            <div class="text-xs text-on-surface-variant">Automated credential injection</div>
-                        </div>
-                    </div>
-                    <div class="glass-panel-subtle p-5 flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-xl bg-success/15 text-success flex items-center justify-center font-bold">
-                            <span class="material-symbols-outlined text-2xl">lock_open</span>
-                        </div>
-                        <div>
-                            <div class="text-sm font-bold text-on-surface">HMAC Webhooks</div>
-                            <div class="text-xs text-on-surface-variant">SHA-256 signature verification</div>
-                        </div>
-                    </div>
-                    <div class="glass-panel-subtle p-5 flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-xl bg-warning/15 text-warning flex items-center justify-center font-bold">
-                            <span class="material-symbols-outlined text-2xl">admin_panel_settings</span>
-                        </div>
-                        <div>
-                            <div class="text-sm font-bold text-on-surface">Console &amp; SLA Queue</div>
-                            <div class="text-xs text-on-surface-variant">6-hour payment verification SLA</div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- PART I -->
-            <section id="part1-overview" class="space-y-10 doc-section">
-                <div class="border-b border-border-subtle pb-5">
-                    <div class="text-xs font-bold text-primary uppercase tracking-widest">Part I</div>
-                    <h2 class="text-2xl md:text-3xl font-extrabold text-on-background mt-1">Getting Started &amp; App Bootstrapping</h2>
-                </div>
-
-                <!-- 01 Overview -->
-                <div class="space-y-4">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">01</span>
-                        Platform Architecture Overview
-                    </h3>
-                    <p class="text-base text-on-surface-variant">
-                        Bifrost strictly separates the <strong>Control Plane</strong> (MongoDB central storage holding application secrets, webhook tokens, custom domain mappings, and staff roles) from the <strong>Tenant Data Plane</strong> (independent PostgreSQL/Supabase databases holding end-user records, transactions, and content).
-                    </p>
-
-                    <!-- Architecture Diagram -->
-                    <div class="glass-panel p-6 md:p-8 overflow-x-auto">
-                        <pre class="text-xs md:text-sm text-primary font-mono leading-relaxed">
-                  +-----------------------------------+
-                  |      Bifrost Control Plane        |
-                  |  - App Registry (Client IDs)      |
-                  |  - Webhook Secrets (HMAC Keys)    |
-                  |  - Vault Secrets (Encrypted API)  |
-                  |  - MongoDB (Central Storage)      |
-                  +-----------------+-----------------+
-                                    |
-                                    | Proxies Writes Live
-                                    v
-                  +-----------------------------------+
-                  |       Tenant Data Plane           |
-                  |  - PostgreSQL / Supabase Tables   |
-                  |  - users, payments, entitlements  |
-                  +----------------+------------------+
-                        </pre>
-                    </div>
-                </div>
-
-                <!-- 02 Python SDK -->
-                <div id="part1-sdk" class="space-y-4 pt-6">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">02</span>
-                        Python SDK &amp; Environment Injection
-                    </h3>
-                    <p class="text-base text-on-surface-variant">
-                        Downstream Python client applications should use the <code class="text-primary font-mono font-semibold">bifrost_client</code> SDK to bootstrap secrets into <code class="text-primary font-mono">os.environ</code> at boot time, or use <code class="text-primary font-mono font-semibold">bifrost_ai</code> for Google Vertex AI / Cloud Vision client factories.
-                    </p>
-                    <div class="space-y-2">
-                        <div class="text-sm font-mono text-on-surface-variant font-semibold">Bootstrap Credentials (<code class="text-primary">bifrost_client</code>):</div>
-                        <pre><code class="language-python">from bifrost_client import BifrostClient
-
-# Bootstrapping credentials into os.environ at client startup:
 BifrostClient(
     client_id="ministry_exam_prep",
     webhook_secret="your_configured_webhook_secret",
     bifrost_url="https://bifrost.wkc.kh"
 )
-# Automatically decrypts and injects DB_CONNECTION, JWT_SECRET, etc. into os.environ
-</code></pre>
-                    </div>
-                </div>
+# Decrypts and injects DB_CONNECTION, JWT_SECRET, etc. into os.environ</code></pre>
 
-                <!-- 03 Direct HTTP Config -->
-                <div id="part1-config" class="space-y-4 pt-6">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">03</span>
-                        Direct HTTP Config Fetching
-                    </h3>
-                    <p class="text-base text-on-surface-variant">
-                        Non-Python applications can query the Bifrost config REST endpoint directly during startup.
-                    </p>
-                    <div class="glass-panel p-5 space-y-3">
-                        <div class="flex items-center gap-3">
-                            <span class="px-2.5 py-1 rounded text-xs badge-get">GET</span>
-                            <code class="text-base font-bold text-primary">/api/v1/config</code>
-                        </div>
-                        <div class="text-sm text-on-surface-variant">
-                            <strong>Headers Required:</strong> <code class="text-primary font-mono">X-Client-ID: &lt;client_id&gt;</code> and <code class="text-primary font-mono">X-Webhook-Secret: &lt;webhook_secret&gt;</code>
-                        </div>
-                    </div>
-                    <pre><code class="language-bash">curl -X GET https://bifrost.wkc.kh/api/v1/config \
+      <h3 id="part1-config">03 · Direct HTTP config fetching</h3>
+      <p>Non-Python applications can query the config endpoint directly at startup.</p>
+      <div class="endpoint">
+        <span class="method">GET</span>
+        <code>/api/v1/config</code>
+        <span class="muted text-[12px]">
+          Requires <code>X-Client-ID</code> and <code>X-Webhook-Secret</code> headers.
+        </span>
+      </div>
+<pre><code>curl -X GET https://bifrost.wkc.kh/api/v1/config \
   -H "X-Client-ID: ministry_exam_prep" \
   -H "X-Webhook-Secret: your_webhook_secret_key"</code></pre>
-                </div>
 
-                <!-- 04 Service Segmentation -->
-                <div id="part1-services" class="space-y-4 pt-6">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">04</span>
-                        Service Segmentation &amp; Feature Flags
-                    </h3>
-                    <p class="text-base text-on-surface-variant">
-                        Each registered tenant can toggle individual services on or off inside their MongoDB application document using the <code class="text-primary font-mono">enabled_services</code> dictionary:
-                    </p>
-                    <table class="doc-table">
-                        <thead>
-                            <tr>
-                                <th>Service Flag</th>
-                                <th>Default</th>
-                                <th>Description</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><code class="text-sm text-primary font-mono font-bold">secrets_vault</code></td>
-                                <td><span class="text-success font-bold">true</span></td>
-                                <td>Allows client applications to fetch decrypted configuration keys.</td>
-                            </tr>
-                            <tr>
-                                <td><code class="text-sm text-primary font-mono font-bold">payment_bot</code></td>
-                                <td><span class="text-success font-bold">true</span></td>
-                                <td>Enables Telegram receipt submission &amp; SLA alert bots.</td>
-                            </tr>
-                            <tr>
-                                <td><code class="text-sm text-primary font-mono font-bold">oauth_sso</code></td>
-                                <td><span class="text-success font-bold">true</span></td>
-                                <td>Enables Google/Facebook OAuth SSO login endpoints.</td>
-                            </tr>
-                            <tr>
-                                <td><code class="text-sm text-primary font-mono font-bold">sms_otp</code></td>
-                                <td><span class="text-success font-bold">true</span></td>
-                                <td>Enables Phone SMS OTP verification endpoints.</td>
-                            </tr>
-                            <tr>
-                                <td><code class="text-sm text-primary font-mono font-bold">email_otp</code></td>
-                                <td><span class="text-success font-bold">true</span></td>
-                                <td>Enables Email verification code endpoints.</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <p class="text-sm text-warning font-medium flex items-center gap-2 pt-2">
-                        <span class="material-symbols-outlined text-base">warning</span>
-                        If a service is set to <code class="font-mono font-bold">false</code>, the Bifrost gateway automatically rejects calls to those endpoints with a <code class="font-mono font-bold">403 Forbidden</code> response.
-                    </p>
-                </div>
-            </section>
+      <h3 id="part1-services">04 · Service segmentation and feature flags</h3>
+      <p>
+        Each tenant toggles services in its <code>enabled_services</code> dictionary. When a
+        flag is <code>false</code>, the gateway rejects calls to those endpoints with
+        <strong>403 Forbidden</strong> — it is a server-side gate, not a hidden button.
+      </p>
+      <div class="table-scroll">
+        <table class="table">
+          <thead><tr><th>Flag</th><th>Default</th><th>Enables</th></tr></thead>
+          <tbody>
+            {% for flag, default, description in [
+              ('secrets_vault', 'true', 'Clients fetching decrypted configuration keys.'),
+              ('payment_bot',   'true', 'Telegram receipt submission and SLA alerts.'),
+              ('oauth_sso',     'true', 'Google and Facebook OAuth SSO endpoints.'),
+              ('sms_otp',       'true', 'Phone SMS OTP verification endpoints.'),
+              ('email_otp',     'true', 'Email verification code endpoints.'),
+            ] %}
+              <tr>
+                <td class="mono">{{ flag }}</td>
+                <td class="mono">{{ default }}</td>
+                <td>{{ description }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-            <!-- PART II -->
-            <section id="part2-vault" class="space-y-10 doc-section">
-                <div class="border-b border-border-subtle pb-5">
-                    <div class="text-xs font-bold text-primary uppercase tracking-widest">Part II</div>
-                    <h2 class="text-2xl md:text-3xl font-extrabold text-on-background mt-1">Secrets Vault &amp; Services API</h2>
-                </div>
+    <!-- ================================================= Part II -->
+    <section class="doc-section" id="part2-vault">
+      <div class="part-label">Part II</div>
+      <h2>Secrets vault and services API</h2>
 
-                <!-- 05 Secrets Vault -->
-                <div class="space-y-4">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">05</span>
-                        Secrets Vault Bulk Injection
-                    </h3>
-                    <p class="text-base text-on-surface-variant">
-                        Tenant app owners can upload or retrieve key-value secrets encrypted at rest in the Bifrost Control Plane.
-                    </p>
-                    <div class="glass-panel p-5 space-y-3">
-                        <div class="flex items-center gap-3">
-                            <span class="px-2.5 py-1 rounded text-xs badge-post">POST</span>
-                            <code class="text-base font-bold text-primary">/api/v1/config/bulk</code>
-                        </div>
-                        <p class="text-sm text-on-surface-variant font-medium">Upload bulk secrets as a JSON dictionary.</p>
-                        <pre><code class="language-json">{
+      <h3>05 · Vault bulk injection</h3>
+      <p>Owners upload or retrieve key-value secrets, encrypted at rest in the control plane.</p>
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <code>/api/v1/config/bulk</code>
+        <span class="muted text-[12px]">Upload secrets as a JSON dictionary.</span>
+      </div>
+<pre><code>{
   "secrets": {
     "DB_CONNECTION": "postgresql://user:pass@ep-prod.supabase.co:5432/postgres",
     "TELEGRAM_BOT_TOKEN": "123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ",
     "JWT_SECRET": "super-secret-jwt-key-2026"
   }
 }</code></pre>
-                    </div>
-                </div>
 
-                <!-- 06 OTP Services -->
-                <div id="part2-otp" class="space-y-4 pt-6">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">06</span>
-                        Phone &amp; Email OTP Authentication
-                    </h3>
-                    <p class="text-base text-on-surface-variant">
-                        Bifrost handles SMS and Email OTP verification code generation, expiration, and validation.
-                    </p>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div class="glass-panel p-5 space-y-2">
-                            <div class="flex items-center gap-3">
-                                <span class="px-2.5 py-1 rounded text-xs badge-post">POST</span>
-                                <code class="text-sm font-bold text-primary">/api/auth/send-otp</code>
-                            </div>
-                            <p class="text-sm text-on-surface-variant">Sends 6-digit verification code to phone number or email.</p>
-                        </div>
-                        <div class="glass-panel p-5 space-y-2">
-                            <div class="flex items-center gap-3">
-                                <span class="px-2.5 py-1 rounded text-xs badge-post">POST</span>
-                                <code class="text-sm font-bold text-primary">/api/auth/verify-otp</code>
-                            </div>
-                            <p class="text-sm text-on-surface-variant">Validates OTP code and returns verified user payload.</p>
-                        </div>
-                    </div>
-                </div>
+      <h3 id="part2-otp">06 · Phone and email OTP</h3>
+      <p>Bifrost handles code generation, expiry and validation.</p>
+      <div class="endpoint">
+        <span class="method">POST</span><code>/api/auth/send-otp</code>
+        <span class="muted text-[12px]">Sends a 6-digit code to a phone or email.</span>
+      </div>
+      <div class="endpoint">
+        <span class="method">POST</span><code>/api/auth/verify-otp</code>
+        <span class="muted text-[12px]">Validates the code and returns the verified user.</span>
+      </div>
 
-                <!-- 07 Hosted SSO Pages -->
-                <div id="part2-sso" class="space-y-4 pt-6">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">07</span>
-                        Hosted SSO &amp; Password Reset Pages
-                    </h3>
-                    <p class="text-base text-on-surface-variant">
-                        Bifrost provides hosted OAuth login and password reset flows for client applications.
-                    </p>
-                    <table class="doc-table">
-                        <thead>
-                            <tr>
-                                <th>Endpoint</th>
-                                <th>Method</th>
-                                <th>Description</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><code class="text-sm text-primary font-mono font-bold">/auth/sso/login</code></td>
-                                <td><span class="px-2 py-0.5 rounded text-xs badge-get">GET</span></td>
-                                <td>Renders hosted OAuth SSO page (Google / Facebook).</td>
-                            </tr>
-                            <tr>
-                                <td><code class="text-sm text-primary font-mono font-bold">/auth/reset-password</code></td>
-                                <td><span class="px-2 py-0.5 rounded text-xs badge-post">POST</span></td>
-                                <td>Processes password reset request from emailed token.</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+      <h3 id="part2-sso">07 · Hosted SSO and password reset</h3>
+      <div class="table-scroll">
+        <table class="table">
+          <thead><tr><th>Endpoint</th><th>Method</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">/auth/sso/login</td><td class="mono">GET</td>
+                <td>Hosted OAuth SSO page (Google, Facebook).</td></tr>
+            <tr><td class="mono">/auth/reset-password</td><td class="mono">POST</td>
+                <td>Processes a reset request from an emailed token.</td></tr>
+          </tbody>
+        </table>
+      </div>
 
-                <!-- 08 Roles & Accounts -->
-                <div id="part2-roles" class="space-y-4 pt-6">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">08</span>
-                        Account Management &amp; Roles API
-                    </h3>
-                    <p class="text-base text-on-surface-variant">
-                        Endpoints for fetching staff roles in bulk, updating user profiles, or deleting accounts.
-                    </p>
-                    <div class="glass-panel p-5 space-y-3">
-                        <div class="flex items-center gap-3">
-                            <span class="px-2.5 py-1 rounded text-xs badge-post">POST</span>
-                            <code class="text-base font-bold text-primary">/api/v1/users/get-roles-bulk</code>
-                        </div>
-                        <p class="text-sm text-on-surface-variant font-medium">Fetch roles for a list of user emails in a single request.</p>
-                        <pre><code class="language-json">{
-  "emails": ["staff1@wkc.kh", "staff2@wkc.kh"]
-}</code></pre>
-                    </div>
-                </div>
-            </section>
+      <h3 id="part2-roles">08 · Accounts and roles API</h3>
+      <div class="endpoint">
+        <span class="method">POST</span><code>/api/v1/users/get-roles-bulk</code>
+        <span class="muted text-[12px]">Roles for many emails in one request.</span>
+      </div>
+<pre><code>{ "emails": ["staff1@wkc.kh", "staff2@wkc.kh"] }</code></pre>
+    </section>
 
-            <!-- PART III -->
-            <section id="part3-architecture" class="space-y-10 doc-section">
-                <div class="border-b border-border-subtle pb-5">
-                    <div class="text-xs font-bold text-primary uppercase tracking-widest">Part III</div>
-                    <h2 class="text-2xl md:text-3xl font-extrabold text-on-background mt-1">Webhook Integration &amp; Security</h2>
-                </div>
+    <!-- ================================================ Part III -->
+    <section class="doc-section" id="part3-architecture">
+      <div class="part-label">Part III</div>
+      <h2>Webhook integration and security</h2>
 
-                <!-- 09 Dispatch System -->
-                <div class="space-y-4">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">09</span>
-                        Webhook Dispatch System
-                    </h3>
-                    <p class="text-base text-on-surface-variant">
-                        Whenever a customer payment is approved, rejected, or refunded in the console, Bifrost triggers a <code class="text-primary font-mono font-bold">POST</code> webhook request to the client application's configured <code class="text-primary font-mono font-bold">webhook_url</code>.
-                    </p>
-                </div>
+      <h3>09 · Dispatch system</h3>
+      <p>
+        When a payment is approved, rejected or refunded in the console, Bifrost POSTs
+        to the application's configured <code>webhook_url</code>.
+      </p>
 
-                <!-- 10 Signature Verification -->
-                <div id="part3-signature" class="space-y-4 pt-6">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">10</span>
-                        HMAC-SHA256 Signature Verification
-                    </h3>
-                    <p class="text-base text-on-surface-variant">
-                        Client applications <strong>must</strong> verify the <code class="text-primary font-mono font-bold">X-Bifrost-Signature</code> header before processing webhook entitlement payloads to prevent forged requests.
-                    </p>
-
-                    <!-- Python Verification Code -->
-                    <div class="space-y-3">
-                        <div class="text-sm font-mono text-on-surface-variant font-semibold">Python Flask Signature Verification Example:</div>
-                        <pre><code class="language-python">import hmac
-import hashlib
+      <h3 id="part3-signature">10 · HMAC-SHA256 signature verification</h3>
+      <p>
+        Verify the <code>X-Bifrost-Signature</code> header <strong>before</strong> processing any
+        entitlement payload. Compare in constant time — a plain <code>==</code> leaks the
+        signature one byte at a time.
+      </p>
+<pre><code>import hmac, hashlib
 from flask import Flask, request, abort
 
 app = Flask(__name__)
@@ -588,60 +325,47 @@ def handle_webhook():
     signature = request.headers.get('X-Bifrost-Signature')
     if not signature:
         abort(403, "Missing signature header")
-        
-    expected_signature = hmac.new(
-        WEBHOOK_SECRET,
-        request.data,
-        hashlib.sha256
-    ).hexdigest()
 
-    if not hmac.compare_digest(expected_signature, signature):
+    expected = hmac.new(WEBHOOK_SECRET, request.data, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, signature):
         abort(403, "Invalid HMAC signature")
 
     payload = request.get_json()
     event_type = payload.get('event')
-    # Process entitlement change...
-    return "OK", 200
-</code></pre>
-                    </div>
+    # Process the entitlement change...
+    return "OK", 200</code></pre>
 
-                    <!-- Node.js Verification Code -->
-                    <div class="space-y-3 pt-2">
-                        <div class="text-sm font-mono text-on-surface-variant font-semibold">Node.js Express Signature Verification Example:</div>
-                        <pre><code class="language-javascript">const crypto = require('crypto');
+<pre><code>const crypto = require('crypto');
 const express = require('express');
 const app = express();
-
 const WEBHOOK_SECRET = "your_configured_webhook_secret";
 
 app.post('/bifrost-webhook', express.raw({ type: 'application/json' }), (req, res) => {
-    const signature = req.headers['x-bifrost-signature'];
-    const expectedSignature = crypto
-        .createHmac('sha256', WEBHOOK_SECRET)
-        .update(req.body)
-        .digest('hex');
+  const signature = req.headers['x-bifrost-signature'] || '';
+  const expected = crypto
+    .createHmac('sha256', WEBHOOK_SECRET)
+    .update(req.body)
+    .digest('hex');
 
-    if (!crypto.timingSafeEqual(Buffer.from(signature || ''), Buffer.from(expectedSignature))) {
-        return res.status(403).send('Invalid signature');
-    }
+  const a = Buffer.from(signature), b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(403).send('Invalid signature');
+  }
 
-    const payload = JSON.parse(req.body.toString());
-    // Handle payload...
-    res.status(200).send('OK');
-});
-</code></pre>
-                    </div>
-                </div>
+  const payload = JSON.parse(req.body.toString());
+  res.status(200).send('OK');
+});</code></pre>
+      <div class="alert alert-warning mb-3">
+        <strong>Note:</strong>
+        <span>
+          <code>timingSafeEqual</code> throws when the two buffers differ in length, so
+          check the length first — otherwise a malformed header crashes the handler
+          instead of returning 403.
+        </span>
+      </div>
 
-                <!-- 11 Webhook Event Payloads -->
-                <div id="part3-payloads" class="space-y-4 pt-6">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">11</span>
-                        Webhook Event Payloads
-                    </h3>
-                    <div class="glass-panel p-5 space-y-3">
-                        <div class="text-sm font-mono text-primary font-bold">Event: payment_approved</div>
-                        <pre><code class="language-json">{
+      <h3 id="part3-payloads">11 · Event payloads</h3>
+<pre><code>{
   "event": "payment_approved",
   "payment_id": "66a5c123abc4567890def123",
   "user_email": "student@aupp.edu.kh",
@@ -650,66 +374,44 @@ app.post('/bifrost-webhook', express.raw({ type: 'application/json' }), (req, re
   "granted_scope": "exam_track_grade_12",
   "timestamp": "2026-07-28T11:00:00Z"
 }</code></pre>
-                    </div>
-                </div>
-            </section>
+    </section>
 
-            <!-- PART IV -->
-            <section id="part4-proxy" class="space-y-10 doc-section">
-                <div class="border-b border-border-subtle pb-5">
-                    <div class="text-xs font-bold text-primary uppercase tracking-widest">Part IV</div>
-                    <h2 class="text-2xl md:text-3xl font-extrabold text-on-background mt-1">CMS Onboarding &amp; Database Proxying</h2>
-                </div>
+    <!-- ================================================= Part IV -->
+    <section class="doc-section" id="part4-proxy">
+      <div class="part-label">Part IV</div>
+      <h2>CMS onboarding and database proxying</h2>
 
-                <!-- 12 Proxy Architecture -->
-                <div class="space-y-4">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">12</span>
-                        Database Proxy Architecture
-                    </h3>
-                    <p class="text-base text-on-surface-variant">
-                        The console holds no customer data locally. It connects directly to your PostgreSQL database using <code class="text-primary font-mono">ThreadedConnectionPool</code> and context managers (<code class="text-primary font-mono">get_tenant_db</code>). Queries are executed dynamically to remain resilient to minor schema deviations.
-                    </p>
-                </div>
+      <h3>12 · Database proxy architecture</h3>
+      <p>
+        The console holds no customer data locally. It connects to your PostgreSQL
+        database through a <code>ThreadedConnectionPool</code> and the
+        <code>get_tenant_db</code> context manager, which always returns the connection to
+        the pool and rolls back any transaction the caller left open. Queries are built
+        dynamically so minor schema deviations don't break the console.
+      </p>
 
-                <!-- 13 3-Step Wizard -->
-                <div id="part4-wizard" class="space-y-4 pt-6">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">13</span>
-                        The 3-Step CMS Onboarding Wizard
-                    </h3>
-                    <p class="text-base text-on-surface-variant">
-                        When launching the Backoffice console for a new application (<code class="text-primary font-mono">/backoffice/app/&lt;app_id&gt;/onboarding</code>), a 3-step setup wizard initializes the workspace:
-                    </p>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                        <div class="glass-panel p-5 space-y-3">
-                            <div class="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-extrabold text-sm">1</div>
-                            <div class="font-bold text-base text-on-surface">Connect Database</div>
-                            <p class="text-sm text-on-surface-variant">Input PostgreSQL connection string. Connection details are encrypted before saving.</p>
-                        </div>
-                        <div class="glass-panel p-5 space-y-3">
-                            <div class="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-extrabold text-sm">2</div>
-                            <div class="font-bold text-base text-on-surface">Smart Schema Detection</div>
-                            <p class="text-sm text-on-surface-variant">Introspects schema, auto-hides plumbing tables (<code class="text-primary font-mono">migrations</code>, <code class="text-primary font-mono">tokens</code>, <code class="text-primary font-mono">logs</code>), and proposes friendly labels (<code class="text-primary font-mono">users</code> &rarr; <code class="text-primary font-mono">Customers</code>).</p>
-                        </div>
-                        <div class="glass-panel p-5 space-y-3">
-                            <div class="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-extrabold text-sm">3</div>
-                            <div class="font-bold text-base text-on-surface">Invite Team</div>
-                            <p class="text-sm text-on-surface-variant">Assign staff roles (<code class="text-primary font-mono">content_manager</code>, <code class="text-primary font-mono">operations</code>, <code class="text-primary font-mono">admin</code>) by email before launching.</p>
-                        </div>
-                    </div>
-                </div>
+      <h3 id="part4-wizard">13 · The setup wizard</h3>
+      <p>Opening the console for a new application runs a three-step wizard.</p>
+      <ul>
+        <li><strong>Connect database</strong> — the connection string is encrypted before it is stored.</li>
+        <li><strong>Smart schema detection</strong> — hides plumbing tables (<code>migrations</code>,
+            <code>tokens</code>, <code>logs</code>) and proposes readable labels
+            (<code>users</code> → Customers).</li>
+        <li><strong>Invite the team</strong> — assign staff roles by email before launching.</li>
+      </ul>
+      <p>
+        If the database is empty, the wizard offers starter schemas instead — exam
+        preparation or storefront — which create a working set of tables in one click.
+      </p>
 
-                <!-- 14 Schema Customization -->
-                <div id="part4-schema" class="space-y-4 pt-6">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">14</span>
-                        Tenant-Agnostic Queue Schema Mapping
-                    </h3>
-                    <p class="text-base text-on-surface-variant">
-                        If your tenant database uses custom table or column names, describe them in CMS Settings under <code class="text-primary font-mono">payment_queue</code> (<code class="text-primary font-mono">cms_config.payment_queue</code>):
-                    </p>
-                    <pre><code class="language-json">{
+      <h3 id="part4-schema">14 · Tenant-agnostic queue schema mapping</h3>
+      <p>
+        If your tables and columns are named differently, describe them under
+        <code>payment_queue</code> in the schema config. The console validates this at save
+        time, so a bad mapping is a readable error rather than a 500 the first time
+        someone opens the queue.
+      </p>
+<pre><code>{
   "payment_queue": {
     "table": "orders",
     "id": "order_id",
@@ -730,263 +432,275 @@ app.post('/bifrost-webhook', express.raw({ type: 'application/json' }), (req, re
     }
   }
 }</code></pre>
-                </div>
-            </section>
+    </section>
 
-            <!-- PART V -->
-            <section id="part5-rbac" class="space-y-10 doc-section">
-                <div class="border-b border-border-subtle pb-5">
-                    <div class="text-xs font-bold text-primary uppercase tracking-widest">Part V</div>
-                    <h2 class="text-2xl md:text-3xl font-extrabold text-on-background mt-1">Console Operator's Manual</h2>
-                </div>
+    <!-- ================================================== Part V -->
+    <section class="doc-section" id="part5-rbac">
+      <div class="part-label">Part V</div>
+      <h2>Console operator's manual</h2>
 
-                <!-- 15 Roles Matrix -->
-                <div class="space-y-4">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">15</span>
-                        Console Roles &amp; Permissions Matrix
-                    </h3>
-                    <table class="doc-table">
-                        <thead>
-                            <tr>
-                                <th>Role</th>
-                                <th>Content</th>
-                                <th>Publish</th>
-                                <th>Payments</th>
-                                <th>Users &amp; Access</th>
-                                <th>Settings</th>
-                                <th>Audit</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><code class="text-sm text-primary font-mono font-bold">owner</code></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                            </tr>
-                            <tr>
-                                <td><code class="text-sm text-primary font-mono font-bold">super_admin</code></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                            </tr>
-                            <tr>
-                                <td><code class="text-sm text-primary font-mono font-bold">admin</code></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                            </tr>
-                            <tr>
-                                <td><code class="text-sm text-primary font-mono font-bold">content_manager</code></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-danger font-bold">No</span></td>
-                                <td><span class="text-danger font-bold">No</span></td>
-                                <td><span class="text-danger font-bold">No</span></td>
-                                <td><span class="text-warning font-bold">Read Only</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                            </tr>
-                            <tr>
-                                <td><code class="text-sm text-primary font-mono font-bold">operations</code></td>
-                                <td><span class="text-danger font-bold">No</span></td>
-                                <td><span class="text-danger font-bold">No</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-warning font-bold">Read Only</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                            </tr>
-                            <tr>
-                                <td><code class="text-sm text-primary font-mono font-bold">billing_agent</code></td>
-                                <td><span class="text-danger font-bold">No</span></td>
-                                <td><span class="text-danger font-bold">No</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                                <td><span class="text-warning font-bold">Read Only</span></td>
-                                <td><span class="text-success font-bold">Yes</span></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+      <h3>15 · Roles and permissions</h3>
+      <p>
+        Every route gates on a permission string, server-side. Hiding a button is not
+        access control — a role without a permission gets a 403 from the server even
+        if it crafts the request by hand.
+      </p>
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Role</th><th>Content</th><th>Publish</th><th>Payments</th>
+              <th>Users</th><th>Settings</th><th>Audit</th><th>Raw SQL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for role, content, publish, payments, users, settings, audit, sql in [
+              ('owner',           'Yes', 'Yes', 'Yes', 'Yes', 'Yes',  'Yes', 'No'),
+              ('super_admin',     'Yes', 'Yes', 'Yes', 'Yes', 'Yes',  'Yes', 'No'),
+              ('admin',           'Yes', 'Yes', 'Yes', 'Yes', 'Yes',  'Yes', 'No'),
+              ('content_manager', 'Yes', 'No',  'No',  'No',  'Read', 'Yes', 'No'),
+              ('operations',      'No',  'No',  'Yes', 'Yes', 'Read', 'Yes', 'No'),
+              ('billing_agent',   'No',  'No',  'Yes', 'Yes', 'Read', 'Yes', 'No'),
+              ('developer',       'Yes', 'No',  'No',  'No',  'Read', 'Yes', 'Yes'),
+            ] %}
+              <tr>
+                <td class="mono">{{ role }}</td>
+                <td>{{ content }}</td><td>{{ publish }}</td><td>{{ payments }}</td>
+                <td>{{ users }}</td><td>{{ settings }}</td><td>{{ audit }}</td>
+                <td>{% if sql == 'Yes' %}<span class="badge badge-danger">Yes</span>
+                    {% else %}{{ sql }}{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="mt-3">
+        Note that <code>developer</code> is <strong>not</strong> a superset of <code>admin</code>.
+        It is deliberately narrow so raw database access can be granted to an engineer
+        without also handing over the payment queue. See <a class="text-accent underline"
+        href="#part6-developer">section 22</a>.
+      </p>
 
-                <!-- 16 Payment Queue & SLA Clock -->
-                <div id="part5-queue" class="space-y-4 pt-6">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">16</span>
-                        Payment Verification Queue &amp; SLA Clock
-                    </h3>
-                    <p class="text-base text-on-surface-variant">
-                        Every submitted receipt enters the human verification queue. The real age clock monitors progress against the 6-hour SLA promise:
-                    </p>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                        <div class="glass-panel p-5 space-y-2">
-                            <div class="text-xs font-bold text-success uppercase tracking-wider">Age &lt; 4h 30m</div>
-                            <div class="text-base font-extrabold text-on-surface">On Time</div>
-                            <p class="text-sm text-on-surface-variant">Payment is comfortably within the service window.</p>
-                        </div>
-                        <div class="glass-panel p-5 space-y-2">
-                            <div class="text-xs font-bold text-warning uppercase tracking-wider">4h 30m – 6h</div>
-                            <div class="text-base font-extrabold text-on-surface">Approaching SLA</div>
-                            <p class="text-sm text-on-surface-variant">Alert dispatched to Telegram channel. Deal with immediately.</p>
-                        </div>
-                        <div class="glass-panel p-5 space-y-2">
-                            <div class="text-xs font-bold text-danger uppercase tracking-wider">Over 6h</div>
-                            <div class="text-base font-extrabold text-on-surface">Breached SLA</div>
-                            <p class="text-sm text-on-surface-variant">Service promise is broken. Priority resolution required.</p>
-                        </div>
-                    </div>
-                </div>
+      <h3 id="part5-queue">16 · Payment queue and the SLA clock</h3>
+      <p>Every submitted receipt enters the human verification queue against a 6-hour SLA.</p>
+      <div class="table-scroll">
+        <table class="table">
+          <thead><tr><th>Age</th><th>State</th><th>What happens</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">under 4h 30m</td><td><span class="badge badge-success">On time</span></td>
+                <td>Comfortably within the service window.</td></tr>
+            <tr><td class="mono">4h 30m – 6h</td><td><span class="badge badge-warning">Approaching</span></td>
+                <td>An alert is dispatched to the Telegram channel. Handle immediately.</td></tr>
+            <tr><td class="mono">over 6h</td><td><span class="badge badge-danger">Breached</span></td>
+                <td>The service promise is broken. Priority resolution.</td></tr>
+          </tbody>
+        </table>
+      </div>
 
-                <!-- 17 Approval State Machine -->
-                <div id="part5-statemachine" class="space-y-4 pt-6">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">17</span>
-                        Payment State Machine &amp; Actions
-                    </h3>
-                    <p class="text-base text-on-surface-variant">
-                        Payments strictly transition between states (<code class="text-primary font-mono font-bold">FREE</code> &rarr; <code class="text-primary font-mono font-bold">PENDING</code> &rarr; <code class="text-primary font-mono font-bold">PREMIUM</code> / <code class="text-primary font-mono font-bold">REJECTED</code>, <code class="text-primary font-mono font-bold">PREMIUM</code> &rarr; <code class="text-primary font-mono font-bold">REFUNDED</code>).
-                    </p>
-                    <div class="space-y-4">
-                        <div class="glass-panel p-5 space-y-2">
-                            <div class="text-base font-bold text-success flex items-center gap-2">
-                                <span class="material-symbols-outlined text-xl">check_circle</span>
-                                Approving
-                            </div>
-                            <p class="text-sm text-on-surface-variant leading-relaxed">Atomically marks payment approved, unlocks track entitlements in Postgres, and triggers client webhooks as one transaction. Duplicate references are rejected.</p>
-                        </div>
-                        <div class="glass-panel p-5 space-y-2">
-                            <div class="text-base font-bold text-warning flex items-center gap-2">
-                                <span class="material-symbols-outlined text-xl">cancel</span>
-                                Rejecting
-                            </div>
-                            <p class="text-sm text-on-surface-variant leading-relaxed">Requires reason code (<code class="text-primary font-mono">wrong_amount</code>, <code class="text-primary font-mono">unreadable</code>, <code class="text-primary font-mono">duplicate_reference</code>, <code class="text-primary font-mono">other</code>). Allows customer to re-submit a fresh receipt.</p>
-                        </div>
-                        <div class="glass-panel p-5 space-y-2">
-                            <div class="text-base font-bold text-danger flex items-center gap-2">
-                                <span class="material-symbols-outlined text-xl">undo</span>
-                                Refunding
-                            </div>
-                            <p class="text-sm text-on-surface-variant leading-relaxed">Allowed only on approved payments. Revokes only the entitlement unlocked by that specific transaction.</p>
-                        </div>
-                    </div>
-                </div>
+      <h3 id="part5-statemachine">17 · Payment state machine</h3>
+      <p>
+        Payments move <code>FREE → PENDING → PREMIUM</code> or <code>REJECTED</code>, and
+        <code>PREMIUM → REFUNDED</code>.
+      </p>
+      <ul>
+        <li><strong>Approving</strong> — atomically marks the payment approved, unlocks the
+            entitlement in Postgres and fires the client webhook as one transaction.
+            Duplicate transaction references are rejected.</li>
+        <li><strong>Rejecting</strong> — requires a reason code
+            (<code>wrong_amount</code>, <code>unreadable</code>, <code>duplicate_reference</code>,
+            <code>other</code>). The customer may submit a fresh receipt.</li>
+        <li><strong>Refunding</strong> — allowed only on approved payments, and revokes only
+            the entitlement that specific transaction unlocked.</li>
+      </ul>
 
-                <!-- 18 Publish Gatekeeper -->
-                <div id="part5-publish" class="space-y-4 pt-6">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">18</span>
-                        Exam Question Automated Publish Quality Gate
-                    </h3>
-                    <p class="text-base text-on-surface-variant">
-                        Publishing exam content (<code class="text-primary font-mono font-bold">review</code> &rarr; <code class="text-primary font-mono font-bold">published</code>) is restricted to Admins/Owners and is automatically blocked by the server unless all 4 criteria pass:
-                    </p>
-                    <div class="glass-panel p-6 space-y-4">
-                        <div class="flex items-center gap-4">
-                            <span class="material-symbols-outlined text-success text-2xl">check_box</span>
-                            <span class="text-sm md:text-base text-on-surface"><strong>Exactly 4 choices</strong> defined on the question.</span>
-                        </div>
-                        <div class="flex items-center gap-4">
-                            <span class="material-symbols-outlined text-success text-2xl">check_box</span>
-                            <span class="text-sm md:text-base text-on-surface"><strong>Exactly 1 choice</strong> marked as correct.</span>
-                        </div>
-                        <div class="flex items-center gap-4">
-                            <span class="material-symbols-outlined text-success text-2xl">check_box</span>
-                            <span class="text-sm md:text-base text-on-surface"><strong>Bilingual explanations</strong> (Khmer &amp; English) present on the correct choice.</span>
-                        </div>
-                        <div class="flex items-center gap-4">
-                            <span class="material-symbols-outlined text-success text-2xl">check_box</span>
-                            <span class="text-sm md:text-base text-on-surface"><strong>Non-empty <code class="text-primary font-mono">source_ref</code></strong> tracing the question to an official source document.</span>
-                        </div>
-                    </div>
-                </div>
+      <h3 id="part5-publish">18 · Publish quality gate</h3>
+      <p>
+        Moving exam content from <code>review</code> to <code>published</code> is restricted to
+        admins and owners, and the server blocks it unless all four hold:
+      </p>
+      <ul>
+        <li>Exactly four choices on the question.</li>
+        <li>Exactly one choice marked correct.</li>
+        <li>Bilingual explanations (Khmer and English) on the correct choice.</li>
+        <li>A non-empty <code>source_ref</code> tracing the question to an official document.</li>
+      </ul>
 
-                <!-- 19 Audit Log -->
-                <div id="part5-audit" class="space-y-4 pt-6">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">19</span>
-                        Audit Log &amp; User Suspensions
-                    </h3>
-                    <p class="text-base text-on-surface-variant">
-                        Every mutation (approvals, rejections, refunds, content edits, manual overrides) is permanently recorded in the immutable audit log with actor ID, timestamp, and before/after JSON diffs. Suspensions lock user accounts while preserving paid entitlements.
-                    </p>
-                </div>
+      <h3 id="part5-audit">19 · Audit trail and suspensions</h3>
+      <p>
+        Every mutation — approvals, rejections, refunds, content edits, manual overrides
+        and raw SQL — is recorded permanently with actor, timestamp and a before/after
+        diff. Retention is at least one year and there is no TTL on the collection.
+        Suspending a user locks the account while preserving paid entitlements, which
+        are restored on reinstatement.
+      </p>
 
-                <!-- 20 Core Guarantees -->
-                <div id="part5-safeguards" class="space-y-4 pt-6">
-                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">20</span>
-                        Operational Safeguards &amp; Guarantees
-                    </h3>
-                    <div class="glass-panel p-6 space-y-5 text-sm md:text-base text-on-surface-variant">
-                        <div class="flex items-start gap-4">
-                            <span class="material-symbols-outlined text-primary text-2xl shrink-0 mt-0.5">shield</span>
-                            <div>
-                                <strong class="text-on-surface text-base">No Passwords in Plaintext:</strong> Passwords are never stored in plaintext or requested by staff.
-                            </div>
-                        </div>
-                        <div class="flex items-start gap-4">
-                            <span class="material-symbols-outlined text-primary text-2xl shrink-0 mt-0.5">account_balance</span>
-                            <div>
-                                <strong class="text-on-surface text-base">Money Movement Outside Console:</strong> The console records verification decisions; actual bank wire transfers and cash refunds occur through tenant banks.
-                            </div>
-                        </div>
-                        <div class="flex items-start gap-4">
-                            <span class="material-symbols-outlined text-primary text-2xl shrink-0 mt-0.5">history_edu</span>
-                            <div>
-                                <strong class="text-on-surface text-base">Immutable Timeline:</strong> Nothing is deleted quietly. Every change is logged with full before and after states.
-                            </div>
-                        </div>
-                    </div>
-                </div>
+      <h3 id="part5-safeguards">20 · Core guarantees</h3>
+      <ul>
+        <li><strong>No plaintext passwords.</strong> Passwords are never stored in plaintext
+            and staff will never ask for one.</li>
+        <li><strong>Money moves outside the console.</strong> The console records verification
+            decisions; bank transfers and cash refunds happen at the tenant's bank.</li>
+        <li><strong>Nothing is deleted quietly.</strong> Every change is logged with full
+            before and after state.</li>
+      </ul>
+    </section>
 
-            </section>
+    <!-- ================================================= Part VI -->
+    <section class="doc-section" id="part6-studio">
+      <div class="part-label">Part VI</div>
+      <h2>SQL Studio</h2>
 
-        </main>
-    </div>
+      <h3>21 · Running raw SQL</h3>
+      <p>
+        SQL Studio runs statements directly against a tenant's PostgreSQL database from
+        the browser, so schema migrations and one-off fixes no longer require opening
+        Supabase Studio. It appears in the console sidebar under <strong>Developer</strong>
+        for anyone holding <code>db:execute</code>.
+      </p>
+      <ul>
+        <li><strong>Multiple statements</strong> separated by semicolons run as one batch —
+            a whole migration can be pasted in.</li>
+        <li><strong>Results</strong> come back as a table for anything that returns rows, and
+            as an affected-row count for <code>CREATE</code>, <code>DROP</code>,
+            <code>UPDATE</code> and friends.</li>
+        <li><strong>Postgres errors are shown verbatim</strong>, including position and hint,
+            rather than being flattened into "query failed".</li>
+        <li><kbd class="mono">Ctrl</kbd>/<kbd class="mono">⌘</kbd> + <kbd class="mono">Enter</kbd>
+            runs the editor contents.</li>
+      </ul>
+      <div class="endpoint">
+        <span class="method">GET</span><code>/backoffice/app/&lt;app_id&gt;/devtools</code>
+        <span class="muted text-[12px]">The editor.</span>
+      </div>
+      <div class="endpoint">
+        <span class="method">POST</span><code>/backoffice/api/app/&lt;app_id&gt;/devtools/execute</code>
+        <span class="muted text-[12px]">
+          Body <code>{"sql": "...", "commit": false}</code>. Both routes require
+          <code>db:execute</code>.
+        </span>
+      </div>
+<pre><code>{
+  "kind": "rows",
+  "columns": ["id", "email"],
+  "rows": [[1, "student@aupp.edu.kh"]],
+  "row_count": 1,
+  "truncated": false,
+  "committed": false,
+  "elapsed_ms": 42.7
+}</code></pre>
 
-    <!-- Interactive Filtering & Copy Tooltips JS -->
-    <script>
-        function filterDocs() {
-            const input = document.getElementById('docSearch').value.toLowerCase();
-            const sections = document.querySelectorAll('.doc-section > div');
-            sections.forEach(sec => {
-                const text = sec.innerText.toLowerCase();
-                if (text.includes(input)) {
-                    sec.style.display = 'block';
-                } else {
-                    sec.style.display = 'none';
-                }
-            });
-        }
+      <h3 id="part6-developer">22 · The developer role</h3>
+      <p>
+        Raw SQL is gated behind a single permission, <code>db:execute</code>, which is held
+        by exactly one role: <code>developer</code>. It is not bundled into
+        <code>admin</code> or <code>owner</code> — an owner has to assign it deliberately,
+        under <strong>Users &amp; settings</strong>.
+      </p>
+      <p>
+        The role is intentionally narrow rather than a superset of admin. A contractor
+        running migrations has no business approving payments or reading vault secrets,
+        and this way you can grant one without the other. Platform staff
+        (<code>heimdall</code> / <code>pr0meth4us</code>) already hold every permission and so
+        have access as well.
+      </p>
+      <div class="alert alert-warning">
+        <strong>Warning:</strong>
+        <span>
+          Business owners, content managers and support staff cannot see the SQL Studio
+          link and are refused by the server if they request the URL directly.
+        </span>
+      </div>
 
-        // Active TOC Scrollspy
-        window.addEventListener('scroll', () => {
-            const sections = document.querySelectorAll('.doc-section');
-            const navLinks = document.querySelectorAll('.toc-item');
-            let current = '';
+      <h3 id="part6-safety">23 · What protects you</h3>
+      <p>
+        There is deliberately <strong>no blocklist of dangerous statements</strong>. Any such
+        filter is trivially bypassed with <code>DO $$ ... $$</code> or <code>EXECUTE</code>, and
+        its real cost is convincing people the tool is safer than it is. The protections
+        are structural instead:
+      </p>
+      <ul>
+        <li><strong>Nothing commits unless you ask.</strong> Statements run inside a
+            transaction that is rolled back unless <em>Commit changes</em> is ticked — so you
+            can run a <code>DELETE</code> and read the row count before meaning it.</li>
+        <li><strong>Every statement is audit-logged before it runs</strong>, against your
+            account. A query that takes the database down still leaves a record of who
+            ran it.</li>
+        <li><strong>A 15-second statement timeout.</strong> The tenant connection pool is
+            eight connections wide, so one runaway scan would otherwise starve the whole
+            console for that tenant.</li>
+        <li><strong>Results cap at 500 rows</strong>, so <code>SELECT *</code> on a large table
+            returns a preview instead of trying to serialise the table.</li>
+      </ul>
+      <div class="alert alert-danger">
+        <strong>Warning:</strong>
+        <span>
+          None of this prevents a committed <code>DROP TABLE users CASCADE</code>. Treat
+          <code>db:execute</code> as equivalent to production database credentials, because
+          that is what it is. Keep backups.
+        </span>
+      </div>
+    </section>
 
-            sections.forEach(section => {
-                const sectionTop = section.offsetTop - 100;
-                if (window.scrollY >= sectionTop) {
-                    current = section.getAttribute('id');
-                }
-            });
+    <p class="empty hidden" id="noResults">No sections match that filter.</p>
+  </main>
+</div>
 
-            navLinks.forEach(link => {
-                link.classList.remove('active');
-                if (link.getAttribute('href') === '#' + current) {
-                    link.classList.add('active');
-                }
-            });
-        });
-    </script>
+{% include 'backoffice/_chrome_js.html' %}
+<script>
+// Filter the table of contents, and hide sections whose text doesn't match, so
+// searching narrows the page itself rather than only the menu.
+function filterDocs() {
+  const q = document.getElementById('docSearch').value.trim().toLowerCase();
+  let visible = 0;
+
+  document.querySelectorAll('.toc-link').forEach(link => {
+    const heading = document.getElementById(link.dataset.target);
+    // A section heading matches if its own text or its section's text matches.
+    const scope = heading?.closest('.doc-section');
+    const hit = !q
+      || link.textContent.toLowerCase().includes(q)
+      || (heading?.textContent || '').toLowerCase().includes(q)
+      || (scope?.textContent || '').toLowerCase().includes(q);
+    link.hidden = !hit;
+    if (hit) visible++;
+  });
+
+  // A part heading with nothing left under it is just noise.
+  document.querySelectorAll('.toc-group').forEach(group => {
+    let any = false;
+    for (let el = group.nextElementSibling;
+         el && !el.classList.contains('toc-group');
+         el = el.nextElementSibling) {
+      if (!el.hidden) { any = true; break; }
+    }
+    group.hidden = !any;
+  });
+
+  document.querySelectorAll('.doc-section').forEach(section => {
+    section.hidden = !!q && !section.textContent.toLowerCase().includes(q);
+  });
+  document.getElementById('noResults').classList.toggle('hidden', visible > 0);
+}
+
+// Highlight the heading currently in view. rootMargin pins the trigger line near
+// the top so the active item changes as a heading reaches it, not when it is
+// halfway down the screen.
+const headings = [...document.querySelectorAll('.toc-link')]
+  .map(l => document.getElementById(l.dataset.target))
+  .filter(Boolean);
+
+if (headings.length && 'IntersectionObserver' in window) {
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      document.querySelectorAll('.toc-link').forEach(l => l.removeAttribute('aria-current'));
+      document.querySelector(`.toc-link[data-target="${entry.target.id}"]`)
+        ?.setAttribute('aria-current', 'true');
+    });
+  }, { rootMargin: '0px 0px -80% 0px' });
+
+  headings.forEach(h => observer.observe(h));
+}
+</script>
 </body>
 </html>

@@ -1,161 +1,133 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Global Users DB</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Plus Jakarta Sans', sans-serif; }</style>
+{% extends "backoffice/base.html" %}
 
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-</head>
-<body class="bg-slate-50 min-h-screen">
-<nav class="bg-white border-b border-slate-200 px-6 py-4 mb-8">
-    <div class="max-w-7xl mx-auto flex items-center space-x-4">
-        <a href="{{ url_for('backoffice.dashboard') }}" class="text-slate-500 hover:text-slate-900 font-bold">← Dashboard</a>
-        <div class="h-6 w-px bg-slate-200"></div>
-        <h1 class="text-xl font-bold text-slate-900">Global Account Database</h1>
-    </div>
-    <div class="flex items-center gap-4">
-        <a href="{{ url_for('backoffice.global_api_keys') }}" class="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-4 py-2 rounded-lg transition-all shadow-md shadow-amber-200">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
-            </svg>
-            API VAULT
-        </a>
-    </div>
-</nav>
+{% block title %}All users{% endblock %}
 
-<div class="max-w-7xl mx-auto px-6 pb-12" x-data="{ open: false, loading: false, user: null }">
+{% block head %}
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+{% endblock %}
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-    <div class="mb-6 space-y-2">
-        {% for category, message in messages %}
-        <div class="p-4 rounded-xl text-sm font-bold bg-white border shadow-sm
-                    {% if category == 'success' %}text-green-700 border-green-200
-                    {% elif category == 'danger' %}text-red-700 border-red-200
-                    {% elif category == 'warning' %}text-amber-800 border-amber-200
-                    {% else %}text-slate-700 border-slate-200{% endif %}">
-            {{ message }}
-        </div>
+{% block content %}
+{# `selected` rather than `user`: the old template shadowed its own x-for
+   variable with the fetch result, so the row that opened the dialog and the
+   dialog's contents fought over one name. #}
+<div class="main-pad space-y-4" x-data="{ open: false, loading: false, selected: null }">
+
+  <form class="flex gap-2 max-w-xl">
+    <label class="sr-only" for="q">Search users</label>
+    <input class="input" id="q" name="q" type="search" value="{{ query }}"
+           placeholder="Search by ID, email or name">
+    <button class="btn btn-primary" type="submit">Search</button>
+  </form>
+
+  <div class="card table-scroll">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Global ID</th>
+          <th>Identity</th>
+          <th>Providers</th>
+          <th class="text-right">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+          <tr>
+            <td class="mono muted select-all">{{ u._id }}</td>
+            <td>
+              <div class="font-medium">{{ u.display_name or 'Unknown' }}</div>
+              <div class="muted text-[12px]">{{ u.email }}</div>
+            </td>
+            <td>
+              <div class="flex flex-wrap gap-1">
+                {% for provider in u.auth_providers %}
+                  <span class="badge">{{ provider }}</span>
+                {% endfor %}
+              </div>
+            </td>
+            <td class="text-right">
+              <button type="button" class="btn btn-sm"
+                      @click="open = true; loading = true; selected = null;
+                              fetch('{{ url_for('backoffice.global_user_details', user_id=u._id) }}')
+                                .then(r => r.json())
+                                .then(d => { selected = d; loading = false; })
+                                .catch(() => { loading = false; })">
+                View
+              </button>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4"><p class="empty">No users match this search.</p></td></tr>
         {% endfor %}
-    </div>
-    {% endif %}
-    {% endwith %}
+      </tbody>
+    </table>
+  </div>
 
-    <div class="mb-8 max-w-2xl">
-        <form class="flex gap-4">
-            <input type="text" name="q" value="{{ query }}" placeholder="Search ID, Email, Username..." class="flex-grow p-4 bg-white border border-slate-200 rounded-2xl shadow-sm outline-none focus:border-indigo-600 font-medium">
-            <button type="submit" class="bg-slate-900 hover:bg-slate-800 text-white font-bold px-8 rounded-2xl transition">Search</button>
-        </form>
-    </div>
+  {# Escape closes it and focus is trapped by the browser's own dialog
+     semantics — x-show alone left keyboard users stuck behind the overlay. #}
+  <div x-show="open" x-cloak x-transition.opacity
+       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+       @keydown.escape.window="open = false"
+       role="dialog" aria-modal="true" aria-labelledby="user-dialog-title">
 
-    <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-        <table class="min-w-full divide-y divide-slate-100">
-            <thead class="bg-slate-50">
-            <tr>
-                <th class="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">Global ID</th>
-                <th class="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">Identity</th>
-                <th class="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">Providers</th>
-                <th class="px-6 py-4 text-right text-xs font-bold text-slate-400 uppercase">Action</th>
-            </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-            {% for user in users %}
-            <tr class="hover:bg-slate-50 transition-colors">
-                <td class="px-6 py-4 text-xs font-mono text-slate-400 select-all">{{ user._id }}</td>
-                <td class="px-6 py-4">
-                    <div class="font-bold text-slate-900">{{ user.display_name or 'Unknown' }}</div>
-                    <div class="text-xs text-slate-500">{{ user.email }}</div>
-                </td>
-                <td class="px-6 py-4">
-                    <div class="flex gap-2">
-                        {% for provider in user.auth_providers %}
-                        <span class="bg-slate-100 text-slate-600 px-2 py-1 rounded-md text-xs font-bold">{{ provider }}</span>
-                        {% endfor %}
-                    </div>
-                </td>
-                <td class="px-6 py-4 text-right">
-                    <button
-                            @click="open = true; loading = true;
-                                    fetch('/backoffice/users/{{ user._id }}/details')
-                                    .then(res => res.json())
-                                    .then(data => { user = data; loading = false; })"
-                            class="text-indigo-600 font-bold text-sm bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-lg transition-colors">
-                        View
-                    </button>
-                </td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    <div class="card w-full max-w-lg max-h-[85vh] overflow-auto" @click.outside="open = false">
+      <div class="card-head flex items-center justify-between">
+        <span id="user-dialog-title">User details</span>
+        <button type="button" class="btn btn-ghost btn-sm" @click="open = false"
+                aria-label="Close">✕</button>
+      </div>
 
-    <div x-show="open" style="display: none;"
-         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
-         x-transition.opacity>
+      <div class="card-pad">
+        <p x-show="loading" class="empty">Loading…</p>
 
-        <div @click.away="open = false" class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
-
-            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                <h3 class="text-xl font-bold text-slate-900">User Details</h3>
-                <button @click="open = false" class="text-slate-400 hover:text-slate-600 text-2xl font-bold">×</button>
+        <div x-show="!loading && selected" class="space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <div class="label">Display name</div>
+              <div x-text="selected?.display_name || '—'"></div>
             </div>
-
-            <div class="p-8">
-                <div x-show="loading" class="text-center py-10 text-slate-400">
-                    <p>Loading user data...</p>
-                </div>
-
-                <div x-show="!loading && user" class="space-y-6">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-400 uppercase">Display Name</label>
-                            <div class="text-slate-900 font-bold" x-text="user?.display_name || '-'"></div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-400 uppercase">Telegram ID</label>
-                            <div class="text-slate-900 font-mono text-sm" x-text="user?.telegram_id || '-'"></div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase">Email</label>
-                        <div class="text-slate-900 font-medium" x-text="user?.email || '-'"></div>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Linked Applications</label>
-                        <template x-if="user?.linked_apps && user.linked_apps.length > 0">
-                            <div class="space-y-2">
-                                <template x-for="app in user.linked_apps">
-                                    <div class="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                        <span class="font-bold text-slate-700" x-text="app.app_name"></span>
-                                        <span class="text-xs font-bold px-2 py-1 rounded bg-indigo-100 text-indigo-700" x-text="app.role"></span>
-                                    </div>
-                                </template>
-                            </div>
-                        </template>
-                        <template x-if="!user?.linked_apps || user.linked_apps.length === 0">
-                            <p class="text-sm text-slate-400 italic">No apps linked.</p>
-                        </template>
-                    </div>
-
-                    <div class="pt-6 mt-6 border-t border-slate-100">
-                        <form :action="'/backoffice/users/' + user?.id + '/delete'" method="POST" onsubmit="return confirm('⚠️ DANGER: This will permanently delete this user and all their links/history from the database. This cannot be undone.');">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                            <button type="submit" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 rounded-xl transition border border-red-200">
-                                Permanently Delete Global Account
-                            </button>
-                        </form>
-                    </div>
-                </div>
+            <div>
+              <div class="label">Telegram ID</div>
+              <div class="mono" x-text="selected?.telegram_id || '—'"></div>
             </div>
+          </div>
+
+          <div>
+            <div class="label">Email</div>
+            <div x-text="selected?.email || '—'"></div>
+          </div>
+
+          <div>
+            <div class="label">Linked applications</div>
+            <template x-if="selected?.linked_apps?.length">
+              <ul class="space-y-1.5">
+                <template x-for="a in selected.linked_apps" :key="a.app_name">
+                  <li class="flex items-center justify-between gap-2 px-3 py-2 rounded bg-surface-2">
+                    <span x-text="a.app_name"></span>
+                    <span class="badge badge-accent" x-text="a.role"></span>
+                  </li>
+                </template>
+              </ul>
+            </template>
+            <template x-if="!selected?.linked_apps?.length">
+              <p class="muted">No applications linked.</p>
+            </template>
+          </div>
+
+          <div class="danger-zone card-pad">
+            <div class="font-semibold text-danger mb-1">Delete this account</div>
+            <p class="muted text-[12px] mb-3">
+              Removes the account and every application link and history record.
+              This cannot be undone.
+            </p>
+            <form method="POST" :action="'/backoffice/users/' + selected?.id + '/delete'"
+                  onsubmit="return confirm('Permanently delete this user and all their links and history? This cannot be undone.');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <button type="submit" class="btn btn-danger w-full">Permanently delete account</button>
+            </form>
+          </div>
         </div>
+      </div>
     </div>
-
+  </div>
 </div>
-</body>
-</html>
+{% endblock %}

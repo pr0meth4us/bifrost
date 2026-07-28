@@ -1,0 +1,47 @@
+{# Role <option> list, in one place.
+
+   It was duplicated between the "add user" form and the "manage user" dialog,
+   which is how `developer` could be added to the RBAC matrix and still be
+   impossible to actually assign from either form. One macro, both callers.
+
+   What you may hand out is capped by your own role — an admin cannot mint
+   another owner. This mirrors the server-side check in user_routes.py; it does
+   not replace it. #}
+{% macro role_options(current_role, selected=None) %}
+  {% set escalating = current_role in ('admin', 'super_admin', 'owner', 'heimdall', 'pr0meth4us') %}
+  {% set senior = current_role in ('super_admin', 'owner', 'heimdall', 'pr0meth4us') %}
+  {% set owner_level = current_role in ('owner', 'heimdall', 'pr0meth4us') %}
+
+  <optgroup label="End users">
+    <option value="guest"        {{ 'selected' if selected == 'guest' }}>Guest</option>
+    <option value="user"         {{ 'selected' if selected == 'user' }}>User</option>
+    <option value="premium_user" {{ 'selected' if selected == 'premium_user' }}>Premium</option>
+  </optgroup>
+
+  {% if escalating %}
+    <optgroup label="Console staff">
+      <option value="content_manager" {{ 'selected' if selected == 'content_manager' }}>Content manager</option>
+      <option value="operations"      {{ 'selected' if selected == 'operations' }}>Operations / billing</option>
+    </optgroup>
+  {% endif %}
+
+  {% if senior %}
+    <optgroup label="Technical">
+      {# Raw SQL against the live tenant database. Deliberately not bundled into
+         admin — it has to be handed out on purpose. #}
+      <option value="developer" {{ 'selected' if selected == 'developer' }}>Developer (raw SQL access)</option>
+    </optgroup>
+  {% endif %}
+
+  <optgroup label="Administrators">
+    {% if senior %}
+      <option value="admin" {{ 'selected' if selected == 'admin' }}>App admin</option>
+    {% endif %}
+    {% if owner_level %}
+      <option value="super_admin" {{ 'selected' if selected == 'super_admin' }}>App super admin</option>
+      <option value="owner"       {{ 'selected' if selected == 'owner' }}>Owner (transfers ownership)</option>
+    {% endif %}
+  </optgroup>
+
+  <option value="banned" {{ 'selected' if selected == 'banned' }}>Banned</option>
+{% endmacro %}

@@ -1,47 +1,31 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Verify sign-in | Bifrost Console</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Plus Jakarta Sans', sans-serif; }</style>
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-</head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center px-6">
-<main class="w-full max-w-sm">
-    <h1 class="text-2xl font-bold mb-2">Verify it's you</h1>
-    <p class="text-sm text-slate-400 mb-6">
-        We sent a 6-digit code to <span class="font-semibold text-slate-200">{{ email }}</span>.
-        It expires in 10 minutes.
-    </p>
+{% extends "backoffice/base_auth.html" %}
+{% block title %}Verify sign-in{% endblock %}
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% for category, message in messages %}
-            <div class="mb-4 p-3 rounded-xl text-xs font-semibold
-                {% if category == 'danger' %}bg-red-950 text-red-300 border border-red-800
-                {% else %}bg-slate-800 text-slate-300 border border-slate-700{% endif %}">
-                {{ message }}
-            </div>
-        {% endfor %}
-    {% endwith %}
+{% block content %}
+<h2 class="text-base font-semibold mb-1">Verify it's you</h2>
+<p class="muted text-[13px] mb-5">
+  We sent a 6-digit code to <span class="font-semibold text-fg">{{ email }}</span>.
+  It expires in 10 minutes.
+</p>
 
-    <form method="POST" class="space-y-4">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-        <label for="otp" class="block text-xs font-bold text-slate-400 uppercase tracking-wide">Verification code</label>
-        <input id="otp" name="otp" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6"
-               autocomplete="one-time-code" autofocus required
-               class="w-full p-4 bg-slate-950 border border-slate-800 rounded-xl text-center text-2xl font-bold tracking-[0.4em] outline-none focus:border-indigo-500">
-        <button type="submit"
-                class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 font-extrabold text-xs tracking-wider uppercase rounded-xl transition">
-            Verify &amp; sign in
-        </button>
-    </form>
+<form method="POST" class="space-y-4">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
-    <a href="{{ url_for('backoffice.login') }}" class="block mt-6 text-center text-xs font-semibold text-slate-500 hover:text-slate-300">
-        Back to sign in
-    </a>
-</main>
-</body>
-</html>
+  <div>
+    <label class="label" for="otp">Verification code</label>
+    {# autocomplete="one-time-code" is what lets iOS/macOS offer the SMS or
+       mail code straight from the keyboard — do not drop it. #}
+    <input class="input mono text-center text-xl tracking-[0.4em]" id="otp" name="otp"
+           type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+           autocomplete="one-time-code" autofocus required>
+  </div>
+
+  <button type="submit" class="btn btn-primary w-full">Verify and sign in</button>
+</form>
+{% endblock %}
+
+{% block below_card %}
+<p class="text-center mt-4">
+  <a class="text-[13px] muted hover:text-fg" href="{{ url_for('backoffice.login') }}">Back to sign in</a>
+</p>
+{% endblock %}

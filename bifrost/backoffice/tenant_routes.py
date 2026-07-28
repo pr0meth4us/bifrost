@@ -816,6 +816,10 @@ def cms_onboarding(app_id_or_slug=None):
     # If it's empty, generate smart config
     if not cms_config.get('tables') and not cms_config.get('hidden_tables'):
         smart_config = _generate_smart_cms_config(all_tables)
+        # Preserve non-schema config (e.g. payment_queue) from bootstrap or previous setup
+        for k, v in cms_config.items():
+            if k not in ('is_onboarded', 'hidden_tables', 'tables', 'roles', 'table_groups'):
+                smart_config[k] = v
     else:
         smart_config = cms_config
         
@@ -1011,4 +1015,3 @@ def cms_rbac(app_id):
         cms_config=cms_config,
         current_role=current_role
     )
-

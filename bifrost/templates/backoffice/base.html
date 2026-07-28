@@ -1,0 +1,71 @@
+{# ============================================================================
+   The console shell — sidebar + topbar + content. Every signed-in backoffice
+   page extends this. Sign-in screens extend base_auth.html instead.
+
+   Before these existed, all 15 templates were standalone <!DOCTYPE html> files,
+   each re-declaring its own fonts, its own Tailwind build and its own nav —
+   which is why the console looked like several unrelated products stitched
+   together. Nothing in backoffice/ should open its own <html> again.
+
+   Blocks:
+     title          — browser tab text (the active app's name is appended)
+     page_title     — heading in the topbar; defaults to `title`
+     topbar_actions — controls on the right, before the theme toggle
+     content        — the page itself
+     head, scripts  — per-page <head> additions / end-of-body scripts
+
+   Set `khmer = true` before extending on any page that renders tenant content
+   (see _khmer_font.html for why the line-height matters).
+   ========================================================================= #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+{% include 'backoffice/_head.html' %}
+<title>{% block title %}{{ title|default('Console') }}{% endblock %}{{ ' · ' ~ app.app_name if app }}</title>
+{% block head %}{% endblock %}
+</head>
+
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<div class="shell">
+  {% block sidebar %}{% include 'backoffice/_nav.html' %}{% endblock %}
+
+  <div class="main">
+    <header class="topbar">
+      <div class="flex items-center gap-3 min-w-0">
+        <button type="button" class="btn btn-ghost btn-sm sidebar-toggle"
+                aria-label="Toggle navigation" aria-expanded="false"
+                onclick="toggleSidebar(this)">☰</button>
+        <h1 class="page-title truncate">{% block page_title %}{{ self.title() }}{% endblock %}</h1>
+      </div>
+
+      <div class="flex items-center gap-2">
+        {% block topbar_actions %}{% endblock %}
+
+        {% if current_role %}
+          <span class="badge" title="Your role in this application">{{ current_role }}</span>
+        {% endif %}
+
+        <button type="button" class="btn btn-ghost btn-sm" onclick="toggleTheme()"
+                aria-label="Switch between light and dark theme">
+          <span aria-hidden="true">◐</span>
+        </button>
+
+        {% if session.get('backoffice_user') %}
+          <a href="{{ url_for('backoffice.logout') }}" class="btn btn-ghost btn-sm">Sign out</a>
+        {% endif %}
+      </div>
+    </header>
+
+    <main id="main" class="flex-1 min-w-0 flex flex-col">
+      {% include 'backoffice/_flash.html' %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+{% include 'backoffice/_chrome_js.html' %}
+{% block scripts %}{% endblock %}
+</body>
+</html>

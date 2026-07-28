@@ -1,0 +1,220 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}SQL Studio{% endblock %}
+{% block page_title %}SQL Studio · {{ app.app_name }}{% endblock %}
+
+{% block head %}
+<style>
+  /* Split pane: editor on top, results below, only the results scroll. */
+  .studio { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100%; }
+  .sql-input {
+    width: 100%; min-height: 190px; resize: vertical;
+    padding: 12px 14px;
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.65;
+    tab-size: 2;
+    border: 1px solid rgb(var(--c-border-strong));
+    border-radius: var(--radius);
+    background: rgb(var(--c-surface)); color: rgb(var(--c-fg));
+  }
+  .schema-chip {
+    font-family: var(--font-mono); font-size: 12px;
+    padding: 2px 7px; border-radius: var(--radius);
+    border: 1px solid rgb(var(--c-border));
+    background: rgb(var(--c-surface-2)); color: rgb(var(--c-fg-muted));
+    cursor: pointer;
+  }
+  .schema-chip:hover { color: rgb(var(--c-accent)); border-color: rgb(var(--c-accent)); }
+  .result-table td { font-family: var(--font-mono); font-size: 12.5px; white-space: pre; }
+  .result-null { color: rgb(var(--c-fg-subtle)); font-style: italic; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="studio main-pad gap-4">
+
+  <div class="flex flex-col gap-3">
+    <div class="danger-zone card-pad">
+      <div class="flex items-start gap-2 text-danger">
+        <strong>Direct database access.</strong>
+        <span class="text-fg-muted">
+          Statements run against <strong>{{ app.app_name }}</strong>'s live database with no
+          undo. Every statement is recorded in the audit log against your account.
+        </span>
+      </div>
+    </div>
+
+    {% if not db_configured %}
+      <div class="alert alert-warning">
+        <strong>Warning:</strong>
+        <span>No tenant database is configured for this application, so nothing can run yet.</span>
+      </div>
+    {% endif %}
+
+    {% if tables %}
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class="text-[11px] muted font-semibold uppercase tracking-wide mr-1">Tables</span>
+        {% for t in tables %}
+          <button type="button" class="schema-chip" onclick="insertTable('{{ t }}')"
+                  title="Insert &quot;{{ t }}&quot; at the cursor">{{ t }}</button>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div>
+      <label class="label" for="sql">SQL</label>
+      <textarea id="sql" class="sql-input" spellcheck="false" autocapitalize="off"
+                autocorrect="off" aria-describedby="sql-hint"
+                placeholder="SELECT * FROM users LIMIT 20;">{{ '' }}</textarea>
+      <p class="hint" id="sql-hint">
+        Multiple statements are allowed, separated by semicolons.
+        Queries are cancelled after {{ timeout_seconds }}s and at most {{ max_rows }} rows are shown.
+        Press <kbd class="mono">Ctrl</kbd>/<kbd class="mono">⌘</kbd> + <kbd class="mono">Enter</kbd> to run.
+      </p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <button type="button" class="btn btn-primary" id="run" onclick="runSql()"
+              {% if not db_configured %}disabled{% endif %}>Run SQL</button>
+
+      <label class="flex items-center gap-2 cursor-pointer select-none">
+        <input type="checkbox" id="commit" class="w-4 h-4 accent-[rgb(var(--c-danger))]">
+        <span>Commit changes</span>
+      </label>
+      <span class="text-[12px] muted">
+        Unchecked, everything is rolled back — safe for testing a <span class="mono">DELETE</span>
+        before you mean it.
+      </span>
+
+      <span class="ml-auto text-[12px] muted" id="timing" aria-live="polite"></span>
+    </div>
+  </div>
+
+  <div class="card flex flex-col min-h-0">
+    <div class="card-head flex items-center justify-between">
+      <span>Output</span>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="clearOutput()">Clear</button>
+    </div>
+    <div class="flex-1 min-h-0 overflow-auto" id="output" aria-live="polite">
+      <p class="empty m-4">Results appear here.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const EXECUTE_URL = "{{ url_for('backoffice.devtools_execute', app_id=app._id|string) }}";
+const editor = document.getElementById('sql');
+const output = document.getElementById('output');
+const timing = document.getElementById('timing');
+const runBtn = document.getElementById('run');
+
+function insertTable(name) {
+  const start = editor.selectionStart, end = editor.selectionEnd;
+  editor.setRangeText(name, start, end, 'end');
+  editor.focus();
+}
+
+function clearOutput() {
+  output.innerHTML = '<p class="empty m-4">Results appear here.</p>';
+  timing.textContent = '';
+}
+
+editor.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); runSql(); }
+});
+
+// Everything from the server is inserted as a text node, never as HTML — the
+// column names and cell values come out of a tenant database we do not control.
+function el(tag, className, text) {
+  const n = document.createElement(tag);
+  if (className) n.className = className;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+
+function showMessage(variant, title, body) {
+  output.replaceChildren();
+  const box = el('div', 'alert alert-' + variant + ' m-4');
+  box.append(el('strong', 'shrink-0', title + ':'));
+  box.append(el('span', 'mono whitespace-pre-wrap', body));
+  output.append(box);
+}
+
+function showRows(data) {
+  output.replaceChildren();
+
+  if (data.row_count === 0) {
+    output.append(el('p', 'empty m-4', 'Query ran successfully and returned no rows.'));
+    return;
+  }
+
+  const wrap = el('div', 'table-scroll');
+  const table = el('table', 'table result-table');
+
+  const thead = el('thead');
+  const hr = el('tr');
+  data.columns.forEach(c => hr.append(el('th', null, c)));
+  thead.append(hr);
+  table.append(thead);
+
+  const tbody = el('tbody');
+  data.rows.forEach(row => {
+    const tr = el('tr');
+    row.forEach(v => {
+      tr.append(v === null ? el('td', 'result-null', 'NULL')
+                           : el('td', null, String(v)));
+    });
+    tbody.append(tr);
+  });
+  table.append(tbody);
+  wrap.append(table);
+  output.append(wrap);
+
+  if (data.truncated) {
+    output.append(el('p', 'hint px-4 py-3',
+      'Showing the first {{ max_rows }} rows. Add a LIMIT or a WHERE clause to narrow this down.'));
+  }
+}
+
+async function runSql() {
+  const sql = editor.value.trim();
+  if (!sql) { showMessage('warning', 'Nothing to run', 'The editor is empty.'); return; }
+
+  const commit = document.getElementById('commit').checked;
+  runBtn.disabled = true;
+  timing.textContent = 'Running…';
+
+  try {
+    const res = await fetch(EXECUTE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+      body: JSON.stringify({ sql, commit }),
+    });
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      showMessage('danger', 'Postgres error', data.error || ('HTTP ' + res.status));
+    } else if (data.kind === 'rows') {
+      showRows(data);
+    } else {
+      showMessage('success', 'Success',
+        (data.message || 'Statement completed') +
+        (data.affected_rows >= 0 ? ' — ' + data.affected_rows + ' row(s) affected' : ''));
+    }
+
+    if (data.elapsed_ms !== undefined) {
+      timing.textContent = data.elapsed_ms + ' ms · ' +
+        (data.committed ? 'committed' : 'rolled back');
+    } else {
+      timing.textContent = '';
+    }
+  } catch (err) {
+    showMessage('danger', 'Request failed', String(err));
+    timing.textContent = '';
+  } finally {
+    runBtn.disabled = false;
+  }
+}
+</script>
+{% endblock %}

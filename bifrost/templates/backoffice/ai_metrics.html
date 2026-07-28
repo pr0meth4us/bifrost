@@ -1,272 +1,227 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Heimdall Vision | Vertex AI Metrics</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        body { 
-            font-family: 'Plus Jakarta Sans', sans-serif; 
-            background-color: #020617;
-            color: #f8fafc;
-            background-image: 
-                radial-gradient(circle at 15% 50%, rgba(16, 185, 129, 0.08), transparent 25%),
-                radial-gradient(circle at 85% 30%, rgba(56, 189, 248, 0.08), transparent 25%);
-        }
-        
-        .glass-panel {
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(51, 65, 85, 0.5);
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 
-                        inset 0 1px 0 rgba(255, 255, 255, 0.05);
-        }
-        .text-glow-green {
-            color: #4ade80;
-            text-shadow: 0 0 10px rgba(74, 222, 128, 0.4);
-        }
-    </style>
-</head>
-<body class="min-h-screen w-full flex flex-col p-4 sm:p-6 lg:p-8">
-    <header class="flex justify-between items-center w-full mb-6 z-10">
-        <div class="flex items-center gap-4">
-            <a href="{{ url_for('backoffice.dashboard') }}" class="group flex items-center justify-center w-10 h-10 rounded-full bg-slate-800/80 border border-slate-700 hover:bg-slate-700 hover:border-slate-500 transition-all shadow-lg hover:shadow-slate-500/20">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5 text-slate-300 group-hover:text-white transition-colors">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                </svg>
-            </a>
-            <div>
-                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight flex items-center gap-3">
-                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">Heimdall</span>
-                    <span class="text-white">Vision</span>
-                </h1>
-                <div class="flex items-center gap-2 mt-1">
-                    <p class="text-xs sm:text-sm font-mono text-slate-400 uppercase tracking-widest text-glow-green opacity-80">
-                        Vertex AI Token Usage (30 Days)
-                    </p>
-                </div>
-            </div>
-        </div>
-    </header>
+{% extends "backoffice/base.html" %}
 
-    <main class="flex-grow w-full max-w-7xl mx-auto z-10 space-y-6">
-        
-        {% if error %}
-        <div class="glass-panel border-rose-500/50 p-6 rounded-2xl">
-            <h2 class="text-rose-400 font-bold mb-2">Error Fetching Metrics</h2>
-            <p class="text-slate-300 font-mono text-sm">{{ error }}</p>
-        </div>
-        {% else %}
-        
-        <!-- Grand Totals -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div class="glass-panel p-5 rounded-2xl">
-                <p class="text-xs font-mono text-slate-400 uppercase tracking-widest mb-1">Total Tokens</p>
-                <p class="text-3xl font-bold text-white">{{ "{:,}".format(grand_input + grand_output) }}</p>
-            </div>
-            <div class="glass-panel p-5 rounded-2xl">
-                <p class="text-xs font-mono text-slate-400 uppercase tracking-widest mb-1">Total Requests</p>
-                <p class="text-3xl font-bold text-white">{{ "{:,}".format(grand_requests) }}</p>
-            </div>
-            <div class="glass-panel p-5 rounded-2xl">
-                <p class="text-xs font-mono text-slate-400 uppercase tracking-widest mb-1">Est. Total Cost</p>
-                <p class="text-3xl font-bold text-emerald-400">${{ "%.4f"|format(grand_cost) }}</p>
-            </div>
-            <div class="glass-panel p-5 rounded-2xl">
-                <p class="text-xs font-mono text-slate-400 uppercase tracking-widest mb-1">Input / Output</p>
-                <div class="flex flex-col gap-1 mt-1">
-                    <span class="text-xs font-mono text-blue-400">IN: {{ "{:,}".format(grand_input) }}</span>
-                    <span class="text-xs font-mono text-fuchsia-400">OUT: {{ "{:,}".format(grand_output) }}</span>
-                </div>
-            </div>
-        </div>
+{% block title %}AI metrics{% endblock %}
+{% block page_title %}AI metrics · last 30 days{% endblock %}
 
-        <!-- Financial Overview (BigQuery) -->
-        {% if billing %}
-        <div class="glass-panel p-5 rounded-2xl mb-8 bg-gradient-to-r from-blue-900/20 to-purple-900/20 border border-slate-700/50">
-            <div class="flex flex-col md:flex-row justify-between items-center border-b border-slate-700/50 pb-4 mb-4">
-                <div class="flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
-                        <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    </div>
-                    <div>
-                        <h3 class="text-sm font-mono text-slate-300 uppercase tracking-widest">Billing Export</h3>
-                        {% if billing.status == 'ready' %}
-                            <p class="text-xs text-green-400 font-mono mt-1">● Live Sync Active</p>
-                        {% else %}
-                            <p class="text-xs text-amber-400 font-mono mt-1">● Waiting for GCP (up to 24h)</p>
-                        {% endif %}
-                    </div>
-                </div>
-                
-                <div class="text-right mt-4 md:mt-0">
-                    <p class="text-xs font-mono text-slate-400 uppercase tracking-widest">Total Spend</p>
-                    <p class="text-2xl font-bold text-white">${{ "%.2f"|format(billing.total_spend) }}</p>
-                </div>
-            </div>
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
 
-            {% if billing.services %}
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse text-xs font-mono">
-                    <thead>
-                        <tr class="border-b border-slate-700/50 text-slate-400">
-                            <th class="pb-2">GCP Service</th>
-                            <th class="pb-2 text-right">Raw Cost</th>
-                            <th class="pb-2 text-right">Credits Applied</th>
-                            <th class="pb-2 text-right">Net Cost</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-800/40 text-slate-300">
-                        {% for service, data in billing.services.items() %}
-                        <tr class="hover:bg-slate-800/10">
-                            <td class="py-2.5 font-semibold text-slate-300">{{ service }}</td>
-                            <td class="py-2.5 text-right text-white">${{ "%.4f"|format(data.cost) }}</td>
-                            <td class="py-2.5 text-right text-slate-400">
-                                {% if data.credits != 0 %}
-                                    -${{ "%.4f"|format(data.credits|abs) }}
-                                {% else %}
-                                    $0.0000
-                                {% endif %}
-                            </td>
-                            <td class="py-2.5 text-right font-bold {% if (data.cost + data.credits) > 0.0001 %}text-amber-400{% elif (data.cost + data.credits) < -0.0001 %}text-green-400{% else %}text-slate-400{% endif %}">
-                                ${{ "%.4f"|format(data.cost + data.credits) }}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+{% block content %}
+<div class="main-pad space-y-4">
+
+  {% if error %}
+    <div class="alert alert-danger">
+      <strong>Error:</strong>
+      <span class="mono">{{ error }}</span>
+    </div>
+  {% else %}
+
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {% set stats = [
+        ('Total tokens',   '{:,}'.format(grand_input + grand_output)),
+        ('Requests',       '{:,}'.format(grand_requests)),
+        ('Estimated cost', '${:.4f}'.format(grand_cost)),
+      ] %}
+      {% for label, value in stats %}
+        <div class="card card-pad">
+          <div class="label">{{ label }}</div>
+          <div class="text-2xl font-semibold tabular-nums">{{ value }}</div>
+        </div>
+      {% endfor %}
+      <div class="card card-pad">
+        <div class="label">Input / output</div>
+        <div class="mono">{{ "{:,}".format(grand_input) }} in</div>
+        <div class="mono">{{ "{:,}".format(grand_output) }} out</div>
+      </div>
+    </div>
+
+    {% if billing %}
+      <div class="card">
+        <div class="card-head flex flex-wrap items-center justify-between gap-2">
+          <span class="flex items-center gap-2">
+            Billing export
+            {% if billing.status == 'ready' %}
+              <span class="badge badge-success">Live</span>
+            {% else %}
+              <span class="badge badge-warning" title="GCP billing export can lag by up to 24 hours">
+                Waiting on GCP
+              </span>
             {% endif %}
+          </span>
+          <span>
+            <span class="label inline">Total spend</span>
+            <strong class="tabular-nums">${{ "%.2f"|format(billing.total_spend) }}</strong>
+          </span>
         </div>
+
+        {% if billing.services %}
+          <div class="table-scroll">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>GCP service</th>
+                  <th class="text-right">Raw cost</th>
+                  <th class="text-right">Credits</th>
+                  <th class="text-right">Net</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for service, data in billing.services.items() %}
+                  {% set net = data.cost + data.credits %}
+                  <tr>
+                    <td>{{ service }}</td>
+                    <td class="text-right mono tabular-nums">${{ "%.4f"|format(data.cost) }}</td>
+                    <td class="text-right mono tabular-nums muted">
+                      {% if data.credits %}−${{ "%.4f"|format(data.credits|abs) }}{% else %}$0.0000{% endif %}
+                    </td>
+                    <td class="text-right mono tabular-nums font-semibold
+                               {% if net > 0.0001 %}text-warning{% elif net < -0.0001 %}text-success{% endif %}">
+                      ${{ "%.4f"|format(net) }}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         {% endif %}
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            <!-- Left Column: Project Breakdown & Models -->
-            <div class="lg:col-span-1 space-y-6">
-                <!-- Projects -->
-                <div class="glass-panel p-5 rounded-2xl">
-                    <h3 class="text-sm font-bold text-slate-200 uppercase tracking-widest mb-4">Projects</h3>
-                    <div class="space-y-4">
-                        {% for p in projects %}
-                        <div class="p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                            <div class="flex justify-between items-center mb-2">
-                                <span class="font-bold text-sm" style="color: {{ p.color | replace('rgba(', 'rgb(') | replace(', 0.7)', ')') }}">{{ p.label }}</span>
-                                <span class="text-emerald-400 font-mono text-xs">${{ "%.4f"|format(p.cost) }}</span>
-                            </div>
-                            <div class="flex justify-between text-xs text-slate-400 font-mono">
-                                <span>Tokens: {{ "{:,}".format(p.input + p.output) }}</span>
-                                <span>Reqs: {{ "{:,}".format(p.requests) }}</span>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                
-                <!-- Models -->
-                <div class="glass-panel p-5 rounded-2xl">
-                    <h3 class="text-sm font-bold text-slate-200 uppercase tracking-widest mb-4">Models Used</h3>
-                    <div class="space-y-3">
-                        {% for model, tokens in grand_models.items() %}
-                        <div class="flex justify-between items-center text-sm font-mono border-b border-slate-700/30 pb-2">
-                            <span class="text-slate-300">{{ model }}</span>
-                            <span class="text-blue-400">{{ "{:,}".format(tokens) }}</span>
-                        </div>
-                        {% endfor %}
-                        {% if not grand_models %}
-                        <p class="text-xs text-slate-500 italic">No model breakdown available.</p>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Column: Charts -->
-            <div class="lg:col-span-2 space-y-6">
-                <!-- Token Chart -->
-                <div class="glass-panel p-5 rounded-2xl h-[320px]">
-                    <h3 class="text-xs font-mono text-slate-400 uppercase tracking-widest mb-2">Daily Tokens by Project</h3>
-                    <canvas id="tokenChart"></canvas>
-                </div>
-                <!-- Requests Chart -->
-                <div class="glass-panel p-5 rounded-2xl h-[280px]">
-                    <h3 class="text-xs font-mono text-slate-400 uppercase tracking-widest mb-2">Daily API Requests by Project</h3>
-                    <canvas id="requestChart"></canvas>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-    </main>
-
-    {% if not error %}
-    <script>
-        const dates = {{ dates | tojson }};
-        const projects = {{ projects | tojson }};
-        
-        // Build datasets for Tokens (stacked)
-        const tokenDatasets = [];
-        const reqDatasets = [];
-        
-        projects.forEach(p => {
-            const rgbColor = p.color + ", 1)";
-            const bgToken = p.color + ", 0.7)";
-            const bgReq = p.color + ", 0.5)";
-            
-            // Combine input+output per day for the token chart
-            const dailyTokens = p.input_by_day.map((inp, i) => inp + p.output_by_day[i]);
-            
-            tokenDatasets.push({
-                label: p.label + ' Tokens',
-                data: dailyTokens,
-                backgroundColor: bgToken,
-                borderColor: rgbColor,
-                borderWidth: 1,
-                stack: 'Stack 0',
-            });
-            
-            reqDatasets.push({
-                label: p.label + ' Reqs',
-                data: p.requests_by_day,
-                backgroundColor: bgReq,
-                borderColor: rgbColor,
-                borderWidth: 2,
-                tension: 0.3,
-                fill: true
-            });
-        });
-
-        const commonOptions = {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { labels: { color: '#cbd5e1', font: {family: 'Plus Jakarta Sans'} } },
-                tooltip: {
-                    mode: 'index', intersect: false,
-                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                    titleColor: '#fff', bodyColor: '#cbd5e1',
-                    borderColor: 'rgba(51, 65, 85, 0.5)', borderWidth: 1
-                }
-            },
-            scales: {
-                x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51, 65, 85, 0.2)' } },
-                y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51, 65, 85, 0.2)' } }
-            }
-        };
-
-        new Chart(document.getElementById('tokenChart').getContext('2d'), {
-            type: 'bar',
-            data: { labels: dates, datasets: tokenDatasets },
-            options: { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, stacked: true } } }
-        });
-
-        new Chart(document.getElementById('requestChart').getContext('2d'), {
-            type: 'line',
-            data: { labels: dates, datasets: reqDatasets },
-            options: commonOptions
-        });
-    </script>
+      </div>
     {% endif %}
-</body>
-</html>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+      <div class="space-y-4">
+        <div class="card">
+          <div class="card-head">Projects</div>
+          <div class="card-pad space-y-2">
+            {% for p in projects %}
+              <div class="p-3 rounded bg-surface-2">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="font-medium truncate">{{ p.label }}</span>
+                  <span class="mono tabular-nums">${{ "%.4f"|format(p.cost) }}</span>
+                </div>
+                <div class="flex justify-between muted text-[12px] tabular-nums">
+                  <span>{{ "{:,}".format(p.input + p.output) }} tokens</span>
+                  <span>{{ "{:,}".format(p.requests) }} requests</span>
+                </div>
+              </div>
+            {% else %}
+              <p class="muted">No project activity.</p>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">Models used</div>
+          <div class="card-pad">
+            {% if grand_models %}
+              <table class="table">
+                <tbody>
+                  {% for model, tokens in grand_models.items() %}
+                    <tr>
+                      <td class="mono">{{ model }}</td>
+                      <td class="text-right mono tabular-nums">{{ "{:,}".format(tokens) }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            {% else %}
+              <p class="muted">No model breakdown available.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="lg:col-span-2 space-y-4">
+        <div class="card card-pad">
+          <div class="label">Daily tokens by project</div>
+          <div class="h-72"><canvas id="tokenChart"></canvas></div>
+        </div>
+        <div class="card card-pad">
+          <div class="label">Daily requests by project</div>
+          <div class="h-64"><canvas id="requestChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if not error %}
+<script>
+const dates = {{ dates | tojson }};
+const projects = {{ projects | tojson }};
+
+// Chart.js has no idea about our CSS variables, so read the resolved values off
+// the document and re-read them when the theme flips. Hard-coded slate hexes
+// were why these charts stayed dark-mode-only.
+function token(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+function rgb(name, alpha) {
+  return 'rgb(' + token(name) + (alpha === undefined ? ')' : ' / ' + alpha + ')');
+}
+
+const tokenDatasets = [];
+const requestDatasets = [];
+
+projects.forEach(p => {
+  const line = p.color + ', 1)';
+  tokenDatasets.push({
+    label: p.label,
+    data: p.input_by_day.map((v, i) => v + p.output_by_day[i]),
+    backgroundColor: p.color + ', 0.7)',
+    borderColor: line,
+    borderWidth: 1,
+    stack: 'tokens',
+  });
+  requestDatasets.push({
+    label: p.label,
+    data: p.requests_by_day,
+    backgroundColor: p.color + ', 0.4)',
+    borderColor: line,
+    borderWidth: 2,
+    tension: 0.3,
+    fill: true,
+  });
+});
+
+function options(stacked) {
+  const grid = rgb('--c-border', 0.6);
+  const text = rgb('--c-fg-muted');
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { labels: { color: text, font: { family: 'system-ui' } } },
+      tooltip: {
+        backgroundColor: rgb('--c-surface'),
+        titleColor: rgb('--c-fg'),
+        bodyColor: text,
+        borderColor: rgb('--c-border'),
+        borderWidth: 1,
+      },
+    },
+    scales: {
+      x: { ticks: { color: text }, grid: { color: grid } },
+      y: { ticks: { color: text }, grid: { color: grid }, stacked: stacked },
+    },
+  };
+}
+
+const charts = [
+  new Chart(document.getElementById('tokenChart'), {
+    type: 'bar', data: { labels: dates, datasets: tokenDatasets }, options: options(true),
+  }),
+  new Chart(document.getElementById('requestChart'), {
+    type: 'line', data: { labels: dates, datasets: requestDatasets }, options: options(false),
+  }),
+];
+
+new MutationObserver(() => {
+  charts.forEach((c, i) => { c.options = options(i === 0); c.update(); });
+}).observe(document.documentElement, { attributeFilter: ['data-theme'] });
+</script>
+{% endif %}
+{% endblock %}

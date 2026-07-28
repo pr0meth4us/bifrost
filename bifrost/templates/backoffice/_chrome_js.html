@@ -1,0 +1,19 @@
+{# The only two behaviours the shell itself needs. Shared by base.html and
+   base_auth.html — the theme toggle exists on the sign-in screen too, so a
+   dark-mode user never gets flashbanged on the way in. #}
+<script>
+function toggleTheme() {
+  var el = document.documentElement;
+  var next = el.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  el.setAttribute('data-theme', next);
+  try { localStorage.setItem('valhalla-theme', next); } catch (e) {}
+}
+
+function toggleSidebar(btn) {
+  var nav = document.querySelector('.sidebar');
+  if (!nav) return;
+  var open = nav.getAttribute('data-open') !== 'true';
+  nav.setAttribute('data-open', open);
+  btn.setAttribute('aria-expanded', open);
+}
+</script>
