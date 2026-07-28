@@ -6,6 +6,7 @@ work. Gap analysis and vendor reply in `docs/scope-response-admin-console.md`;
 operator runbook in `docs/console-onboarding.md`.
 
 ### Fixed
+- **Missing `.gitmodules` file caused submodule build failure**: Added `.gitmodules` configuration for submodule `prolong` (`https://github.com/pr0meth4us/prolong.git`) resolving `fatal: No url found for submodule path 'prolong' in .gitmodules` during automated CI/CD git clones.
 - **CSRF tokens were missing from every backoffice form.** `CSRFProtect` had been enabled without them, so approve, reject, refund and all CMS writes were returning 400. Tokens added to all 10 templates; `/api/tenant/<app_id>/payments/notify-new` explicitly exempted (machine-to-machine, secret-authenticated) and its secret comparison made constant-time.
 - **Refund could never succeed** — the route required a `track_id` the form never sent. The track is now derived from the payment itself, never from a form field.
 - **The approval webhook silently never fired** — a tenant Postgres `user_id` was passed where a Bifrost `ObjectId` was expected and the `InvalidId` was swallowed. The payer is now resolved from their email, and a failure to resolve is surfaced instead of reported as success.
@@ -17,6 +18,7 @@ operator runbook in `docs/console-onboarding.md`.
 - `assert`-based SQL identifier guards replaced with `safe_ident()` raising `ValueError` (asserts vanish under `python -O`).
 
 ### Added
+- **Unified Claude Artifact-styled Documentation Portal (`/docs`)**: Redesigned `bifrost/templates/docs.html` into a single, sectionized, external-facing documentation hub styled with Claude Artifact aesthetics (dark mode, glassmorphism panels, `Plus Jakarta Sans` typography, and JetBrains Mono code blocks). Covers Part I: Getting Started & SDK, Part II: Secrets Vault & Services API, Part III: Webhook HMAC Signatures, Part IV: 3-Step CMS Onboarding Wizard, and Part V: Console Operator's Manual & Money Path rules.
 - **Payment state machine** enforced server-side: `FREE → PENDING → PREMIUM | REJECTED`, `PREMIUM → REFUNDED`, with `SELECT … FOR UPDATE`, mandatory reason codes, and actor/timestamp/reason on every transition.
 - **Duplicate `txn_ref` rejection** inside the approving transaction, surfacing the earlier payment; duplicate-receipt detection by checksum (or URL where the column is absent).
 - **MFA on all console accounts** — emailed 6-digit second factor, no session issued until it verifies. Plus admin session policy (30 min idle / 8 h max, HttpOnly/SameSite/Secure) and Redis-backed login rate limiting.
