@@ -97,9 +97,9 @@ tailwind.config = {
   </div>
 </div>
 <div class="px-4 mb-6">
-  <a href="/backoffice/app/{{ app._id }}" class="w-full bg-surface-variant hover:bg-surface-bright text-on-surface font-body-md py-2 px-4 rounded transition-colors flex items-center justify-center gap-2">
+  <a href="/backoffice/app" class="w-full bg-surface-variant hover:bg-surface-bright text-on-surface font-body-md py-2 px-4 rounded transition-colors flex items-center justify-center gap-2">
     <span class="material-symbols-outlined text-[18px]">arrow_back</span>
-    Back to Dashboard
+    Back to App
   </a>
 </div>
 <div class="flex-1 overflow-y-auto space-y-1">
@@ -130,12 +130,13 @@ tailwind.config = {
 </div>
 <div class="mt-auto px-4 space-y-1 border-t border-outline-variant/10 pt-4">
   {% if current_role in ('owner','super_admin','admin','heimdall') %}
-  <a href="/backoffice/app/{{ app._id }}/cms/settings" class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:text-on-surface transition-colors hover:bg-surface-variant/50 transition-all duration-200">
+  <a href="/backoffice/onboarding" class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:text-on-surface transition-colors hover:bg-surface-variant/50 transition-all duration-200">
     <span class="material-symbols-outlined">settings</span>
     Schema Config
   </a>
   {% endif %}
 </div>
+
 </nav>
 
 <!-- TopNavBar -->
