@@ -13,7 +13,44 @@ def get_db():
 
 # --- PERMISSION HELPERS ---
 
-def get_current_role_in_app(app_id):
+def resolve_app_doc(db, app_id_or_slug=None):
+    """Resolves application document by ObjectId, client_id slug, or active session context."""
+    from bson import ObjectId
+    if app_id_or_slug:
+        if isinstance(app_id_or_slug, ObjectId):
+            app = db.db.applications.find_one({"_id": app_id_or_slug})
+            if app:
+                session['active_app_id'] = str(app['_id'])
+                return app
+        if isinstance(app_id_or_slug, str) and ObjectId.is_valid(app_id_or_slug):
+            app = db.db.applications.find_one({"_id": ObjectId(app_id_or_slug)})
+            if app:
+                session['active_app_id'] = str(app['_id'])
+                return app
+        # Try slug lookup (e.g. ministry_exam_prep)
+        app = db.db.applications.find_one({"client_id": str(app_id_or_slug).strip()})
+        if app:
+            session['active_app_id'] = str(app['_id'])
+            return app
+
+    # Fallback to active app in session
+    active_id = session.get('active_app_id')
+    if active_id and ObjectId.is_valid(active_id):
+        app = db.db.applications.find_one({"_id": ObjectId(active_id)})
+        if app:
+            return app
+
+    # Fallback to user's first managed app
+    user_id = session.get('backoffice_user')
+    if user_id:
+        apps = db.get_managed_apps(user_id)
+        if apps:
+            app = apps[0]
+            session['active_app_id'] = str(app['_id'])
+            return app
+    return None
+
+def get_current_role_in_app(app_id_or_slug):
     """Returns: owner, super_admin, admin, or None/heimdall/pr0meth4us"""
     if session.get('is_heimdall'):
         return 'heimdall'
@@ -24,7 +61,11 @@ def get_current_role_in_app(app_id):
     user_id = session.get('backoffice_user')
     if not user_id: return None
 
-    return db.get_user_role_for_app(user_id, app_id)
+    app = resolve_app_doc(db, app_id_or_slug)
+    if not app: return None
+
+    return db.get_user_role_for_app(user_id, str(app['_id']))
+
 
 
 # Console roles (SOW 3.8). Three that matter:

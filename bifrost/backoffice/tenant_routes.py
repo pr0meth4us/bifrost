@@ -77,14 +77,24 @@ def _app_and_conn(db, app_id):
     return app, get_tenant_db_conn_str(app), queue
 
 
-@backoffice_bp.route('/app/<app_id>/payments')
-@requires("payments:view")
-def view_manual_payments(app_id):
+@backoffice_bp.route('/payments')
+@backoffice_bp.route('/app/<app_id_or_slug>/payments')
+@login_required
+def view_manual_payments(app_id_or_slug=None):
     db = get_db()
-    app, db_conn_str, queue = _app_and_conn(db, app_id)
+    from . import resolve_app_doc
+    app = resolve_app_doc(db, app_id_or_slug)
     if not app:
         flash("Application not found.", "danger")
         return redirect(url_for('backoffice.dashboard'))
+
+    app_id = str(app['_id'])
+    if not check_permission(app_id, "payments:view"):
+        flash("Unauthorized.", "danger")
+        return redirect(url_for('backoffice.dashboard'))
+
+    _, db_conn_str, queue = _app_and_conn(db, app_id)
+
 
     payments, tracks = [], []
     if not db_conn_str:
@@ -356,23 +366,27 @@ def api_notify_new_payment(app_id):
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
-@backoffice_bp.route('/app/<app_id>/cms')
+@backoffice_bp.route('/cms')
+@backoffice_bp.route('/app/<app_id_or_slug>/cms')
 @login_required
-def view_cms_grid(app_id):
+def view_cms_grid(app_id_or_slug=None):
     db = get_db()
-    if not check_permission(app_id, "read:config"):
-        flash("Unauthorized.", "danger")
-        return redirect(url_for('backoffice.dashboard'))
-
-    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
+    from . import resolve_app_doc
+    app = resolve_app_doc(db, app_id_or_slug)
     if not app:
         flash("Application not found.", "danger")
+        return redirect(url_for('backoffice.dashboard'))
+
+    app_id = str(app['_id'])
+    if not check_permission(app_id, "read:config"):
+        flash("Unauthorized.", "danger")
         return redirect(url_for('backoffice.dashboard'))
 
     db_conn_str = get_tenant_db_conn_str(app)
     if not db_conn_str:
         flash("Tenant DB connection not configured.", "warning")
-        return redirect(url_for('backoffice.view_app', app_id=app_id))
+        return redirect(url_for('backoffice.view_app', app_id_or_slug=app_id))
+
 
     # Load per-app CMS config from MongoDB
     cms_config = db.get_cms_config(str(app['_id']))
@@ -747,25 +761,29 @@ def _generate_smart_cms_config(all_tables):
     
     return config
 
-@backoffice_bp.route('/app/<app_id>/cms/onboarding', methods=['GET', 'POST'])
+@backoffice_bp.route('/onboarding', methods=['GET', 'POST'])
+@backoffice_bp.route('/app/<app_id_or_slug>/cms/onboarding', methods=['GET', 'POST'])
 @login_required
-def cms_onboarding(app_id):
+def cms_onboarding(app_id_or_slug=None):
     db = get_db()
-    if not check_permission(app_id, "write:config"):
-        flash("Unauthorized.", "danger")
-        return redirect(url_for('backoffice.dashboard'))
-
-    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
+    from . import resolve_app_doc
+    app = resolve_app_doc(db, app_id_or_slug)
     if not app:
         flash("Application not found.", "danger")
+        return redirect(url_for('backoffice.dashboard'))
+
+    app_id = str(app['_id'])
+    if not check_permission(app_id, "write:config"):
+        flash("Unauthorized.", "danger")
         return redirect(url_for('backoffice.dashboard'))
 
     db_conn_str = get_tenant_db_conn_str(app)
     if not db_conn_str:
         flash("Tenant DB connection not configured.", "warning")
-        return redirect(url_for('backoffice.view_app', app_id=app_id))
+        return redirect(url_for('backoffice.view_app', app_id_or_slug=app_id))
         
     cms_config = db.get_cms_config(str(app['_id']))
+
     
     if request.method == 'POST':
         action = request.form.get('action')

@@ -49,21 +49,28 @@ def create_app():
     return render_template('backoffice/create_app.html')
 
 
-@backoffice_bp.route('/app/<app_id>')
+@backoffice_bp.route('/app')
+@backoffice_bp.route('/app/<app_id_or_slug>')
 @login_required
-def view_app(app_id):
+def view_app(app_id_or_slug=None):
     db = get_db()
-    # Check if user has ANY access
+    from . import resolve_app_doc
+    app = resolve_app_doc(db, app_id_or_slug)
+    if not app:
+        flash("Application not found.", "danger")
+        return redirect(url_for('backoffice.dashboard'))
+
+    app_id = str(app['_id'])
     if not check_permission(app_id, "read:config"):
         flash("Unauthorized.", "danger")
         return redirect(url_for('backoffice.dashboard'))
 
-    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
     users = db.get_app_users(app_id)
     owner = db.get_app_owner(app_id)
     current_role = get_current_role_in_app(app_id)
 
     return render_template('backoffice/app_users.html', app=app, users=users, owner=owner, current_role=current_role)
+
 
 
 @backoffice_bp.route('/app/<app_id>/update', methods=['POST'])
