@@ -122,6 +122,19 @@ If a payment predates the migration and the console can't tell which track it pa
 for, it refuses and says so rather than guessing. Fix it by setting
 `payments.exam_track_id` on that row, then refund.
 
+### If your schema isn't Ministry's
+
+The queue no longer assumes the `payments` / `entitlements` / `exam_track_id`
+names — they come from the `payment_queue` block in **CMS Settings**
+(`cms_config.payment_queue`): table, column names, status values, and the grant
+step. An app with **no block gets Ministry's shape as the default**, which is why
+this manual and its fallback SQL (§10) just work for Ministry. A tenant with a
+different schema configures the block instead of waiting for a deploy; the console
+validates the names against the live database schema on save. Omitting the `grant`
+step gives a queue that settles the payment and leaves fulfilment to the tenant's
+own app. The money-path tests for both shapes live in
+[`tests/test_queue_schema.py`](../tests/test_queue_schema.py).
+
 ---
 
 ## 5. Publishing content

@@ -197,13 +197,7 @@ def create_app(config_class):
         from flask import g, redirect, url_for
         if hasattr(g, 'tenant_app_id'):
             return redirect(url_for('backoffice.view_app', app_id=g.tenant_app_id))
-        try:
-            db_name = current_app.config.get('DB_NAME', 'bifrost_db')
-            db = mongo.cx[db_name]
-            apps = list(db.applications.find({}))
-            return render_template('index.html', apps=apps, app=None)
-        except Exception as e:
-            return jsonify(status="error", message=f"Portal error: {e}"), 500
+        return render_template('index.html')
 
     @app.route('/favicon.ico')
     def favicon():

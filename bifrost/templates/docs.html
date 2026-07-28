@@ -148,7 +148,7 @@
             <section id="introduction" class="mb-24 scroll-mt-24">
                 <h1 class="text-5xl font-extrabold text-slate-900 mb-6 tracking-tight">Introduction</h1>
                 <p class="text-xl text-slate-600 leading-relaxed mb-8 font-medium">
-                    <strong>Bifrost</strong> is the centralized Identity Provider (IdP) and Payment Gateway for the Helm Ecosystem.
+                    <strong>Bifrost</strong> is a multi-tenant Identity Provider (IdP) and Payment Gateway.
                     It acts as the secure bridge between users, client applications, and financial providers.
                 </p>
                 <p class="text-slate-600 leading-loose mb-10 max-w-3xl">
@@ -287,7 +287,7 @@
                             <h3 class="font-bold text-lg text-slate-900">Heimdall (God Admin)</h3>
                         </div>
                         <p class="text-sm text-slate-600 mb-6 leading-relaxed">
-                            This elevated role operates beyond individual client apps, providing ecosystem-wide oversight for tasks like debugging, billing oversight, and infrastructure management.
+                            This elevated role operates beyond individual client apps, providing platform-wide oversight for tasks like debugging, billing oversight, and infrastructure management.
                         </p>
                         <div class="alert bg-white border border-slate-200 shadow-sm text-xs font-medium text-slate-500">
                             This role cannot be assigned through the API and is reserved exclusively for Bifrost system maintainers.
@@ -415,6 +415,21 @@ def verify_webhook(request_body, signature_header, client_secret):
                             <td class="text-sm text-slate-500 pr-6"><code>client_id</code></td>
                         </tr>
                         <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="font-bold text-slate-800 pl-6">Verify OTP</td>
+                            <td><code onclick="copyText('/auth/ui/verify-otp')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/auth/ui/verify-otp</code></td>
+                            <td class="text-sm text-slate-500 pr-6"><code>verification_id</code>, <code>client_id</code></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="font-bold text-slate-800 pl-6">Reset Password</td>
+                            <td><code onclick="copyText('/auth/ui/reset-password')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/auth/ui/reset-password</code></td>
+                            <td class="text-sm text-slate-500 pr-6"><code>client_id</code></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="font-bold text-slate-800 pl-6">SSO Login (Google, etc.)</td>
+                            <td><code onclick="copyText('/auth/ui/sso/<provider>/login')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/auth/ui/sso/&lt;provider&gt;/login</code></td>
+                            <td class="text-sm text-slate-500 pr-6"><code>client_id</code></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
                             <td class="font-bold text-slate-800 pl-6">Activate Account</td>
                             <td><code onclick="copyText('/auth/ui/set-password')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/auth/ui/set-password</code></td>
                             <td class="text-sm text-slate-500 pr-6"><code>verification_id</code>, <code>client_id</code></td>
@@ -496,6 +511,43 @@ def verify_webhook(request_body, signature_header, client_secret):
                             <div class="mt-2"></div>
                             <div class="payload-block response">
                                 <pre><code class="language-json">{ "status": "verified", "proof_token": "pt_abc123..." }</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- POST /auth/api/request-phone-otp -->
+                    <div class="collapse collapse-arrow border border-slate-200 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                        <input type="checkbox" />
+                        <div class="collapse-title text-lg font-medium flex gap-4 items-center p-4">
+                            <span class="badge badge-success text-xs font-bold py-3 px-3 text-white">POST</span>
+                            <code onclick="copyText('/auth/api/request-phone-otp')" class="font-mono text-sm text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">/auth/api/request-phone-otp</code>
+                        </div>
+                        <div class="collapse-content px-4 pb-4">
+                            <p class="text-xs text-slate-500 mb-2">Sends an OTP via SMS (Twilio).</p>
+                            <div class="payload-block">
+                                <pre><code class="language-json">{ "phone_number": "+85512345678", "client_id": "your_client_id" }</code></pre>
+                            </div>
+                            <div class="mt-2"></div>
+                            <div class="payload-block response">
+                                <pre><code class="language-json">{ "message": "SMS OTP sent successfully", "verification_id": "..." }</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- POST /auth/api/verify-phone-otp -->
+                    <div class="collapse collapse-arrow border border-slate-200 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                        <input type="checkbox" />
+                        <div class="collapse-title text-lg font-medium flex gap-4 items-center p-4">
+                            <span class="badge badge-success text-xs font-bold py-3 px-3 text-white">POST</span>
+                            <code onclick="copyText('/auth/api/verify-phone-otp')" class="font-mono text-sm text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">/auth/api/verify-phone-otp</code>
+                        </div>
+                        <div class="collapse-content px-4 pb-4">
+                            <div class="payload-block">
+                                <pre><code class="language-json">{ "verification_id": "...", "code": "123456" }</code></pre>
+                            </div>
+                            <div class="mt-2"></div>
+                            <div class="payload-block response">
+                                <pre><code class="language-json">{ "success": true, "proof_token": "pt_abc123...", "phone_number": "+85512345678" }</code></pre>
                             </div>
                         </div>
                     </div>
@@ -688,6 +740,38 @@ def verify_webhook(request_body, signature_header, client_secret):
                             </td>
                         </tr>
                         <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="pl-6"><code onclick="copyText('/internal/get-roles-bulk')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/internal/get-roles-bulk</code></td>
+                            <td><span class="badge badge-success badge-xs font-bold text-white">POST</span></td>
+                            <td class="text-xs font-mono text-slate-500 pr-6">
+                                <div>Payload: <code>{ "account_ids": ["65a...", "65b..."] }</code></div>
+                                <div class="mt-1 text-green-600">Response: <code>{ "roles": { "65a...": { "role": "premium", "has_used_trial": false } } }</code></div>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="pl-6"><code onclick="copyText('/internal/users/<id>/update')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/internal/users/&lt;id&gt;/update</code></td>
+                            <td><span class="badge badge-success badge-xs font-bold text-white">POST</span></td>
+                            <td class="text-xs font-mono text-slate-500 pr-6">
+                                <div>Payload: <code>{ "display_name": "...", "email": "...", "username": "..." }</code> (any subset)</div>
+                                <div class="mt-1 text-green-600">Response: <code>{ "success": true, "message": "..." }</code></div>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="pl-6"><code onclick="copyText('/internal/auth/users/<id>')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/internal/auth/users/&lt;id&gt;</code></td>
+                            <td><span class="badge badge-error badge-xs font-bold text-white">DELETE</span></td>
+                            <td class="text-xs font-mono text-slate-500 pr-6">
+                                <div>Permanently deletes a core identity</div>
+                                <div class="mt-1 text-green-600">Response: <code>{ "success": true }</code></div>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="pl-6"><code onclick="copyText('/internal/set-credentials')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/internal/set-credentials</code></td>
+                            <td><span class="badge badge-success badge-xs font-bold text-white">POST</span></td>
+                            <td class="text-xs font-mono text-slate-500 pr-6">
+                                <div>Payload: <code>{ "email": "...", "password": "...", "proof_token": "..." }</code></div>
+                                <div class="mt-1 text-green-600">Response: <code>{ "success": true, "mode": "created|updated|linked" }</code></div>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
                             <td class="pl-6"><code onclick="copyText('/internal/payments/status/<id>')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/internal/payments/status/&lt;id&gt;</code></td>
                             <td><span class="badge badge-info badge-xs font-bold text-white">GET</span></td>
                             <td class="text-xs font-mono text-slate-500 pr-6">
@@ -806,6 +890,29 @@ def verify_webhook(request_body, signature_header, client_secret):
                         </div>
                     </div>
 
+                    <!-- Activate Free Trial -->
+                    <div class="card bg-white border border-slate-200 shadow-sm feature-card">
+                        <div class="card-body p-6">
+                            <div class="flex justify-between items-start">
+                                <h3 class="card-title text-base text-slate-800">Activate Free Trial</h3>
+                                <span class="badge badge-success text-xs font-bold text-white">POST</span>
+                            </div>
+                            <p class="text-xs text-slate-500 my-2">Grants a one-time free trial to a user. Fails if the trial was already used.</p>
+                            <code onclick="copyText('/internal/payments/activate-trial')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 block mb-2 font-mono">/internal/payments/activate-trial</code>
+                            <div class="payload-block">
+                            <pre><code class="language-json">{
+    "account_id": "65a...",
+    "target_client_id": "optional_if_cross_app",
+    "duration": "14d"
+}</code></pre>
+                            </div>
+                            <div class="mt-2"></div>
+                            <div class="payload-block response">
+                                <pre><code class="language-json">{ "success": true, "message": "Trial activated." }</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Submit Proof (Web) -->
                     <div class="card bg-white border border-slate-200 shadow-sm feature-card">
                         <div class="card-body p-6">
@@ -900,9 +1007,50 @@ def verify_webhook(request_body, signature_header, client_secret):
                 </div>
             </section>
 
-            <section id="advanced" class="mb-32 scroll-mt-24">
+            <section id="secrets-vault" class="mb-24 scroll-mt-24">
                 <h2 class="text-3xl font-bold mb-8 flex items-center gap-4 text-slate-900">
                     <span class="bg-indigo-600 text-white w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold shadow-md shadow-indigo-200">7</span>
+                    Secrets Vault
+                </h2>
+                <p class="text-slate-600 mb-6">Store your app's API keys encrypted in Bifrost and fetch them at runtime — no <code>.env</code> files to distribute. Authenticate with <code>X-Client-ID</code> and <code>X-Webhook-Secret</code> headers.</p>
+
+                <div class="space-y-4">
+                    <div class="collapse collapse-arrow border border-slate-200 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                        <input type="checkbox" />
+                        <div class="collapse-title text-lg font-medium flex gap-4 items-center p-4">
+                            <span class="badge badge-info text-xs font-bold py-3 px-3 text-white">GET</span>
+                            <code onclick="copyText('/api/v1/config')" class="font-mono text-sm text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">/api/v1/config</code>
+                        </div>
+                        <div class="collapse-content px-4 pb-4">
+                            <p class="text-xs text-slate-500 mb-2">Returns all stored keys, decrypted server-side for the authenticated app.</p>
+                            <div class="payload-block response">
+                                <pre><code class="language-json">{ "status": "success", "data": { "api_keys": { "OPENAI_KEY": "sk-..." } } }</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="collapse collapse-arrow border border-slate-200 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                        <input type="checkbox" />
+                        <div class="collapse-title text-lg font-medium flex gap-4 items-center p-4">
+                            <span class="badge badge-success text-xs font-bold py-3 px-3 text-white">POST</span>
+                            <code onclick="copyText('/api/v1/config/bulk-upload')" class="font-mono text-sm text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">/api/v1/config/bulk-upload</code>
+                        </div>
+                        <div class="collapse-content px-4 pb-4">
+                            <div class="payload-block">
+                                <pre><code class="language-json">{ "keys": { "OPENAI_KEY": "sk-...", "STRIPE_KEY": "..." } }</code></pre>
+                            </div>
+                            <div class="mt-2"></div>
+                            <div class="payload-block response">
+                                <pre><code class="language-json">{ "status": "success", "message": "Successfully encrypted and uploaded 2 keys to Bifrost Vault." }</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="advanced" class="mb-32 scroll-mt-24">
+                <h2 class="text-3xl font-bold mb-8 flex items-center gap-4 text-slate-900">
+                    <span class="bg-indigo-600 text-white w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold shadow-md shadow-indigo-200">8</span>
                     Advanced Features
                 </h2>
                 <p class="text-lg text-slate-600 mb-12 leading-relaxed max-w-3xl">
@@ -1164,6 +1312,7 @@ def handle_admin_approval(admin_user, transaction):
                 <li><a href="#internal-api" class="nav-link hover:bg-slate-100 hover:text-indigo-600 rounded-lg">Internal API (S2S)</a></li>
                 <li><a href="#payments-api" class="nav-link hover:bg-slate-100 hover:text-indigo-600 rounded-lg">Payments</a></li>
                 <li><a href="#webhooks" class="nav-link hover:bg-slate-100 hover:text-indigo-600 rounded-lg">Webhooks</a></li>
+                <li><a href="#secrets-vault" class="nav-link hover:bg-slate-100 hover:text-indigo-600 rounded-lg">Secrets Vault</a></li>
                 <li><a href="#advanced" class="nav-link hover:bg-slate-100 hover:text-indigo-600 rounded-lg text-indigo-600 bg-indigo-50">Advanced Features</a></li>
 
                 <li class="mt-8">
