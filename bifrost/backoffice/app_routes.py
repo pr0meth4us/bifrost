@@ -105,8 +105,12 @@ def update_app_settings(app_id):
         'heimdall_monitor': bool(request.form.get('service_heimdall_monitor'))
     }
 
-    raw_db_conn = request.form.get('db_connection')
-    if raw_db_conn and not raw_db_conn.startswith('gAAAAA'):
+    # The form no longer renders the stored value, so blank means "unchanged"
+    # rather than "clear it". Only a value the operator actually typed is
+    # plaintext, which is why the old startswith('gAAAAA') ciphertext sniff —
+    # and its one-character-typo failure mode of double-encrypting — is gone.
+    raw_db_conn = (request.form.get('db_connection') or '').strip()
+    if raw_db_conn:
         from ..utils.encryption import encrypt_value
         app_doc = db.db.applications.find_one({"_id": ObjectId(app_id)})
         if app_doc and app_doc.get('webhook_secret'):
@@ -120,10 +124,11 @@ def update_app_settings(app_id):
         'app_logo_url': request.form.get('logo_url'),
         'app_qr_url': request.form.get('qr_url'),
         'telegram_bot_token': request.form.get('telegram_bot_token'),
-        'db_connection': raw_db_conn,
         'db_mode': request.form.get('db_mode', 'custom'),
         'enabled_services': enabled_services
     }
+    if raw_db_conn:
+        data['db_connection'] = raw_db_conn
 
 
     if db.update_app_details(app_id, data):

@@ -144,7 +144,7 @@
                        whole <tr> clickable, which is unreachable by keyboard and
                        fired on every accidental text selection. #}
                     <button type="button" class="btn btn-sm"
-                            data-row="{{ row | tojson }}"
+                            data-row="{{ row |tojson|forceescape }}"
                             onclick="openEdit(JSON.parse(this.dataset.row))">Edit</button>
                     <form method="POST" class="inline"
                           action="{{ url_for('backoffice.delete_cms_row', app_id=app._id, table_name=selected_table, row_id=row.id) }}"
