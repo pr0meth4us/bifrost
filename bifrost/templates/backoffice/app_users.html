@@ -89,7 +89,7 @@
                   <button type="button" class="btn btn-sm"
                           @click="$dispatch('manage-user', {
                             id: '{{ u.account_id }}',
-                            name: {{ (u.display_name or u.email)|tojson }},
+                            name: {{ (u.display_name or u.email)|tojson|forceescape }},
                             role: '{{ u.role }}' })">Manage</button>
                 {% else %}
                   <span class="muted text-[12px]">Locked</span>
@@ -182,11 +182,15 @@
 
             <div x-show="dbMode === 'custom'" x-cloak class="sm:col-span-2">
               <label class="label" for="s-db">Connection string</label>
+              {# Never echo the stored value back: it is ciphertext, so the field
+                 showed the operator a wall of gAAAAA… instead of their URL.
+                 Blank means "keep what's stored" — see update_app_settings. #}
               <input class="input mono" id="s-db" name="db_connection" type="text"
-                     value="{{ app.db_connection or '' }}" {{ 'disabled' if is_disabled }}
-                     placeholder="postgresql://user:password@host:5432/db"
+                     value="" {{ 'disabled' if is_disabled }}
+                     placeholder="{% if app.db_connection %}•••••••• stored — type a new URL to replace{% else %}postgresql://user:password@host:5432/db{% endif %}"
                      aria-describedby="s-db-hint">
               <p class="hint" id="s-db-hint">
+                {% if app.db_connection %}A connection string is stored. Leave blank to keep it.{% endif %}
                 This database is proxied for you. Use a role with only the privileges it needs.
               </p>
             </div>
@@ -240,12 +244,12 @@
             <div>
               <div class="label">Client ID</div>
               <code class="mono block p-2.5 rounded bg-surface-2 break-all"
-                    x-text="showSecrets ? {{ app.client_id|tojson }} : '••••••••••••••••'"></code>
+                    x-text="showSecrets ? {{ app.client_id|tojson|forceescape }} : '••••••••••••••••'"></code>
             </div>
             <div>
               <div class="label">Webhook secret</div>
               <code class="mono block p-2.5 rounded bg-surface-2 break-all"
-                    x-text="showSecrets ? {{ app.webhook_secret|tojson }} : '••••••••••••••••'"></code>
+                    x-text="showSecrets ? {{ app.webhook_secret|tojson|forceescape }} : '••••••••••••••••'"></code>
             </div>
 
             <div class="danger-zone card-pad">
@@ -279,7 +283,7 @@
                     <span class="min-w-0">
                       <span class="block mono truncate">{{ key_name }}</span>
                       <code class="mono muted"
-                            x-text="showSecrets ? {{ key_value|tojson }} : '••••••••••••'"></code>
+                            x-text="showSecrets ? {{ key_value|tojson|forceescape }} : '••••••••••••'"></code>
                     </span>
                     <form method="POST" action="{{ url_for('backoffice.delete_api_key', app_id=app._id) }}"
                           onsubmit="return confirm('Revoke {{ key_name }}? Anything using it stops working immediately.');">
@@ -334,7 +338,7 @@
          url_for() with a placeholder rather than hand-assembled from string
          fragments — the route can move without breaking this. #}
       <form method="POST" class="card-pad space-y-4"
-            :action="{{ url_for('backoffice.update_user_role', app_id=app._id, user_id='__USER_ID__')|tojson }}.replace('__USER_ID__', userId)">
+            :action="{{ url_for('backoffice.update_user_role', app_id=app._id, user_id='__USER_ID__')|tojson|forceescape }}.replace('__USER_ID__', userId)">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
         <div>

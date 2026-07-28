@@ -41,9 +41,14 @@
              this screen unusable without a mouse. #}
           <button type="button"
                   class="w-full text-left px-4 py-3 border-b border-border flex justify-between gap-3 hover:bg-surface-2"
-                  :class="selected && selected.id === {{ p.id }} && 'bg-surface-2'"
-                  :aria-pressed="selected && selected.id === {{ p.id }}"
-                  @click="selected = {{ p|tojson }}">
+                  {# A text/UUID primary key interpolated bare renders as a naked
+                     identifier (=== 3f2a-9c11), which is a syntax error that
+                     takes this element's @click down with it. tojson quotes it;
+                     forceescape is what keeps those quotes from closing the
+                     attribute early — tojson alone silently truncates it. #}
+                  :class="selected && selected.id === {{ p.id|tojson|forceescape }} && 'bg-surface-2'"
+                  :aria-pressed="selected && selected.id === {{ p.id|tojson|forceescape }}"
+                  @click="selected = {{ p|tojson|forceescape }}">
             <span class="min-w-0">
               <span class="block font-medium truncate">{{ p.email or 'Unknown user' }}</span>
               <span class="block mono muted truncate">{{ p.txn_ref }}</span>
@@ -124,7 +129,7 @@
               <div x-show="selected.status === 'pending' || selected.status === 'unclaimed'"
                    class="space-y-4">
                 <form method="POST" class="space-y-2"
-                      :action="{{ url_for('backoffice.approve_payment', app_id=app._id, payment_id='__ID__')|tojson }}.replace('__ID__', selected.id)">
+                      :action="{{ url_for('backoffice.approve_payment', app_id=app._id, payment_id='__ID__')|tojson|forceescape }}.replace('__ID__', selected.id)">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                   <div>
                     <label class="label" for="track">Grant access to</label>
@@ -145,7 +150,7 @@
                 </form>
 
                 <form method="POST" class="space-y-2 border-t border-border pt-4"
-                      :action="{{ url_for('backoffice.reject_payment', app_id=app._id, payment_id='__ID__')|tojson }}.replace('__ID__', selected.id)">
+                      :action="{{ url_for('backoffice.reject_payment', app_id=app._id, payment_id='__ID__')|tojson|forceescape }}.replace('__ID__', selected.id)">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                   <div>
                     <label class="label" for="reject-reason">Rejection reason</label>
@@ -165,7 +170,7 @@
 
               <div x-show="selected.status === 'approved'">
                 <form method="POST" class="space-y-2"
-                      :action="{{ url_for('backoffice.refund_payment', app_id=app._id, payment_id='__ID__')|tojson }}.replace('__ID__', selected.id)"
+                      :action="{{ url_for('backoffice.refund_payment', app_id=app._id, payment_id='__ID__')|tojson|forceescape }}.replace('__ID__', selected.id)"
                       onsubmit="return confirm('Issue this refund? Access is revoked immediately.');">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                   <div class="alert alert-warning">

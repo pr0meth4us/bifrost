@@ -116,7 +116,10 @@ function addRole() {
   const input = prompt('New role name (letters, numbers and underscores):');
   if (!input) return;
   const role = input.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
-  if (!role || rolesConfig[role]) return;
+  // hasOwnProperty, not a truthiness test: `rolesConfig['constructor']` is
+  // truthy off the prototype, so naming a role "constructor" or "toString"
+  // made Add silently do nothing.
+  if (!role || Object.prototype.hasOwnProperty.call(rolesConfig, role)) return;
   rolesConfig[role] = { tables: {} };
   selectRole(role);
 }

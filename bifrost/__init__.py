@@ -170,6 +170,12 @@ def create_app(config_class):
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         start_scheduler(app)
 
+    # Local-only login bypass. Raises at boot unless MONGO_URI is loopback,
+    # so this can never come up attached to a real database.
+    from . import dev_mode
+    if dev_mode.enabled():
+        dev_mode.attach(app)
+
     @app.before_request
     def resolve_custom_domain():
         host = request.headers.get("Host")
