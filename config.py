@@ -10,6 +10,9 @@ class Config:
     DB_NAME = os.environ.get('DB_NAME', 'bifrost_db')
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
 
+    # --- MANAGED BIFROST POSTGRES ---
+    MANAGED_POSTGRES_URL = os.environ.get('MANAGED_POSTGRES_URL') or os.environ.get('DATABASE_URL')
+
     # --- EMAIL SETTINGS ---
     EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD')
     SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
