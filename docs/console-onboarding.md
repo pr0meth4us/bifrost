@@ -20,6 +20,15 @@ It talks directly to your Supabase Postgres — there is no second copy of your 
 | See who changed what | **Audit** → `/backoffice/app/<app_id>/audit` |
 | Configure the grid (labels, hidden columns) | **CMS Settings** |
 | Configure who can do what | **CMS RBAC** |
+| Run 3-step setup wizard | **Onboarding Wizard** → `/backoffice/app/<app_id>/onboarding` |
+
+### First-Run Setup (The 3-Step Onboarding Wizard)
+When initializing a new app, the backoffice launches a 3-step wizard (`/backoffice/app/<app_id>/onboarding`):
+1. **Connect Database**: Save encrypted PostgreSQL connection string.
+2. **Smart Schema Detection**: Introspect schema, auto-hide system plumbing tables (`migrations`, `tokens`, `logs`), and propose friendly labels (`users` → `Customers`).
+3. **Invite Team**: Assign initial staff roles by email before launching.
+
+For the full interactive documentation, see the unified portal at `/docs`.
 
 ---
 
