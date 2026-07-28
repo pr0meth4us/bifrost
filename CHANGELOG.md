@@ -6,6 +6,7 @@ work. Gap analysis and vendor reply in `docs/scope-response-admin-console.md`;
 operator runbook in `docs/console-onboarding.md`.
 
 ### Fixed
+- **App Configuration form unlocked for authorized roles**: Removed artificial Alpine.js `:disabled` blocking and hidden submit button in `bifrost/templates/backoffice/app_users.html`. Owners, Admins, Super Admins, and Heimdall can now directly edit configuration fields and click "Save Changes".
 - **Docs formatting and button URL fixes**: Replaced raw Markdown bold tags with `<strong>` HTML tags, increased base typography size (15.2px, line-height 1.7), added high-contrast glassmorphism panels, and fixed Changelog & Console Login link routes in `bifrost/templates/docs.html`.
 - **Koyeb build failure due to submodule gitlink**: Removed `prolong` submodule gitlink and `.gitmodules` so Koyeb and automated CI/CD runners build the `bifrost` Docker container cleanly without git credential errors.
 - **CSRF tokens were missing from every backoffice form.** `CSRFProtect` had been enabled without them, so approve, reject, refund and all CMS writes were returning 400. Tokens added to all 10 templates; `/api/tenant/<app_id>/payments/notify-new` explicitly exempted (machine-to-machine, secret-authenticated) and its secret comparison made constant-time.
