@@ -49,8 +49,21 @@ def create_app():
     return render_template('backoffice/create_app.html')
 
 
+@backoffice_bp.route('/select-app/<app_id>')
+@login_required
+def select_app(app_id):
+    db = get_db()
+    from . import resolve_app_doc
+    app = resolve_app_doc(db, app_id)
+    if not app:
+        flash("Application not found.", "danger")
+        return redirect(url_for('backoffice.dashboard'))
+    session['active_app_id'] = str(app['_id'])
+    return redirect(url_for('backoffice.view_app'))
+
+
 @backoffice_bp.route('/app')
-@backoffice_bp.route('/app/<app_id_or_slug>')
+@backoffice_bp.route('/users')
 @login_required
 def view_app(app_id_or_slug=None):
     db = get_db()
@@ -70,6 +83,7 @@ def view_app(app_id_or_slug=None):
     current_role = get_current_role_in_app(app_id)
 
     return render_template('backoffice/app_users.html', app=app, users=users, owner=owner, current_role=current_role)
+
 
 
 
