@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <title>Bifrost Documentation — API Reference & Operator's Manual</title>
+    <title>Bifrost Documentation — API Reference &amp; Operator's Manual</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
 
     <!-- Google Fonts & Icons -->
@@ -22,18 +22,18 @@
                         "on-primary": "#1000a9",
                         "primary-container": "#3233c8",
                         "brand": "#c6613f",
-                        "brand-hover": "#d97721",
-                        "background": "#0d0d0d",
-                        "surface": "#111318",
-                        "surface-container": "#1a1b21",
-                        "surface-container-high": "#23242a",
-                        "surface-variant": "#33353a",
-                        "on-background": "#e2e2e9",
-                        "on-surface": "#e2e2e9",
-                        "on-surface-variant": "#908fa0",
-                        "outline": "#464554",
-                        "outline-variant": "#282a2f",
-                        "border-subtle": "rgba(255, 255, 255, 0.08)",
+                        "brand-hover": "#e06c48",
+                        "background": "#0b0c10",
+                        "surface": "#12141c",
+                        "surface-container": "#181a24",
+                        "surface-container-high": "#222533",
+                        "surface-variant": "#2b2e3e",
+                        "on-background": "#f0f2f8",
+                        "on-surface": "#e6e8f0",
+                        "on-surface-variant": "#a2a6be",
+                        "outline": "#4a4e66",
+                        "outline-variant": "#2a2d3d",
+                        "border-subtle": "rgba(255, 255, 255, 0.12)",
                         "success": "#62d294",
                         "warning": "#ffb783",
                         "danger": "#ff8e8e"
@@ -55,24 +55,26 @@
     <style>
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
-            background-color: #0d0d0d;
-            color: #e2e2e9;
-            line-height: 1.6;
+            background-color: #0b0c10;
+            color: #f0f2f8;
+            font-size: 0.95rem; /* 15.2px readable font size */
+            line-height: 1.7;
             scroll-behavior: smooth;
         }
 
-        /* Glassmorphism Claude Artifact Styling */
+        /* High Contrast Glassmorphism Claude Artifact Styling */
         .glass-panel {
-            background-color: rgba(26, 27, 33, 0.65);
+            background-color: rgba(22, 24, 33, 0.85);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 14px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
         }
         
         .glass-panel-subtle {
-            background-color: rgba(17, 19, 24, 0.4);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 8px;
+            background-color: rgba(26, 29, 40, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
         }
 
         /* Custom Scrollbar */
@@ -81,25 +83,25 @@
             height: 8px;
         }
         ::-webkit-scrollbar-track {
-            background: #0d0d0d;
+            background: #0b0c10;
         }
         ::-webkit-scrollbar-thumb {
-            background: #33353a;
+            background: #2b2e3e;
             border-radius: 4px;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: #464554;
+            background: #4a4e66;
         }
 
         /* Code Blocks */
         pre code.hljs {
-            background: #14161d !important;
+            background: #12141c !important;
             padding: 1.25rem !important;
-            border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
-            line-height: 1.5;
+            font-size: 0.9rem;
+            line-height: 1.6;
         }
 
         /* Table Styling */
@@ -107,188 +109,186 @@
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
-            border-radius: 8px;
+            border-radius: 10px;
             overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
         .doc-table th {
-            background-color: rgba(35, 36, 42, 0.8);
+            background-color: rgba(34, 37, 51, 0.9);
             color: #c0c1ff;
-            font-weight: 600;
-            font-size: 0.75rem;
+            font-weight: 700;
+            font-size: 0.8rem;
             text-transform: uppercase;
             letter-spacing: 0.08em;
-            padding: 12px 16px;
+            padding: 14px 18px;
             text-align: left;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
         .doc-table td {
-            padding: 12px 16px;
-            font-size: 0.875rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-            background-color: rgba(17, 19, 24, 0.3);
+            padding: 14px 18px;
+            font-size: 0.9rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            background-color: rgba(18, 20, 28, 0.4);
         }
         .doc-table tr:last-child td {
             border-bottom: none;
         }
         .doc-table tr:hover td {
-            background-color: rgba(255, 255, 255, 0.02);
-        }
-
-        /* Copy Button Tooltip */
-        .copy-btn {
-            position: relative;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .copy-btn:active {
-            transform: scale(0.95);
+            background-color: rgba(255, 255, 255, 0.04);
         }
 
         /* Method Badges */
-        .badge-get { background: rgba(98, 210, 148, 0.15); color: #62d294; border: 1px solid rgba(98, 210, 148, 0.3); }
-        .badge-post { background: rgba(192, 193, 255, 0.15); color: #c0c1ff; border: 1px solid rgba(192, 193, 255, 0.3); }
-        .badge-put { background: rgba(255, 183, 131, 0.15); color: #ffb783; border: 1px solid rgba(255, 183, 131, 0.3); }
-        .badge-delete { background: rgba(255, 142, 142, 0.15); color: #ff8e8e; border: 1px solid rgba(255, 142, 142, 0.3); }
+        .badge-get { background: rgba(98, 210, 148, 0.2); color: #62d294; border: 1px solid rgba(98, 210, 148, 0.4); font-weight: 700; }
+        .badge-post { background: rgba(192, 193, 255, 0.2); color: #c0c1ff; border: 1px solid rgba(192, 193, 255, 0.4); font-weight: 700; }
+        .badge-put { background: rgba(255, 183, 131, 0.2); color: #ffb783; border: 1px solid rgba(255, 183, 131, 0.4); font-weight: 700; }
+        .badge-delete { background: rgba(255, 142, 142, 0.2); color: #ff8e8e; border: 1px solid rgba(255, 142, 142, 0.4); font-weight: 700; }
 
         /* Smooth TOC Highlight */
         .toc-item.active {
             color: #c0c1ff;
-            background-color: rgba(192, 193, 255, 0.08);
-            border-left: 2px solid #c0c1ff;
+            background-color: rgba(192, 193, 255, 0.12);
+            border-left: 3px solid #c0c1ff;
+            font-weight: 700;
         }
     </style>
 </head>
 <body class="min-h-screen flex flex-col text-on-background selection:bg-primary/30">
 
     <!-- Top Navigation Header -->
-    <header class="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border-subtle px-6 py-3.5 flex items-center justify-between">
+    <header class="sticky top-0 z-50 bg-background/90 backdrop-blur-md border-b border-border-subtle px-6 py-4 flex items-center justify-between">
         <div class="flex items-center gap-4">
             <a href="/" class="flex items-center gap-3 group">
-                <div class="w-9 h-9 rounded-lg bg-brand/20 border border-brand/40 flex items-center justify-center text-brand group-hover:scale-105 transition-transform">
-                    <span class="material-symbols-outlined text-[22px]">hub</span>
+                <div class="w-10 h-10 rounded-xl bg-brand/20 border border-brand/40 flex items-center justify-center text-brand group-hover:scale-105 transition-transform shadow-md">
+                    <!-- SVG Hub Icon Fallback -->
+                    <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3c0 .35.06.69.17 1L5.59 9.59A3.001 3.001 0 0 0 2 12a3 3 0 0 0 3 3c.69 0 1.33-.23 1.84-.63l3.75 3.75c-.11.31-.17.65-.17 1a3 3 0 0 0 6 0c0-.35-.06-.69-.17-1l3.75-3.75c.51.4 1.15.63 1.84.63a3 3 0 0 0 3-3 3 3 0 0 0-3-3c-.69 0-1.33.23-1.84.63L14.83 6.17c.11-.31.17-.65.17-1a3 3 0 0 0-3-3zm0 2a1 1 0 0 1 1 1 1 1 0 0 1-1 1 1 1 0 0 1-1-1 1 1 1 0 0 1 1-1zM5 11a1 1 0 0 1 1 1 1 1 0 0 1-1 1 1 1 0 0 1-1-1 1 1 0 0 1 1-1zm14 0a1 1 0 0 1 1 1 1 1 0 0 1-1 1 1 1 0 0 1-1-1 1 1 0 0 1 1-1zm-7 7a1 1 0 0 1 1 1 1 1 0 0 1-1 1 1 1 0 0 1-1-1 1 1 0 0 1 1-1z"/></svg>
                 </div>
                 <div class="flex flex-col">
-                    <span class="font-bold text-base tracking-tight text-on-background">Bifrost Control Plane</span>
-                    <span class="text-xs text-on-surface-variant">External Developer &amp; Operator Portal</span>
+                    <span class="font-extrabold text-lg tracking-tight text-on-background">Bifrost Control Plane</span>
+                    <span class="text-xs text-on-surface-variant font-medium">External Developer &amp; Operator Portal</span>
                 </div>
             </a>
             <span class="text-border-subtle">|</span>
-            <span class="px-2.5 py-0.5 rounded-full text-xs font-mono bg-primary/10 text-primary border border-primary/20">v{{ version if version else '1.0.0' }}</span>
-            <span class="px-2.5 py-0.5 rounded-full text-xs font-sans bg-surface-variant/50 text-on-surface-variant border border-outline-variant/30 hidden md:inline-block">Edition 1.0 — 2026-07-28 Release</span>
+            <span class="px-3 py-1 rounded-full text-xs font-mono bg-primary/15 text-primary border border-primary/30 font-semibold">v{{ version if version else '1.0.0' }}</span>
+            <span class="px-3 py-1 rounded-full text-xs font-sans bg-surface-variant/60 text-on-surface-variant border border-outline-variant/40 hidden md:inline-block">Edition 1.0 — 2026-07-28 Release</span>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-4">
             <div class="relative hidden sm:block">
-                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
-                <input id="docSearch" type="text" placeholder="Search documentation..." class="bg-surface-container border border-outline-variant/40 rounded-lg pl-9 pr-4 py-1.5 text-xs w-64 text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary/50 transition-colors" onkeyup="filterDocs()"/>
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-base">search</span>
+                <input id="docSearch" type="text" placeholder="Search documentation..." class="bg-surface-container border border-outline-variant/50 rounded-xl pl-10 pr-4 py-2 text-sm w-72 text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary/60 transition-colors" onkeyup="filterDocs()"/>
             </div>
-            <a href="/docs/changelog" class="text-xs text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-1">
-                <span class="material-symbols-outlined text-sm">history</span> Changelog
+            <a href="{{ url_for('changelog_page') }}" class="text-xs md:text-sm font-semibold text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-surface-variant/40">
+                <span class="material-symbols-outlined text-base">history</span> Changelog
             </a>
-            <a href="/backoffice/login" class="px-3.5 py-1.5 rounded-lg bg-brand hover:bg-brand-hover text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-sm">
-                <span class="material-symbols-outlined text-sm">login</span> Console Login
+            <a href="{{ url_for('backoffice.login') }}" class="px-4 py-2 rounded-xl bg-brand hover:bg-brand-hover text-white text-xs md:text-sm font-bold transition-all flex items-center gap-2 shadow-lg shadow-brand/20">
+                <span class="material-symbols-outlined text-base">login</span> Console Login
             </a>
         </div>
     </header>
 
     <!-- Main Container with Sidebar + Content -->
-    <div class="flex-1 flex w-full max-w-[1600px] mx-auto">
+    <div class="flex-1 flex w-full max-w-[1650px] mx-auto">
 
         <!-- Left Sidebar Table of Contents -->
-        <aside class="w-72 shrink-0 border-r border-border-subtle hidden lg:block sticky top-[57px] h-[calc(100vh-57px)] overflow-y-auto p-4 space-y-6">
-            <div class="text-xs font-bold text-on-surface-variant uppercase tracking-wider px-3">Documentation Index</div>
+        <aside class="w-80 shrink-0 border-r border-border-subtle hidden lg:block sticky top-[73px] h-[calc(100vh-73px)] overflow-y-auto p-5 space-y-6 bg-surface/30">
+            <div class="text-xs font-bold text-on-surface-variant uppercase tracking-widest px-3">Documentation Index</div>
             
-            <nav class="space-y-4 text-xs font-medium">
+            <nav class="space-y-5 text-sm font-medium">
                 <!-- Part I -->
                 <div>
-                    <div class="px-3 py-1 font-semibold text-primary uppercase text-[11px] tracking-wider">Part I · Getting Started</div>
-                    <ul class="mt-1 space-y-0.5">
-                        <li><a href="#part1-overview" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">01 Platform Overview</a></li>
-                        <li><a href="#part1-sdk" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">02 Python SDK &amp; Injection</a></li>
-                        <li><a href="#part1-config" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">03 Direct HTTP Config Endpoint</a></li>
-                        <li><a href="#part1-services" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">04 Service Segmentation</a></li>
+                    <div class="px-3 py-1 font-bold text-primary uppercase text-xs tracking-wider">Part I · Getting Started</div>
+                    <ul class="mt-1.5 space-y-1">
+                        <li><a href="#part1-overview" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">01 Platform Overview</a></li>
+                        <li><a href="#part1-sdk" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">02 Python SDK &amp; Injection</a></li>
+                        <li><a href="#part1-config" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">03 Direct HTTP Config Endpoint</a></li>
+                        <li><a href="#part1-services" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">04 Service Segmentation</a></li>
                     </ul>
                 </div>
 
                 <!-- Part II -->
                 <div>
-                    <div class="px-3 py-1 font-semibold text-primary uppercase text-[11px] tracking-wider">Part II · Secrets &amp; Services API</div>
-                    <ul class="mt-1 space-y-0.5">
-                        <li><a href="#part2-vault" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">05 Secrets Vault Endpoint</a></li>
-                        <li><a href="#part2-otp" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">06 Phone &amp; Email OTP Verification</a></li>
-                        <li><a href="#part2-sso" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">07 Hosted SSO &amp; Password Reset</a></li>
-                        <li><a href="#part2-roles" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">08 Account Management &amp; Roles</a></li>
+                    <div class="px-3 py-1 font-bold text-primary uppercase text-xs tracking-wider">Part II · Secrets &amp; Services API</div>
+                    <ul class="mt-1.5 space-y-1">
+                        <li><a href="#part2-vault" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">05 Secrets Vault Endpoint</a></li>
+                        <li><a href="#part2-otp" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">06 Phone &amp; Email OTP Verification</a></li>
+                        <li><a href="#part2-sso" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">07 Hosted SSO &amp; Password Reset</a></li>
+                        <li><a href="#part2-roles" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">08 Account Management &amp; Roles</a></li>
                     </ul>
                 </div>
 
                 <!-- Part III -->
                 <div>
-                    <div class="px-3 py-1 font-semibold text-primary uppercase text-[11px] tracking-wider">Part III · Webhook Integration</div>
-                    <ul class="mt-1 space-y-0.5">
-                        <li><a href="#part3-architecture" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">09 Webhook Dispatch System</a></li>
-                        <li><a href="#part3-signature" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">10 HMAC-SHA256 Verification</a></li>
-                        <li><a href="#part3-payloads" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">11 Webhook Event Payloads</a></li>
+                    <div class="px-3 py-1 font-bold text-primary uppercase text-xs tracking-wider">Part III · Webhook Integration</div>
+                    <ul class="mt-1.5 space-y-1">
+                        <li><a href="#part3-architecture" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">09 Webhook Dispatch System</a></li>
+                        <li><a href="#part3-signature" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">10 HMAC-SHA256 Verification</a></li>
+                        <li><a href="#part3-payloads" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">11 Webhook Event Payloads</a></li>
                     </ul>
                 </div>
 
                 <!-- Part IV -->
                 <div>
-                    <div class="px-3 py-1 font-semibold text-primary uppercase text-[11px] tracking-wider">Part IV · CMS Onboarding &amp; Setup</div>
-                    <ul class="mt-1 space-y-0.5">
-                        <li><a href="#part4-proxy" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">12 Database Proxy Architecture</a></li>
-                        <li><a href="#part4-wizard" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">13 The 3-Step Setup Wizard</a></li>
-                        <li><a href="#part4-schema" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">14 Schema Mapping (`payment_queue`)</a></li>
+                    <div class="px-3 py-1 font-bold text-primary uppercase text-xs tracking-wider">Part IV · CMS Onboarding &amp; Setup</div>
+                    <ul class="mt-1.5 space-y-1">
+                        <li><a href="#part4-proxy" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">12 Database Proxy Architecture</a></li>
+                        <li><a href="#part4-wizard" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">13 The 3-Step Setup Wizard</a></li>
+                        <li><a href="#part4-schema" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">14 Schema Mapping (`payment_queue`)</a></li>
                     </ul>
                 </div>
 
                 <!-- Part V -->
                 <div>
-                    <div class="px-3 py-1 font-semibold text-primary uppercase text-[11px] tracking-wider">Part V · Console Operator's Manual</div>
-                    <ul class="mt-1 space-y-0.5">
-                        <li><a href="#part5-rbac" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">15 Console Roles &amp; Matrix</a></li>
-                        <li><a href="#part5-queue" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">16 Payment Queue &amp; SLA Clock</a></li>
-                        <li><a href="#part5-statemachine" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">17 Approval State Machine</a></li>
-                        <li><a href="#part5-publish" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">18 Publish Quality Gatekeeper</a></li>
-                        <li><a href="#part5-audit" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">19 Audit Trail &amp; Suspensions</a></li>
-                        <li><a href="#part5-safeguards" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">20 Core Guarantees</a></li>
+                    <div class="px-3 py-1 font-bold text-primary uppercase text-xs tracking-wider">Part V · Console Operator's Manual</div>
+                    <ul class="mt-1.5 space-y-1">
+                        <li><a href="#part5-rbac" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">15 Console Roles &amp; Matrix</a></li>
+                        <li><a href="#part5-queue" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">16 Payment Queue &amp; SLA Clock</a></li>
+                        <li><a href="#part5-statemachine" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">17 Approval State Machine</a></li>
+                        <li><a href="#part5-publish" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">18 Publish Quality Gatekeeper</a></li>
+                        <li><a href="#part5-audit" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">19 Audit Trail &amp; Suspensions</a></li>
+                        <li><a href="#part5-safeguards" class="toc-item block px-3 py-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">20 Core Guarantees</a></li>
                     </ul>
                 </div>
             </nav>
         </aside>
 
         <!-- Main Documentation Content Body -->
-        <main class="flex-1 p-6 md:p-10 space-y-16 max-w-5xl">
+        <main class="flex-1 p-6 md:p-12 space-y-16 max-w-5xl">
 
             <!-- Hero Introduction -->
-            <section class="glass-panel p-8 space-y-4">
-                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand/10 text-brand border border-brand/20 text-xs font-semibold">
-                    <span class="material-symbols-outlined text-sm">verified</span>
+            <section class="glass-panel p-8 md:p-10 space-y-5">
+                <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand/15 text-brand border border-brand/30 text-xs font-bold">
+                    <span class="material-symbols-outlined text-base">verified</span>
                     Official Client &amp; Staff Reference Manual
                 </div>
-                <h1 class="text-3xl font-extrabold tracking-tight text-on-background">Bifrost Identity, Secrets &amp; Control Plane</h1>
-                <p class="text-sm text-on-surface-variant max-w-3xl leading-relaxed">
+                <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-on-background">Bifrost Identity, Secrets &amp; Control Plane</h1>
+                <p class="text-base md:text-lg text-on-surface-variant max-w-3xl leading-relaxed font-normal">
                     Bifrost acts as a central control plane managing application registration, credentials, secrets vault, and identity authentication, while proxying administrative operations live to independent tenant database planes. This document covers client app onboarding, SDK initialization, API endpoints, webhook signature verification, and the Console Operator's Manual.
                 </p>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                    <div class="glass-panel-subtle p-3.5 flex items-center gap-3">
-                        <span class="material-symbols-outlined text-primary text-xl">key</span>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 pt-4">
+                    <div class="glass-panel-subtle p-5 flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-xl bg-primary/15 text-primary flex items-center justify-center font-bold">
+                            <span class="material-symbols-outlined text-2xl">key</span>
+                        </div>
                         <div>
-                            <div class="text-xs font-bold text-on-surface">Client SDK &amp; Vault</div>
-                            <div class="text-[11px] text-on-surface-variant">Automated credential injection</div>
+                            <div class="text-sm font-bold text-on-surface">Client SDK &amp; Vault</div>
+                            <div class="text-xs text-on-surface-variant">Automated credential injection</div>
                         </div>
                     </div>
-                    <div class="glass-panel-subtle p-3.5 flex items-center gap-3">
-                        <span class="material-symbols-outlined text-success text-xl">lock_open</span>
+                    <div class="glass-panel-subtle p-5 flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-xl bg-success/15 text-success flex items-center justify-center font-bold">
+                            <span class="material-symbols-outlined text-2xl">lock_open</span>
+                        </div>
                         <div>
-                            <div class="text-xs font-bold text-on-surface">HMAC Webhooks</div>
-                            <div class="text-[11px] text-on-surface-variant">SHA-256 signature verification</div>
+                            <div class="text-sm font-bold text-on-surface">HMAC Webhooks</div>
+                            <div class="text-xs text-on-surface-variant">SHA-256 signature verification</div>
                         </div>
                     </div>
-                    <div class="glass-panel-subtle p-3.5 flex items-center gap-3">
-                        <span class="material-symbols-outlined text-warning text-xl">admin_panel_settings</span>
+                    <div class="glass-panel-subtle p-5 flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-xl bg-warning/15 text-warning flex items-center justify-center font-bold">
+                            <span class="material-symbols-outlined text-2xl">admin_panel_settings</span>
+                        </div>
                         <div>
-                            <div class="text-xs font-bold text-on-surface">Console &amp; SLA Queue</div>
-                            <div class="text-[11px] text-on-surface-variant">6-hour payment verification SLA</div>
+                            <div class="text-sm font-bold text-on-surface">Console &amp; SLA Queue</div>
+                            <div class="text-xs text-on-surface-variant">6-hour payment verification SLA</div>
                         </div>
                     </div>
                 </div>
@@ -296,24 +296,24 @@
 
             <!-- PART I -->
             <section id="part1-overview" class="space-y-10 doc-section">
-                <div class="border-b border-border-subtle pb-4">
+                <div class="border-b border-border-subtle pb-5">
                     <div class="text-xs font-bold text-primary uppercase tracking-widest">Part I</div>
-                    <h2 class="text-2xl font-bold text-on-background mt-1">Getting Started &amp; App Bootstrapping</h2>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-on-background mt-1">Getting Started &amp; App Bootstrapping</h2>
                 </div>
 
                 <!-- 01 Overview -->
                 <div class="space-y-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">01</span>
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">01</span>
                         Platform Architecture Overview
                     </h3>
-                    <p class="text-sm text-on-surface-variant">
-                        Bifrost strictly separates the **Control Plane** (MongoDB central storage holding application secrets, webhook tokens, custom domain mappings, and staff roles) from the **Tenant Data Plane** (independent PostgreSQL/Supabase databases holding end-user records, transactions, and content).
+                    <p class="text-base text-on-surface-variant">
+                        Bifrost strictly separates the <strong>Control Plane</strong> (MongoDB central storage holding application secrets, webhook tokens, custom domain mappings, and staff roles) from the <strong>Tenant Data Plane</strong> (independent PostgreSQL/Supabase databases holding end-user records, transactions, and content).
                     </p>
 
                     <!-- Architecture Diagram -->
-                    <div class="glass-panel p-6 overflow-x-auto">
-                        <pre class="text-xs text-primary font-mono leading-normal">
+                    <div class="glass-panel p-6 md:p-8 overflow-x-auto">
+                        <pre class="text-xs md:text-sm text-primary font-mono leading-relaxed">
                   +-----------------------------------+
                   |      Bifrost Control Plane        |
                   |  - App Registry (Client IDs)      |
@@ -334,16 +334,16 @@
                 </div>
 
                 <!-- 02 Python SDK -->
-                <div id="part1-sdk" class="space-y-4 pt-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">02</span>
+                <div id="part1-sdk" class="space-y-4 pt-6">
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">02</span>
                         Python SDK &amp; Environment Injection
                     </h3>
-                    <p class="text-sm text-on-surface-variant">
-                        Downstream Python client applications should use the `bifrost_client` SDK to bootstrap secrets into `os.environ` at boot time, or use `bifrost_ai` for Google Vertex AI / Cloud Vision client factories.
+                    <p class="text-base text-on-surface-variant">
+                        Downstream Python client applications should use the <code class="text-primary font-mono font-semibold">bifrost_client</code> SDK to bootstrap secrets into <code class="text-primary font-mono">os.environ</code> at boot time, or use <code class="text-primary font-mono font-semibold">bifrost_ai</code> for Google Vertex AI / Cloud Vision client factories.
                     </p>
                     <div class="space-y-2">
-                        <div class="text-xs font-mono text-on-surface-variant">Bootstrap Credentials (`bifrost_client`):</div>
+                        <div class="text-sm font-mono text-on-surface-variant font-semibold">Bootstrap Credentials (<code class="text-primary">bifrost_client</code>):</div>
                         <pre><code class="language-python">from bifrost_client import BifrostClient
 
 # Bootstrapping credentials into os.environ at client startup:
@@ -358,21 +358,21 @@ BifrostClient(
                 </div>
 
                 <!-- 03 Direct HTTP Config -->
-                <div id="part1-config" class="space-y-4 pt-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">03</span>
+                <div id="part1-config" class="space-y-4 pt-6">
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">03</span>
                         Direct HTTP Config Fetching
                     </h3>
-                    <p class="text-sm text-on-surface-variant">
+                    <p class="text-base text-on-surface-variant">
                         Non-Python applications can query the Bifrost config REST endpoint directly during startup.
                     </p>
-                    <div class="glass-panel p-4 space-y-2">
-                        <div class="flex items-center gap-2">
-                            <span class="px-2 py-0.5 rounded text-xs font-bold badge-get">GET</span>
-                            <code class="text-sm text-primary">/api/v1/config</code>
+                    <div class="glass-panel p-5 space-y-3">
+                        <div class="flex items-center gap-3">
+                            <span class="px-2.5 py-1 rounded text-xs badge-get">GET</span>
+                            <code class="text-base font-bold text-primary">/api/v1/config</code>
                         </div>
-                        <div class="text-xs text-on-surface-variant">
-                            <strong>Headers Required:</strong> `X-Client-ID: <client_id>` and `X-Webhook-Secret: <webhook_secret>`
+                        <div class="text-sm text-on-surface-variant">
+                            <strong>Headers Required:</strong> <code class="text-primary font-mono">X-Client-ID: &lt;client_id&gt;</code> and <code class="text-primary font-mono">X-Webhook-Secret: &lt;webhook_secret&gt;</code>
                         </div>
                     </div>
                     <pre><code class="language-bash">curl -X GET https://bifrost.wkc.kh/api/v1/config \
@@ -381,13 +381,13 @@ BifrostClient(
                 </div>
 
                 <!-- 04 Service Segmentation -->
-                <div id="part1-services" class="space-y-4 pt-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">04</span>
+                <div id="part1-services" class="space-y-4 pt-6">
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">04</span>
                         Service Segmentation &amp; Feature Flags
                     </h3>
-                    <p class="text-sm text-on-surface-variant">
-                        Each registered tenant can toggle individual services on or off inside their MongoDB application document using the `enabled_services` dictionary:
+                    <p class="text-base text-on-surface-variant">
+                        Each registered tenant can toggle individual services on or off inside their MongoDB application document using the <code class="text-primary font-mono">enabled_services</code> dictionary:
                     </p>
                     <table class="doc-table">
                         <thead>
@@ -399,61 +399,61 @@ BifrostClient(
                         </thead>
                         <tbody>
                             <tr>
-                                <td><code class="text-xs text-primary">secrets_vault</code></td>
-                                <td><span class="text-success">true</span></td>
+                                <td><code class="text-sm text-primary font-mono font-bold">secrets_vault</code></td>
+                                <td><span class="text-success font-bold">true</span></td>
                                 <td>Allows client applications to fetch decrypted configuration keys.</td>
                             </tr>
                             <tr>
-                                <td><code class="text-xs text-primary">payment_bot</code></td>
-                                <td><span class="text-success">true</span></td>
+                                <td><code class="text-sm text-primary font-mono font-bold">payment_bot</code></td>
+                                <td><span class="text-success font-bold">true</span></td>
                                 <td>Enables Telegram receipt submission &amp; SLA alert bots.</td>
                             </tr>
                             <tr>
-                                <td><code class="text-xs text-primary">oauth_sso</code></td>
-                                <td><span class="text-success">true</span></td>
+                                <td><code class="text-sm text-primary font-mono font-bold">oauth_sso</code></td>
+                                <td><span class="text-success font-bold">true</span></td>
                                 <td>Enables Google/Facebook OAuth SSO login endpoints.</td>
                             </tr>
                             <tr>
-                                <td><code class="text-xs text-primary">sms_otp</code></td>
-                                <td><span class="text-success">true</span></td>
+                                <td><code class="text-sm text-primary font-mono font-bold">sms_otp</code></td>
+                                <td><span class="text-success font-bold">true</span></td>
                                 <td>Enables Phone SMS OTP verification endpoints.</td>
                             </tr>
                             <tr>
-                                <td><code class="text-xs text-primary">email_otp</code></td>
-                                <td><span class="text-success">true</span></td>
+                                <td><code class="text-sm text-primary font-mono font-bold">email_otp</code></td>
+                                <td><span class="text-success font-bold">true</span></td>
                                 <td>Enables Email verification code endpoints.</td>
                             </tr>
                         </tbody>
                     </table>
-                    <p class="text-xs text-warning flex items-center gap-1">
-                        <span class="material-symbols-outlined text-sm">warning</span>
-                        If a service is set to <code>false</code>, the Bifrost gateway automatically rejects calls to those endpoints with a <code>403 Forbidden</code> response.
+                    <p class="text-sm text-warning font-medium flex items-center gap-2 pt-2">
+                        <span class="material-symbols-outlined text-base">warning</span>
+                        If a service is set to <code class="font-mono font-bold">false</code>, the Bifrost gateway automatically rejects calls to those endpoints with a <code class="font-mono font-bold">403 Forbidden</code> response.
                     </p>
                 </div>
             </section>
 
             <!-- PART II -->
             <section id="part2-vault" class="space-y-10 doc-section">
-                <div class="border-b border-border-subtle pb-4">
+                <div class="border-b border-border-subtle pb-5">
                     <div class="text-xs font-bold text-primary uppercase tracking-widest">Part II</div>
-                    <h2 class="text-2xl font-bold text-on-background mt-1">Secrets Vault &amp; Services API</h2>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-on-background mt-1">Secrets Vault &amp; Services API</h2>
                 </div>
 
                 <!-- 05 Secrets Vault -->
                 <div class="space-y-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">05</span>
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">05</span>
                         Secrets Vault Bulk Injection
                     </h3>
-                    <p class="text-sm text-on-surface-variant">
+                    <p class="text-base text-on-surface-variant">
                         Tenant app owners can upload or retrieve key-value secrets encrypted at rest in the Bifrost Control Plane.
                     </p>
-                    <div class="glass-panel p-4 space-y-3">
-                        <div class="flex items-center gap-2">
-                            <span class="px-2 py-0.5 rounded text-xs font-bold badge-post">POST</span>
-                            <code class="text-sm text-primary">/api/v1/config/bulk</code>
+                    <div class="glass-panel p-5 space-y-3">
+                        <div class="flex items-center gap-3">
+                            <span class="px-2.5 py-1 rounded text-xs badge-post">POST</span>
+                            <code class="text-base font-bold text-primary">/api/v1/config/bulk</code>
                         </div>
-                        <p class="text-xs text-on-surface-variant">Upload bulk secrets as a JSON dictionary.</p>
+                        <p class="text-sm text-on-surface-variant font-medium">Upload bulk secrets as a JSON dictionary.</p>
                         <pre><code class="language-json">{
   "secrets": {
     "DB_CONNECTION": "postgresql://user:pass@ep-prod.supabase.co:5432/postgres",
@@ -465,39 +465,39 @@ BifrostClient(
                 </div>
 
                 <!-- 06 OTP Services -->
-                <div id="part2-otp" class="space-y-4 pt-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">06</span>
+                <div id="part2-otp" class="space-y-4 pt-6">
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">06</span>
                         Phone &amp; Email OTP Authentication
                     </h3>
-                    <p class="text-sm text-on-surface-variant">
+                    <p class="text-base text-on-surface-variant">
                         Bifrost handles SMS and Email OTP verification code generation, expiration, and validation.
                     </p>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="glass-panel p-4 space-y-2">
-                            <div class="flex items-center gap-2">
-                                <span class="px-2 py-0.5 rounded text-xs font-bold badge-post">POST</span>
-                                <code class="text-xs text-primary">/api/auth/send-otp</code>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div class="glass-panel p-5 space-y-2">
+                            <div class="flex items-center gap-3">
+                                <span class="px-2.5 py-1 rounded text-xs badge-post">POST</span>
+                                <code class="text-sm font-bold text-primary">/api/auth/send-otp</code>
                             </div>
-                            <p class="text-xs text-on-surface-variant">Sends 6-digit verification code to phone number or email.</p>
+                            <p class="text-sm text-on-surface-variant">Sends 6-digit verification code to phone number or email.</p>
                         </div>
-                        <div class="glass-panel p-4 space-y-2">
-                            <div class="flex items-center gap-2">
-                                <span class="px-2 py-0.5 rounded text-xs font-bold badge-post">POST</span>
-                                <code class="text-xs text-primary">/api/auth/verify-otp</code>
+                        <div class="glass-panel p-5 space-y-2">
+                            <div class="flex items-center gap-3">
+                                <span class="px-2.5 py-1 rounded text-xs badge-post">POST</span>
+                                <code class="text-sm font-bold text-primary">/api/auth/verify-otp</code>
                             </div>
-                            <p class="text-xs text-on-surface-variant">Validates OTP code and returns verified user payload.</p>
+                            <p class="text-sm text-on-surface-variant">Validates OTP code and returns verified user payload.</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- 07 Hosted SSO Pages -->
-                <div id="part2-sso" class="space-y-4 pt-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">07</span>
+                <div id="part2-sso" class="space-y-4 pt-6">
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">07</span>
                         Hosted SSO &amp; Password Reset Pages
                     </h3>
-                    <p class="text-sm text-on-surface-variant">
+                    <p class="text-base text-on-surface-variant">
                         Bifrost provides hosted OAuth login and password reset flows for client applications.
                     </p>
                     <table class="doc-table">
@@ -510,13 +510,13 @@ BifrostClient(
                         </thead>
                         <tbody>
                             <tr>
-                                <td><code class="text-xs text-primary">/auth/sso/login</code></td>
-                                <td><span class="px-1.5 py-0.5 rounded text-[10px] badge-get">GET</span></td>
+                                <td><code class="text-sm text-primary font-mono font-bold">/auth/sso/login</code></td>
+                                <td><span class="px-2 py-0.5 rounded text-xs badge-get">GET</span></td>
                                 <td>Renders hosted OAuth SSO page (Google / Facebook).</td>
                             </tr>
                             <tr>
-                                <td><code class="text-xs text-primary">/auth/reset-password</code></td>
-                                <td><span class="px-1.5 py-0.5 rounded text-[10px] badge-post">POST</span></td>
+                                <td><code class="text-sm text-primary font-mono font-bold">/auth/reset-password</code></td>
+                                <td><span class="px-2 py-0.5 rounded text-xs badge-post">POST</span></td>
                                 <td>Processes password reset request from emailed token.</td>
                             </tr>
                         </tbody>
@@ -524,20 +524,20 @@ BifrostClient(
                 </div>
 
                 <!-- 08 Roles & Accounts -->
-                <div id="part2-roles" class="space-y-4 pt-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">08</span>
+                <div id="part2-roles" class="space-y-4 pt-6">
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">08</span>
                         Account Management &amp; Roles API
                     </h3>
-                    <p class="text-sm text-on-surface-variant">
+                    <p class="text-base text-on-surface-variant">
                         Endpoints for fetching staff roles in bulk, updating user profiles, or deleting accounts.
                     </p>
-                    <div class="glass-panel p-4 space-y-2">
-                        <div class="flex items-center gap-2">
-                            <span class="px-2 py-0.5 rounded text-xs font-bold badge-post">POST</span>
-                            <code class="text-sm text-primary">/api/v1/users/get-roles-bulk</code>
+                    <div class="glass-panel p-5 space-y-3">
+                        <div class="flex items-center gap-3">
+                            <span class="px-2.5 py-1 rounded text-xs badge-post">POST</span>
+                            <code class="text-base font-bold text-primary">/api/v1/users/get-roles-bulk</code>
                         </div>
-                        <p class="text-xs text-on-surface-variant">Fetch roles for a list of user emails in a single request.</p>
+                        <p class="text-sm text-on-surface-variant font-medium">Fetch roles for a list of user emails in a single request.</p>
                         <pre><code class="language-json">{
   "emails": ["staff1@wkc.kh", "staff2@wkc.kh"]
 }</code></pre>
@@ -547,35 +547,35 @@ BifrostClient(
 
             <!-- PART III -->
             <section id="part3-architecture" class="space-y-10 doc-section">
-                <div class="border-b border-border-subtle pb-4">
+                <div class="border-b border-border-subtle pb-5">
                     <div class="text-xs font-bold text-primary uppercase tracking-widest">Part III</div>
-                    <h2 class="text-2xl font-bold text-on-background mt-1">Webhook Integration &amp; Security</h2>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-on-background mt-1">Webhook Integration &amp; Security</h2>
                 </div>
 
                 <!-- 09 Dispatch System -->
                 <div class="space-y-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">09</span>
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">09</span>
                         Webhook Dispatch System
                     </h3>
-                    <p class="text-sm text-on-surface-variant">
-                        Whenever a customer payment is approved, rejected, or refunded in the console, Bifrost triggers a `POST` webhook request to the client application's configured `webhook_url`.
+                    <p class="text-base text-on-surface-variant">
+                        Whenever a customer payment is approved, rejected, or refunded in the console, Bifrost triggers a <code class="text-primary font-mono font-bold">POST</code> webhook request to the client application's configured <code class="text-primary font-mono font-bold">webhook_url</code>.
                     </p>
                 </div>
 
                 <!-- 10 Signature Verification -->
-                <div id="part3-signature" class="space-y-4 pt-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">10</span>
+                <div id="part3-signature" class="space-y-4 pt-6">
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">10</span>
                         HMAC-SHA256 Signature Verification
                     </h3>
-                    <p class="text-sm text-on-surface-variant">
-                        Client applications **must** verify the `X-Bifrost-Signature` header before processing webhook entitlement payloads to prevent forged requests.
+                    <p class="text-base text-on-surface-variant">
+                        Client applications <strong>must</strong> verify the <code class="text-primary font-mono font-bold">X-Bifrost-Signature</code> header before processing webhook entitlement payloads to prevent forged requests.
                     </p>
 
                     <!-- Python Verification Code -->
-                    <div class="space-y-2">
-                        <div class="text-xs font-mono text-on-surface-variant">Python Flask Signature Verification Example:</div>
+                    <div class="space-y-3">
+                        <div class="text-sm font-mono text-on-surface-variant font-semibold">Python Flask Signature Verification Example:</div>
                         <pre><code class="language-python">import hmac
 import hashlib
 from flask import Flask, request, abort
@@ -606,8 +606,8 @@ def handle_webhook():
                     </div>
 
                     <!-- Node.js Verification Code -->
-                    <div class="space-y-2">
-                        <div class="text-xs font-mono text-on-surface-variant">Node.js Express Signature Verification Example:</div>
+                    <div class="space-y-3 pt-2">
+                        <div class="text-sm font-mono text-on-surface-variant font-semibold">Node.js Express Signature Verification Example:</div>
                         <pre><code class="language-javascript">const crypto = require('crypto');
 const express = require('express');
 const app = express();
@@ -634,13 +634,13 @@ app.post('/bifrost-webhook', express.raw({ type: 'application/json' }), (req, re
                 </div>
 
                 <!-- 11 Webhook Event Payloads -->
-                <div id="part3-payloads" class="space-y-4 pt-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">11</span>
+                <div id="part3-payloads" class="space-y-4 pt-6">
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">11</span>
                         Webhook Event Payloads
                     </h3>
-                    <div class="glass-panel p-4 space-y-2">
-                        <div class="text-xs font-mono text-primary font-bold">Event: payment_approved</div>
+                    <div class="glass-panel p-5 space-y-3">
+                        <div class="text-sm font-mono text-primary font-bold">Event: payment_approved</div>
                         <pre><code class="language-json">{
   "event": "payment_approved",
   "payment_id": "66a5c123abc4567890def123",
@@ -656,58 +656,58 @@ app.post('/bifrost-webhook', express.raw({ type: 'application/json' }), (req, re
 
             <!-- PART IV -->
             <section id="part4-proxy" class="space-y-10 doc-section">
-                <div class="border-b border-border-subtle pb-4">
+                <div class="border-b border-border-subtle pb-5">
                     <div class="text-xs font-bold text-primary uppercase tracking-widest">Part IV</div>
-                    <h2 class="text-2xl font-bold text-on-background mt-1">CMS Onboarding &amp; Database Proxying</h2>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-on-background mt-1">CMS Onboarding &amp; Database Proxying</h2>
                 </div>
 
                 <!-- 12 Proxy Architecture -->
                 <div class="space-y-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">12</span>
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">12</span>
                         Database Proxy Architecture
                     </h3>
-                    <p class="text-sm text-on-surface-variant">
-                        The console holds no customer data locally. It connects directly to your PostgreSQL database using `ThreadedConnectionPool` and context managers (`get_tenant_db`). Queries are executed dynamically to remain resilient to minor schema deviations.
+                    <p class="text-base text-on-surface-variant">
+                        The console holds no customer data locally. It connects directly to your PostgreSQL database using <code class="text-primary font-mono">ThreadedConnectionPool</code> and context managers (<code class="text-primary font-mono">get_tenant_db</code>). Queries are executed dynamically to remain resilient to minor schema deviations.
                     </p>
                 </div>
 
                 <!-- 13 3-Step Wizard -->
-                <div id="part4-wizard" class="space-y-4 pt-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">13</span>
+                <div id="part4-wizard" class="space-y-4 pt-6">
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">13</span>
                         The 3-Step CMS Onboarding Wizard
                     </h3>
-                    <p class="text-sm text-on-surface-variant">
-                        When launching the Backoffice console for a new application (`/backoffice/app/<app_id>/onboarding`), a 3-step setup wizard initializes the workspace:
+                    <p class="text-base text-on-surface-variant">
+                        When launching the Backoffice console for a new application (<code class="text-primary font-mono">/backoffice/app/&lt;app_id&gt;/onboarding</code>), a 3-step setup wizard initializes the workspace:
                     </p>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="glass-panel p-4 space-y-2">
-                            <div class="w-7 h-7 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs">1</div>
-                            <div class="font-bold text-sm text-on-surface">Connect Database</div>
-                            <p class="text-xs text-on-surface-variant">Input PostgreSQL connection string. Connection details are encrypted before saving.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                        <div class="glass-panel p-5 space-y-3">
+                            <div class="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-extrabold text-sm">1</div>
+                            <div class="font-bold text-base text-on-surface">Connect Database</div>
+                            <p class="text-sm text-on-surface-variant">Input PostgreSQL connection string. Connection details are encrypted before saving.</p>
                         </div>
-                        <div class="glass-panel p-4 space-y-2">
-                            <div class="w-7 h-7 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs">2</div>
-                            <div class="font-bold text-sm text-on-surface">Smart Schema Detection</div>
-                            <p class="text-xs text-on-surface-variant">Introspects schema, auto-hides plumbing tables (`migrations`, `tokens`, `logs`), and proposes friendly labels (`users` &rarr; `Customers`).</p>
+                        <div class="glass-panel p-5 space-y-3">
+                            <div class="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-extrabold text-sm">2</div>
+                            <div class="font-bold text-base text-on-surface">Smart Schema Detection</div>
+                            <p class="text-sm text-on-surface-variant">Introspects schema, auto-hides plumbing tables (<code class="text-primary font-mono">migrations</code>, <code class="text-primary font-mono">tokens</code>, <code class="text-primary font-mono">logs</code>), and proposes friendly labels (<code class="text-primary font-mono">users</code> &rarr; <code class="text-primary font-mono">Customers</code>).</p>
                         </div>
-                        <div class="glass-panel p-4 space-y-2">
-                            <div class="w-7 h-7 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs">3</div>
-                            <div class="font-bold text-sm text-on-surface">Invite Team</div>
-                            <p class="text-xs text-on-surface-variant">Assign staff roles (`content_manager`, `operations`, `admin`) by email before launching.</p>
+                        <div class="glass-panel p-5 space-y-3">
+                            <div class="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-extrabold text-sm">3</div>
+                            <div class="font-bold text-base text-on-surface">Invite Team</div>
+                            <p class="text-sm text-on-surface-variant">Assign staff roles (<code class="text-primary font-mono">content_manager</code>, <code class="text-primary font-mono">operations</code>, <code class="text-primary font-mono">admin</code>) by email before launching.</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- 14 Schema Customization -->
-                <div id="part4-schema" class="space-y-4 pt-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">14</span>
+                <div id="part4-schema" class="space-y-4 pt-6">
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">14</span>
                         Tenant-Agnostic Queue Schema Mapping
                     </h3>
-                    <p class="text-sm text-on-surface-variant">
-                        If your tenant database uses custom table or column names, describe them in CMS Settings under `payment_queue` (`cms_config.payment_queue`):
+                    <p class="text-base text-on-surface-variant">
+                        If your tenant database uses custom table or column names, describe them in CMS Settings under <code class="text-primary font-mono">payment_queue</code> (<code class="text-primary font-mono">cms_config.payment_queue</code>):
                     </p>
                     <pre><code class="language-json">{
   "payment_queue": {
@@ -735,15 +735,15 @@ app.post('/bifrost-webhook', express.raw({ type: 'application/json' }), (req, re
 
             <!-- PART V -->
             <section id="part5-rbac" class="space-y-10 doc-section">
-                <div class="border-b border-border-subtle pb-4">
+                <div class="border-b border-border-subtle pb-5">
                     <div class="text-xs font-bold text-primary uppercase tracking-widest">Part V</div>
-                    <h2 class="text-2xl font-bold text-on-background mt-1">Console Operator's Manual</h2>
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-on-background mt-1">Console Operator's Manual</h2>
                 </div>
 
                 <!-- 15 Roles Matrix -->
                 <div class="space-y-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">15</span>
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">15</span>
                         Console Roles &amp; Permissions Matrix
                     </h3>
                     <table class="doc-table">
@@ -760,188 +760,188 @@ app.post('/bifrost-webhook', express.raw({ type: 'application/json' }), (req, re
                         </thead>
                         <tbody>
                             <tr>
-                                <td><code class="text-xs text-primary font-bold">owner</code></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-success">Yes</span></td>
+                                <td><code class="text-sm text-primary font-mono font-bold">owner</code></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
                             </tr>
                             <tr>
-                                <td><code class="text-xs text-primary font-bold">super_admin</code></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-success">Yes</span></td>
+                                <td><code class="text-sm text-primary font-mono font-bold">super_admin</code></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
                             </tr>
                             <tr>
-                                <td><code class="text-xs text-primary font-bold">admin</code></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-success">Yes</span></td>
+                                <td><code class="text-sm text-primary font-mono font-bold">admin</code></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
                             </tr>
                             <tr>
-                                <td><code class="text-xs text-primary font-bold">content_manager</code></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-danger">No</span></td>
-                                <td><span class="text-danger">No</span></td>
-                                <td><span class="text-danger">No</span></td>
-                                <td><span class="text-warning">Read Only</span></td>
-                                <td><span class="text-success">Yes</span></td>
+                                <td><code class="text-sm text-primary font-mono font-bold">content_manager</code></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-danger font-bold">No</span></td>
+                                <td><span class="text-danger font-bold">No</span></td>
+                                <td><span class="text-danger font-bold">No</span></td>
+                                <td><span class="text-warning font-bold">Read Only</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
                             </tr>
                             <tr>
-                                <td><code class="text-xs text-primary font-bold">operations</code></td>
-                                <td><span class="text-danger">No</span></td>
-                                <td><span class="text-danger">No</span></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-warning">Read Only</span></td>
-                                <td><span class="text-success">Yes</span></td>
+                                <td><code class="text-sm text-primary font-mono font-bold">operations</code></td>
+                                <td><span class="text-danger font-bold">No</span></td>
+                                <td><span class="text-danger font-bold">No</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-warning font-bold">Read Only</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
                             </tr>
                             <tr>
-                                <td><code class="text-xs text-primary font-bold">billing_agent</code></td>
-                                <td><span class="text-danger">No</span></td>
-                                <td><span class="text-danger">No</span></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-success">Yes</span></td>
-                                <td><span class="text-warning">Read Only</span></td>
-                                <td><span class="text-success">Yes</span></td>
+                                <td><code class="text-sm text-primary font-mono font-bold">billing_agent</code></td>
+                                <td><span class="text-danger font-bold">No</span></td>
+                                <td><span class="text-danger font-bold">No</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
+                                <td><span class="text-warning font-bold">Read Only</span></td>
+                                <td><span class="text-success font-bold">Yes</span></td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
 
                 <!-- 16 Payment Queue & SLA Clock -->
-                <div id="part5-queue" class="space-y-4 pt-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">16</span>
+                <div id="part5-queue" class="space-y-4 pt-6">
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">16</span>
                         Payment Verification Queue &amp; SLA Clock
                     </h3>
-                    <p class="text-sm text-on-surface-variant">
+                    <p class="text-base text-on-surface-variant">
                         Every submitted receipt enters the human verification queue. The real age clock monitors progress against the 6-hour SLA promise:
                     </p>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="glass-panel p-4 space-y-1">
-                            <div class="text-xs font-bold text-success">Age &lt; 4h 30m</div>
-                            <div class="text-sm font-bold text-on-surface">On Time</div>
-                            <p class="text-xs text-on-surface-variant">Payment is comfortably within the service window.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                        <div class="glass-panel p-5 space-y-2">
+                            <div class="text-xs font-bold text-success uppercase tracking-wider">Age &lt; 4h 30m</div>
+                            <div class="text-base font-extrabold text-on-surface">On Time</div>
+                            <p class="text-sm text-on-surface-variant">Payment is comfortably within the service window.</p>
                         </div>
-                        <div class="glass-panel p-4 space-y-1">
-                            <div class="text-xs font-bold text-warning">4h 30m – 6h</div>
-                            <div class="text-sm font-bold text-on-surface">Approaching SLA</div>
-                            <p class="text-xs text-on-surface-variant">Alert dispatched to Telegram channel. Deal with immediately.</p>
+                        <div class="glass-panel p-5 space-y-2">
+                            <div class="text-xs font-bold text-warning uppercase tracking-wider">4h 30m – 6h</div>
+                            <div class="text-base font-extrabold text-on-surface">Approaching SLA</div>
+                            <p class="text-sm text-on-surface-variant">Alert dispatched to Telegram channel. Deal with immediately.</p>
                         </div>
-                        <div class="glass-panel p-4 space-y-1">
-                            <div class="text-xs font-bold text-danger">Over 6h</div>
-                            <div class="text-sm font-bold text-on-surface">Breached SLA</div>
-                            <p class="text-xs text-on-surface-variant">Service promise is broken. Priority resolution required.</p>
+                        <div class="glass-panel p-5 space-y-2">
+                            <div class="text-xs font-bold text-danger uppercase tracking-wider">Over 6h</div>
+                            <div class="text-base font-extrabold text-on-surface">Breached SLA</div>
+                            <p class="text-sm text-on-surface-variant">Service promise is broken. Priority resolution required.</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- 17 Approval State Machine -->
-                <div id="part5-statemachine" class="space-y-4 pt-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">17</span>
+                <div id="part5-statemachine" class="space-y-4 pt-6">
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">17</span>
                         Payment State Machine &amp; Actions
                     </h3>
-                    <p class="text-sm text-on-surface-variant">
-                        Payments strictly transition between states (`FREE` &rarr; `PENDING` &rarr; `PREMIUM` / `REJECTED`, `PREMIUM` &rarr; `REFUNDED`).
+                    <p class="text-base text-on-surface-variant">
+                        Payments strictly transition between states (<code class="text-primary font-mono font-bold">FREE</code> &rarr; <code class="text-primary font-mono font-bold">PENDING</code> &rarr; <code class="text-primary font-mono font-bold">PREMIUM</code> / <code class="text-primary font-mono font-bold">REJECTED</code>, <code class="text-primary font-mono font-bold">PREMIUM</code> &rarr; <code class="text-primary font-mono font-bold">REFUNDED</code>).
                     </p>
-                    <div class="space-y-3">
-                        <div class="glass-panel p-4 space-y-1">
-                            <div class="text-sm font-bold text-success flex items-center gap-1.5">
-                                <span class="material-symbols-outlined text-base">check_circle</span>
+                    <div class="space-y-4">
+                        <div class="glass-panel p-5 space-y-2">
+                            <div class="text-base font-bold text-success flex items-center gap-2">
+                                <span class="material-symbols-outlined text-xl">check_circle</span>
                                 Approving
                             </div>
-                            <p class="text-xs text-on-surface-variant">Atomically marks payment approved, unlocks track entitlements in Postgres, and triggers client webhooks as one transaction. Duplicate references are rejected.</p>
+                            <p class="text-sm text-on-surface-variant leading-relaxed">Atomically marks payment approved, unlocks track entitlements in Postgres, and triggers client webhooks as one transaction. Duplicate references are rejected.</p>
                         </div>
-                        <div class="glass-panel p-4 space-y-1">
-                            <div class="text-sm font-bold text-warning flex items-center gap-1.5">
-                                <span class="material-symbols-outlined text-base">cancel</span>
+                        <div class="glass-panel p-5 space-y-2">
+                            <div class="text-base font-bold text-warning flex items-center gap-2">
+                                <span class="material-symbols-outlined text-xl">cancel</span>
                                 Rejecting
                             </div>
-                            <p class="text-xs text-on-surface-variant">Requires reason code (`wrong_amount`, `unreadable`, `duplicate_reference`, `other`). Allows customer to re-submit a fresh receipt.</p>
+                            <p class="text-sm text-on-surface-variant leading-relaxed">Requires reason code (<code class="text-primary font-mono">wrong_amount</code>, <code class="text-primary font-mono">unreadable</code>, <code class="text-primary font-mono">duplicate_reference</code>, <code class="text-primary font-mono">other</code>). Allows customer to re-submit a fresh receipt.</p>
                         </div>
-                        <div class="glass-panel p-4 space-y-1">
-                            <div class="text-sm font-bold text-danger flex items-center gap-1.5">
-                                <span class="material-symbols-outlined text-base">undo</span>
+                        <div class="glass-panel p-5 space-y-2">
+                            <div class="text-base font-bold text-danger flex items-center gap-2">
+                                <span class="material-symbols-outlined text-xl">undo</span>
                                 Refunding
                             </div>
-                            <p class="text-xs text-on-surface-variant">Allowed only on approved payments. Revokes only the entitlement unlocked by that specific transaction.</p>
+                            <p class="text-sm text-on-surface-variant leading-relaxed">Allowed only on approved payments. Revokes only the entitlement unlocked by that specific transaction.</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- 18 Publish Gatekeeper -->
-                <div id="part5-publish" class="space-y-4 pt-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">18</span>
+                <div id="part5-publish" class="space-y-4 pt-6">
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">18</span>
                         Exam Question Automated Publish Quality Gate
                     </h3>
-                    <p class="text-sm text-on-surface-variant">
-                        Publishing exam content (`review` &rarr; `published`) is restricted to Admins/Owners and is automatically blocked by the server unless all 4 criteria pass:
+                    <p class="text-base text-on-surface-variant">
+                        Publishing exam content (<code class="text-primary font-mono font-bold">review</code> &rarr; <code class="text-primary font-mono font-bold">published</code>) is restricted to Admins/Owners and is automatically blocked by the server unless all 4 criteria pass:
                     </p>
-                    <div class="glass-panel p-6 space-y-3">
-                        <div class="flex items-center gap-3">
-                            <span class="material-symbols-outlined text-success text-xl">check_box</span>
-                            <span class="text-xs text-on-surface"><strong>Exactly 4 choices</strong> defined on the question.</span>
+                    <div class="glass-panel p-6 space-y-4">
+                        <div class="flex items-center gap-4">
+                            <span class="material-symbols-outlined text-success text-2xl">check_box</span>
+                            <span class="text-sm md:text-base text-on-surface"><strong>Exactly 4 choices</strong> defined on the question.</span>
                         </div>
-                        <div class="flex items-center gap-3">
-                            <span class="material-symbols-outlined text-success text-xl">check_box</span>
-                            <span class="text-xs text-on-surface"><strong>Exactly 1 choice</strong> marked as correct.</span>
+                        <div class="flex items-center gap-4">
+                            <span class="material-symbols-outlined text-success text-2xl">check_box</span>
+                            <span class="text-sm md:text-base text-on-surface"><strong>Exactly 1 choice</strong> marked as correct.</span>
                         </div>
-                        <div class="flex items-center gap-3">
-                            <span class="material-symbols-outlined text-success text-xl">check_box</span>
-                            <span class="text-xs text-on-surface"><strong>Bilingual explanations</strong> (Khmer &amp; English) present on the correct choice.</span>
+                        <div class="flex items-center gap-4">
+                            <span class="material-symbols-outlined text-success text-2xl">check_box</span>
+                            <span class="text-sm md:text-base text-on-surface"><strong>Bilingual explanations</strong> (Khmer &amp; English) present on the correct choice.</span>
                         </div>
-                        <div class="flex items-center gap-3">
-                            <span class="material-symbols-outlined text-success text-xl">check_box</span>
-                            <span class="text-xs text-on-surface"><strong>Non-empty `source_ref`</strong> tracing the question to an official source document.</span>
+                        <div class="flex items-center gap-4">
+                            <span class="material-symbols-outlined text-success text-2xl">check_box</span>
+                            <span class="text-sm md:text-base text-on-surface"><strong>Non-empty <code class="text-primary font-mono">source_ref</code></strong> tracing the question to an official source document.</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- 19 Audit Log -->
-                <div id="part5-audit" class="space-y-4 pt-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">19</span>
+                <div id="part5-audit" class="space-y-4 pt-6">
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">19</span>
                         Audit Log &amp; User Suspensions
                     </h3>
-                    <p class="text-sm text-on-surface-variant">
+                    <p class="text-base text-on-surface-variant">
                         Every mutation (approvals, rejections, refunds, content edits, manual overrides) is permanently recorded in the immutable audit log with actor ID, timestamp, and before/after JSON diffs. Suspensions lock user accounts while preserving paid entitlements.
                     </p>
                 </div>
 
                 <!-- 20 Core Guarantees -->
-                <div id="part5-safeguards" class="space-y-4 pt-4">
-                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
-                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">20</span>
+                <div id="part5-safeguards" class="space-y-4 pt-6">
+                    <h3 class="text-xl font-bold text-on-surface flex items-center gap-3">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2.5 py-1 rounded-md font-bold">20</span>
                         Operational Safeguards &amp; Guarantees
                     </h3>
-                    <div class="glass-panel p-6 space-y-4 text-xs text-on-surface-variant">
-                        <div class="flex items-start gap-3">
-                            <span class="material-symbols-outlined text-primary text-lg">shield</span>
+                    <div class="glass-panel p-6 space-y-5 text-sm md:text-base text-on-surface-variant">
+                        <div class="flex items-start gap-4">
+                            <span class="material-symbols-outlined text-primary text-2xl shrink-0 mt-0.5">shield</span>
                             <div>
-                                <strong class="text-on-surface">No Passwords in Plaintext:</strong> Passwords are never stored in plaintext or requested by staff.
+                                <strong class="text-on-surface text-base">No Passwords in Plaintext:</strong> Passwords are never stored in plaintext or requested by staff.
                             </div>
                         </div>
-                        <div class="flex items-start gap-3">
-                            <span class="material-symbols-outlined text-primary text-lg">account_balance</span>
+                        <div class="flex items-start gap-4">
+                            <span class="material-symbols-outlined text-primary text-2xl shrink-0 mt-0.5">account_balance</span>
                             <div>
-                                <strong class="text-on-surface">Money Movement Outside Console:</strong> The console records verification decisions; actual bank wire transfers and cash refunds occur through tenant banks.
+                                <strong class="text-on-surface text-base">Money Movement Outside Console:</strong> The console records verification decisions; actual bank wire transfers and cash refunds occur through tenant banks.
                             </div>
                         </div>
-                        <div class="flex items-start gap-3">
-                            <span class="material-symbols-outlined text-primary text-lg">history_edu</span>
+                        <div class="flex items-start gap-4">
+                            <span class="material-symbols-outlined text-primary text-2xl shrink-0 mt-0.5">history_edu</span>
                             <div>
-                                <strong class="text-on-surface">Immutable Timeline:</strong> Nothing is deleted quietly. Every change is logged with full before and after states.
+                                <strong class="text-on-surface text-base">Immutable Timeline:</strong> Nothing is deleted quietly. Every change is logged with full before and after states.
                             </div>
                         </div>
                     </div>
