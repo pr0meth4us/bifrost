@@ -1,1375 +1,992 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html class="dark" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bifrost API Reference</title>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Bifrost Documentation — API Reference & Operator's Manual</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
 
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <!-- Google Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#c0c1ff",
+                        "on-primary": "#1000a9",
+                        "primary-container": "#3233c8",
+                        "brand": "#c6613f",
+                        "brand-hover": "#d97721",
+                        "background": "#0d0d0d",
+                        "surface": "#111318",
+                        "surface-container": "#1a1b21",
+                        "surface-container-high": "#23242a",
+                        "surface-variant": "#33353a",
+                        "on-background": "#e2e2e9",
+                        "on-surface": "#e2e2e9",
+                        "on-surface-variant": "#908fa0",
+                        "outline": "#464554",
+                        "outline-variant": "#282a2f",
+                        "border-subtle": "rgba(255, 255, 255, 0.08)",
+                        "success": "#62d294",
+                        "warning": "#ffb783",
+                        "danger": "#ff8e8e"
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Menlo', 'Monaco', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Syntax Highlighting -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <script>hljs.highlightAll();</script>
+    <script>document.addEventListener('DOMContentLoaded', () => { hljs.highlightAll(); });</script>
 
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
-        code { font-family: 'JetBrains Mono', monospace; }
-        html { scroll-behavior: smooth; }
-
-        /* Typography Enhancements */
-        h1, h2, h3, h4 { color: #0f172a; letter-spacing: -0.025em; }
-        p, li { color: #475569; }
-
-        /* Copy Animation Classes - Tooltip Style */
-        .endpoint-copy {
-            cursor: pointer;
-            transition: all 0.2s ease;
-            position: relative;
-        }
-        .endpoint-copy:hover {
-            background-color: #e2e8f0; /* slate-200 */
-        }
-        .endpoint-copy:active {
-            transform: scale(0.98);
-        }
-        /* Tooltip positioned above to avoid overlap */
-        .endpoint-copy::after {
-            content: 'Click to copy';
-            position: absolute;
-            bottom: 100%;
-            right: 0;
-            margin-bottom: 5px;
-            background-color: #1e293b; /* slate-800 */
-            color: #ffffff;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.65rem;
-            font-weight: bold;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.2s;
-            white-space: nowrap;
-            z-index: 10;
-        }
-        .endpoint-copy:hover::after {
-            opacity: 1;
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #0d0d0d;
+            color: #e2e2e9;
+            line-height: 1.6;
+            scroll-behavior: smooth;
         }
 
-        /* Payload Highlighter - Overhauled Dark Style */
-        .payload-block {
-            background-color: #282c34; /* Matches Atom One Dark */
-            border-radius: 0.75rem;
-            margin-top: 1rem;
-            overflow: hidden;
-            border: 1px solid #3e4451;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            position: relative;
+        /* Glassmorphism Claude Artifact Styling */
+        .glass-panel {
+            background-color: rgba(26, 27, 33, 0.65);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+        }
+        
+        .glass-panel-subtle {
+            background-color: rgba(17, 19, 24, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
         }
 
-        /* Header bar for code blocks */
-        .payload-block::before {
-            content: 'JSON Payload';
-            display: block;
-            background: #21252b;
-            color: #abb2bf;
-            font-size: 0.7rem;
-            font-weight: bold;
-            padding: 0.5rem 1rem;
-            border-bottom: 1px solid #3e4451;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            display: flex;
-            align-items: center;
-        }
-
-        /* Modifier for Responses */
-        .payload-block.response::before {
-            content: 'JSON Response';
-            color: #98c379; /* Atom Green */
-        }
-
-        .payload-block pre {
-            margin: 0 !important;
-            padding: 1.25rem !important;
-            background: transparent !important;
-        }
-
-        /* Custom scrollbar for code blocks */
-        .payload-block pre::-webkit-scrollbar {
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
             height: 8px;
         }
-        .payload-block pre::-webkit-scrollbar-track {
-            background: #282c34;
+        ::-webkit-scrollbar-track {
+            background: #0d0d0d;
         }
-        .payload-block pre::-webkit-scrollbar-thumb {
-            background: #4b5563;
+        ::-webkit-scrollbar-thumb {
+            background: #33353a;
             border-radius: 4px;
         }
-
-        /* Feature Card Hover Effects */
-        .feature-card {
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        ::-webkit-scrollbar-thumb:hover {
+            background: #464554;
         }
-        .feature-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+
+        /* Code Blocks */
+        pre code.hljs {
+            background: #14161d !important;
+            padding: 1.25rem !important;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        /* Table Styling */
+        .doc-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .doc-table th {
+            background-color: rgba(35, 36, 42, 0.8);
+            color: #c0c1ff;
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .doc-table td {
+            padding: 12px 16px;
+            font-size: 0.875rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            background-color: rgba(17, 19, 24, 0.3);
+        }
+        .doc-table tr:last-child td {
+            border-bottom: none;
+        }
+        .doc-table tr:hover td {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        /* Copy Button Tooltip */
+        .copy-btn {
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .copy-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Method Badges */
+        .badge-get { background: rgba(98, 210, 148, 0.15); color: #62d294; border: 1px solid rgba(98, 210, 148, 0.3); }
+        .badge-post { background: rgba(192, 193, 255, 0.15); color: #c0c1ff; border: 1px solid rgba(192, 193, 255, 0.3); }
+        .badge-put { background: rgba(255, 183, 131, 0.15); color: #ffb783; border: 1px solid rgba(255, 183, 131, 0.3); }
+        .badge-delete { background: rgba(255, 142, 142, 0.15); color: #ff8e8e; border: 1px solid rgba(255, 142, 142, 0.3); }
+
+        /* Smooth TOC Highlight */
+        .toc-item.active {
+            color: #c0c1ff;
+            background-color: rgba(192, 193, 255, 0.08);
+            border-left: 2px solid #c0c1ff;
         }
     </style>
 </head>
-<body class="bg-base-100">
+<body class="min-h-screen flex flex-col text-on-background selection:bg-primary/30">
 
-<div id="toast-container" class="toast toast-end z-50"></div>
-
-<div class="drawer lg:drawer-open">
-    <input id="docs-drawer" type="checkbox" class="drawer-toggle" />
-
-    <div class="drawer-content flex flex-col bg-white">
-        <!-- Navbar for Mobile -->
-        <div class="w-full navbar bg-white lg:hidden border-b border-base-200 sticky top-0 z-30">
-            <div class="flex-none">
-                <label for="docs-drawer" class="btn btn-square btn-ghost">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-6 h-6 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-                </label>
-            </div>
-            <div class="flex-1 px-2 mx-2 font-bold text-lg text-slate-800">Bifrost API</div>
+    <!-- Top Navigation Header -->
+    <header class="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border-subtle px-6 py-3.5 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <a href="/" class="flex items-center gap-3 group">
+                <div class="w-9 h-9 rounded-lg bg-brand/20 border border-brand/40 flex items-center justify-center text-brand group-hover:scale-105 transition-transform">
+                    <span class="material-symbols-outlined text-[22px]">hub</span>
+                </div>
+                <div class="flex flex-col">
+                    <span class="font-bold text-base tracking-tight text-on-background">Bifrost Control Plane</span>
+                    <span class="text-xs text-on-surface-variant">External Developer &amp; Operator Portal</span>
+                </div>
+            </a>
+            <span class="text-border-subtle">|</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-mono bg-primary/10 text-primary border border-primary/20">v{{ version if version else '1.0.0' }}</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-sans bg-surface-variant/50 text-on-surface-variant border border-outline-variant/30 hidden md:inline-block">Edition 1.0 — 2026-07-28 Release</span>
         </div>
-
-        <main class="p-6 lg:p-12 max-w-6xl mx-auto w-full">
-
-            <div class="alert alert-info bg-indigo-50 border-indigo-100 text-indigo-900 mb-12 shadow-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6 text-indigo-600"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                <span class="text-sm font-medium">Documentation updated to v{{ version }} ({{ date }}). See <a href="{{ url_for('changelog_page') }}" class="link underline decoration-indigo-300 underline-offset-4">Changelog</a> for details.</span>
+        <div class="flex items-center gap-3">
+            <div class="relative hidden sm:block">
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+                <input id="docSearch" type="text" placeholder="Search documentation..." class="bg-surface-container border border-outline-variant/40 rounded-lg pl-9 pr-4 py-1.5 text-xs w-64 text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary/50 transition-colors" onkeyup="filterDocs()"/>
             </div>
+            <a href="/docs/changelog" class="text-xs text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">history</span> Changelog
+            </a>
+            <a href="/backoffice/login" class="px-3.5 py-1.5 rounded-lg bg-brand hover:bg-brand-hover text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-sm">
+                <span class="material-symbols-outlined text-sm">login</span> Console Login
+            </a>
+        </div>
+    </header>
 
-            <section id="introduction" class="mb-24 scroll-mt-24">
-                <h1 class="text-5xl font-extrabold text-slate-900 mb-6 tracking-tight">Introduction</h1>
-                <p class="text-xl text-slate-600 leading-relaxed mb-8 font-medium">
-                    <strong>Bifrost</strong> is a multi-tenant Identity Provider (IdP) and Payment Gateway.
-                    It acts as the secure bridge between users, client applications, and financial providers.
+    <!-- Main Container with Sidebar + Content -->
+    <div class="flex-1 flex w-full max-w-[1600px] mx-auto">
+
+        <!-- Left Sidebar Table of Contents -->
+        <aside class="w-72 shrink-0 border-r border-border-subtle hidden lg:block sticky top-[57px] h-[calc(100vh-57px)] overflow-y-auto p-4 space-y-6">
+            <div class="text-xs font-bold text-on-surface-variant uppercase tracking-wider px-3">Documentation Index</div>
+            
+            <nav class="space-y-4 text-xs font-medium">
+                <!-- Part I -->
+                <div>
+                    <div class="px-3 py-1 font-semibold text-primary uppercase text-[11px] tracking-wider">Part I · Getting Started</div>
+                    <ul class="mt-1 space-y-0.5">
+                        <li><a href="#part1-overview" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">01 Platform Overview</a></li>
+                        <li><a href="#part1-sdk" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">02 Python SDK &amp; Injection</a></li>
+                        <li><a href="#part1-config" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">03 Direct HTTP Config Endpoint</a></li>
+                        <li><a href="#part1-services" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">04 Service Segmentation</a></li>
+                    </ul>
+                </div>
+
+                <!-- Part II -->
+                <div>
+                    <div class="px-3 py-1 font-semibold text-primary uppercase text-[11px] tracking-wider">Part II · Secrets &amp; Services API</div>
+                    <ul class="mt-1 space-y-0.5">
+                        <li><a href="#part2-vault" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">05 Secrets Vault Endpoint</a></li>
+                        <li><a href="#part2-otp" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">06 Phone &amp; Email OTP Verification</a></li>
+                        <li><a href="#part2-sso" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">07 Hosted SSO &amp; Password Reset</a></li>
+                        <li><a href="#part2-roles" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">08 Account Management &amp; Roles</a></li>
+                    </ul>
+                </div>
+
+                <!-- Part III -->
+                <div>
+                    <div class="px-3 py-1 font-semibold text-primary uppercase text-[11px] tracking-wider">Part III · Webhook Integration</div>
+                    <ul class="mt-1 space-y-0.5">
+                        <li><a href="#part3-architecture" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">09 Webhook Dispatch System</a></li>
+                        <li><a href="#part3-signature" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">10 HMAC-SHA256 Verification</a></li>
+                        <li><a href="#part3-payloads" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">11 Webhook Event Payloads</a></li>
+                    </ul>
+                </div>
+
+                <!-- Part IV -->
+                <div>
+                    <div class="px-3 py-1 font-semibold text-primary uppercase text-[11px] tracking-wider">Part IV · CMS Onboarding &amp; Setup</div>
+                    <ul class="mt-1 space-y-0.5">
+                        <li><a href="#part4-proxy" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">12 Database Proxy Architecture</a></li>
+                        <li><a href="#part4-wizard" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">13 The 3-Step Setup Wizard</a></li>
+                        <li><a href="#part4-schema" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">14 Schema Mapping (`payment_queue`)</a></li>
+                    </ul>
+                </div>
+
+                <!-- Part V -->
+                <div>
+                    <div class="px-3 py-1 font-semibold text-primary uppercase text-[11px] tracking-wider">Part V · Console Operator's Manual</div>
+                    <ul class="mt-1 space-y-0.5">
+                        <li><a href="#part5-rbac" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">15 Console Roles &amp; Matrix</a></li>
+                        <li><a href="#part5-queue" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">16 Payment Queue &amp; SLA Clock</a></li>
+                        <li><a href="#part5-statemachine" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">17 Approval State Machine</a></li>
+                        <li><a href="#part5-publish" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">18 Publish Quality Gatekeeper</a></li>
+                        <li><a href="#part5-audit" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">19 Audit Trail &amp; Suspensions</a></li>
+                        <li><a href="#part5-safeguards" class="toc-item block px-3 py-1.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all">20 Core Guarantees</a></li>
+                    </ul>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Documentation Content Body -->
+        <main class="flex-1 p-6 md:p-10 space-y-16 max-w-5xl">
+
+            <!-- Hero Introduction -->
+            <section class="glass-panel p-8 space-y-4">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand/10 text-brand border border-brand/20 text-xs font-semibold">
+                    <span class="material-symbols-outlined text-sm">verified</span>
+                    Official Client &amp; Staff Reference Manual
+                </div>
+                <h1 class="text-3xl font-extrabold tracking-tight text-on-background">Bifrost Identity, Secrets &amp; Control Plane</h1>
+                <p class="text-sm text-on-surface-variant max-w-3xl leading-relaxed">
+                    Bifrost acts as a central control plane managing application registration, credentials, secrets vault, and identity authentication, while proxying administrative operations live to independent tenant database planes. This document covers client app onboarding, SDK initialization, API endpoints, webhook signature verification, and the Console Operator's Manual.
                 </p>
-                <p class="text-slate-600 leading-loose mb-10 max-w-3xl">
-                    By integrating with Bifrost, your application gains:
-                    <br>• <strong>Unified Login:</strong> Single Sign-On (SSO) via Email or Telegram.
-                    <br>• <strong>Role Management:</strong> Centralized permission handling (Guest, User, Premium, Admin).
-                    <br>• <strong>Payment Processing:</strong> Abstraction layer for ABA PayWay, Gumroad, and Manual/Bot payments.
-                    <br>• <strong>Branding Support:</strong> Custom logos, QR codes, and email templates per app.
-                </p>
-
-                <div class="flex flex-col sm:flex-row gap-4 items-center bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm">
-                    <div class="badge badge-primary badge-lg gap-2 py-4 px-4 font-bold">Base URL</div>
-                    <code onclick="copyText('https://objective-denna-auppecampus-9a7d86fc.koyeb.app')" class="endpoint-copy font-mono text-sm font-bold text-slate-700 flex-1 truncate w-full sm:w-auto bg-white p-3 rounded-lg border border-slate-200">https://objective-denna-auppecampus-9a7d86fc.koyeb.app</code>
-                </div>
-            </section>
-
-            <section id="get-started" class="mb-24 scroll-mt-24">
-                <h2 class="text-3xl font-bold mb-8 flex items-center gap-4 text-slate-900">
-                    <span class="bg-indigo-600 text-white w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold shadow-md shadow-indigo-200">!</span>
-                    Get Started
-                </h2>
-
-                <div class="grid md:grid-cols-2 gap-6">
-                    <div class="card bg-white border border-slate-200 shadow-sm feature-card">
-                        <div class="card-body p-6">
-                            <div class="flex items-center gap-4 mb-4">
-                                <span class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm">1</span>
-                                <h3 class="font-bold text-slate-800">Register Application</h3>
-                            </div>
-                            <p class="text-sm text-slate-600 leading-relaxed">
-                                Access the <strong>Bifrost Backoffice</strong> to create your application. You will receive a unique <code>client_id</code> and <code>client_secret</code>. These credentials are required for all Server-to-Server (S2S) requests.
-                            </p>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                    <div class="glass-panel-subtle p-3.5 flex items-center gap-3">
+                        <span class="material-symbols-outlined text-primary text-xl">key</span>
+                        <div>
+                            <div class="text-xs font-bold text-on-surface">Client SDK &amp; Vault</div>
+                            <div class="text-[11px] text-on-surface-variant">Automated credential injection</div>
                         </div>
                     </div>
-
-                    <div class="card bg-white border border-slate-200 shadow-sm feature-card">
-                        <div class="card-body p-6">
-                            <div class="flex items-center gap-4 mb-4">
-                                <span class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm">2</span>
-                                <h3 class="font-bold text-slate-800">Choose Auth Strategy</h3>
-                            </div>
-                            <p class="text-sm text-slate-600 leading-relaxed">
-                                Decide between using our <strong>Hosted UI</strong> (fastest) or the <strong>Headless API</strong> (full control). Most apps start with Hosted UI to handle password resets and email verification automatically.
-                            </p>
+                    <div class="glass-panel-subtle p-3.5 flex items-center gap-3">
+                        <span class="material-symbols-outlined text-success text-xl">lock_open</span>
+                        <div>
+                            <div class="text-xs font-bold text-on-surface">HMAC Webhooks</div>
+                            <div class="text-[11px] text-on-surface-variant">SHA-256 signature verification</div>
                         </div>
                     </div>
-
-                    <div class="card bg-white border border-slate-200 shadow-sm feature-card">
-                        <div class="card-body p-6">
-                            <div class="flex items-center gap-4 mb-4">
-                                <span class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm">3</span>
-                                <h3 class="font-bold text-slate-800">Configure Webhooks</h3>
-                            </div>
-                            <p class="text-sm text-slate-600 leading-relaxed">
-                                Set your <code>Webhook URL</code> in the app settings. Bifrost will notify your server whenever a user pays, a subscription expires, or a profile is updated. Always verify the HMAC signature.
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="card bg-white border border-slate-200 shadow-sm feature-card">
-                        <div class="card-body p-6">
-                            <div class="flex items-center gap-4 mb-4">
-                                <span class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm">4</span>
-                                <h3 class="font-bold text-slate-800">Secure Payments</h3>
-                            </div>
-                            <p class="text-sm text-slate-600 leading-relaxed">
-                                Use the <code>/internal/payments/secure-intent</code> endpoint to generate tamper-proof payment requests. This ensures that users cannot manipulate prices or durations on the frontend.
-                            </p>
+                    <div class="glass-panel-subtle p-3.5 flex items-center gap-3">
+                        <span class="material-symbols-outlined text-warning text-xl">admin_panel_settings</span>
+                        <div>
+                            <div class="text-xs font-bold text-on-surface">Console &amp; SLA Queue</div>
+                            <div class="text-[11px] text-on-surface-variant">6-hour payment verification SLA</div>
                         </div>
                     </div>
                 </div>
             </section>
 
-            <div class="divider text-slate-300"></div>
-
-            <section id="roles-hierarchy" class="mb-24 scroll-mt-24">
-                <h2 class="text-3xl font-bold mb-8 flex items-center gap-4 text-slate-900">
-                    <span class="bg-slate-900 text-white w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold shadow-md">0</span>
-                    Role Hierarchy
-                </h2>
-
-                <div class="grid lg:grid-cols-2 gap-16">
-                    <div>
-                        <p class="mb-8 text-slate-600 leading-relaxed">
-                            Bifrost maintains a clear hierarchy of roles, where each level builds on the access and capabilities of the ones below it. This structure ensures secure and scalable user management across applications.
-                        </p>
-                        <div class="bg-amber-50 border-l-4 border-amber-400 p-4 mb-8 rounded-r-lg">
-                            <p class="text-xs text-amber-800 font-medium">
-                                <strong>Note:</strong> Client apps have full flexibility to define and name their subscription tiers. Bifrost records these roles without limits—apps can create as many tiers as needed (e.g., 'basic', 'gold', 'platinum').
-                            </p>
-                        </div>
-
-                        <ul class="steps steps-vertical w-full font-medium">
-                            <li class="step step-neutral" data-content="?">
-                                <div class="text-left w-full pl-6 py-2">
-                                    <strong class="block text-slate-900">Guest</strong>
-                                    <span class="text-sm text-slate-500">Unauthenticated or unverified users.</span>
-                                </div>
-                            </li>
-                            <li class="step step-primary" data-content="✓">
-                                <div class="text-left w-full pl-6 py-2">
-                                    <strong class="block text-slate-900">User</strong>
-                                    <span class="text-sm text-slate-500">Standard authenticated users (Free Tier).</span>
-                                </div>
-                            </li>
-                            <li class="step step-accent" data-content="★">
-                                <div class="text-left w-full pl-6 py-2">
-                                    <strong class="block text-slate-900">Subscriber</strong>
-                                    <span class="text-sm text-slate-500">Active subscription holders (Premium, Gold, etc.).</span>
-                                </div>
-                            </li>
-                            <li class="step step-secondary" data-content="🛡️">
-                                <div class="text-left w-full pl-6 py-2">
-                                    <strong class="block text-slate-900">Admin</strong>
-                                    <span class="text-sm text-slate-500">App-specific managers (User Management).</span>
-                                </div>
-                            </li>
-                            <li class="step step-secondary" data-content="⚡">
-                                <div class="text-left w-full pl-6 py-2">
-                                    <strong class="block text-slate-900">Super Admin</strong>
-                                    <span class="text-sm text-slate-500">App Configuration & Admin Management.</span>
-                                </div>
-                            </li>
-                            <li class="step step-secondary" data-content="👑">
-                                <div class="text-left w-full pl-6 py-2">
-                                    <strong class="block text-slate-900">Owner</strong>
-                                    <span class="text-sm text-slate-500">App Creator (Full Access + Secrets).</span>
-                                </div>
-                            </li>
-                        </ul>
-                    </div>
-
-                    <div class="bg-gradient-to-br from-slate-50 to-slate-100 p-8 rounded-3xl border border-slate-200 h-fit shadow-inner">
-                        <div class="flex items-center gap-3 mb-6">
-                            <span class="badge badge-warning font-bold shadow-sm">System Level</span>
-                            <h3 class="font-bold text-lg text-slate-900">Heimdall (God Admin)</h3>
-                        </div>
-                        <p class="text-sm text-slate-600 mb-6 leading-relaxed">
-                            This elevated role operates beyond individual client apps, providing platform-wide oversight for tasks like debugging, billing oversight, and infrastructure management.
-                        </p>
-                        <div class="alert bg-white border border-slate-200 shadow-sm text-xs font-medium text-slate-500">
-                            This role cannot be assigned through the API and is reserved exclusively for Bifrost system maintainers.
-                        </div>
-                    </div>
+            <!-- PART I -->
+            <section id="part1-overview" class="space-y-10 doc-section">
+                <div class="border-b border-border-subtle pb-4">
+                    <div class="text-xs font-bold text-primary uppercase tracking-widest">Part I</div>
+                    <h2 class="text-2xl font-bold text-on-background mt-1">Getting Started &amp; App Bootstrapping</h2>
                 </div>
-            </section>
 
-            <section id="flows-guides" class="mb-24 scroll-mt-24">
-                <h2 class="text-3xl font-bold mb-8 flex items-center gap-4 text-slate-900">
-                    <span class="bg-indigo-600 text-white w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold shadow-md shadow-indigo-200">1</span>
-                    Flows & Guides
-                </h2>
-                <p class="mb-8 text-slate-600 text-lg">Step-by-step guides for key integration processes.</p>
-
-                <div class="space-y-10">
-                    <!-- Registration Flow -->
-                    <div class="card bg-white border border-slate-200 shadow-lg shadow-slate-100/50 feature-card">
-                        <div class="card-body p-8">
-                            <h3 class="card-title text-xl text-slate-900 mb-2">Registration Flow (Email OTP)</h3>
-                            <p class="text-sm mb-6 text-slate-500">Secure user sign-ups with email verification.</p>
-                            <ol class="relative border-l border-slate-200 ml-3">
-                                <li class="mb-10 ml-6">
-                                <span class="absolute flex items-center justify-center w-6 h-6 bg-indigo-100 rounded-full -left-3 ring-8 ring-white">
-                                    <svg class="w-3 h-3 text-indigo-800" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path></svg>
-                                </span>
-                                    <h3 class="flex items-center mb-1 text-lg font-semibold text-slate-900">Check Email</h3>
-                                    <code class="text-xs bg-slate-100 p-1 rounded border border-slate-200">POST /auth/api/check-email</code>
-                                    <div class="payload-block">
-                                        <pre><code class="language-json">{ "email": "user@example.com" }</code></pre>
-                                    </div>
-                                    <div class="mt-2"></div>
-                                    <div class="payload-block response">
-                                        <pre><code class="language-json">{ "exists": false, "provider": "email" }</code></pre>
-                                    </div>
-                                </li>
-                                <li class="mb-10 ml-6">
-                                <span class="absolute flex items-center justify-center w-6 h-6 bg-indigo-100 rounded-full -left-3 ring-8 ring-white">
-                                    <span class="text-xs font-bold text-indigo-800">2</span>
-                                </span>
-                                    <h3 class="flex items-center mb-1 text-lg font-semibold text-slate-900">Request OTP</h3>
-                                    <code class="text-xs bg-slate-100 p-1 rounded border border-slate-200">POST /auth/api/request-email-otp</code>
-                                    <div class="payload-block">
-                                        <pre><code class="language-json">{ "email": "user@example.com", "client_id": "your_client_id" }</code></pre>
-                                    </div>
-                                    <div class="mt-2"></div>
-                                    <div class="payload-block response">
-                                        <pre><code class="language-json">{ "status": "sent", "message": "OTP sent." }</code></pre>
-                                    </div>
-                                </li>
-                                <li class="ml-6">
-                                <span class="absolute flex items-center justify-center w-6 h-6 bg-indigo-100 rounded-full -left-3 ring-8 ring-white">
-                                    <span class="text-xs font-bold text-indigo-800">3</span>
-                                </span>
-                                    <h3 class="flex items-center mb-1 text-lg font-semibold text-slate-900">Complete Registration</h3>
-                                    <code class="text-xs bg-slate-100 p-1 rounded border border-slate-200">POST /auth/api/complete-registration</code>
-                                    <div class="payload-block">
-                                    <pre><code class="language-json">{
-  "proof_token": "from_verify_step",
-  "password": "user_password",
-  "display_name": "User Name",
-  "client_id": "your_client_id"
-}</code></pre>
-                                    </div>
-                                    <div class="mt-2"></div>
-                                    <div class="payload-block response">
-                                    <pre><code class="language-json">{
-  "status": "created",
-  "token": "eyJhbGci...",
-  "user": { "id": "...", "email": "user@example.com" }
-}</code></pre>
-                                    </div>
-                                </li>
-                            </ol>
-                        </div>
-                    </div>
-
-                    <!-- Webhook Verification -->
-                    <div class="card bg-white border border-slate-200 shadow-lg shadow-slate-100/50 feature-card">
-                        <div class="card-body p-8">
-                            <h3 class="card-title text-xl text-slate-900 mb-4">HMAC Webhook Verification (Python)</h3>
-                            <p class="text-sm mb-6 text-slate-500">Secure your webhook endpoints by verifying the X-Bifrost-Signature header.</p>
-                            <div class="payload-block mt-0">
-                            <pre><code class="language-python">import hmac
-import hashlib
-
-def verify_webhook(request_body, signature_header, client_secret):
-    computed_sig = hmac.new(
-        client_secret.encode(),
-        request_body.encode(),
-        hashlib.sha256
-    ).hexdigest()
-    return hmac.compare_digest(computed_sig, signature_header)</code></pre>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section id="auth-hosted" class="mb-24 scroll-mt-24">
-                <h2 class="text-3xl font-bold mb-8 flex items-center gap-4 text-slate-900">
-                    <span class="bg-indigo-600 text-white w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold shadow-md shadow-indigo-200">2</span>
-                    Hosted Login UI
-                </h2>
-                <p class="mb-8 text-slate-600">Pre-built, branded authentication pages.</p>
-
-                <div class="overflow-hidden bg-white border border-slate-200 rounded-2xl shadow-sm">
-                    <table class="table w-full">
-                        <thead>
-                        <tr class="bg-slate-50 text-slate-700 uppercase text-xs font-bold tracking-wider">
-                            <th class="py-4 pl-6">View Name</th>
-                            <th class="py-4">Endpoint URL (Click to Copy)</th>
-                            <th class="py-4 pr-6">Parameters</th>
-                        </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="font-bold text-slate-800 pl-6">Sign In</td>
-                            <td><code onclick="copyText('/auth/ui/login')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/auth/ui/login</code></td>
-                            <td class="text-sm text-slate-500 pr-6"><code>client_id</code></td>
-                        </tr>
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="font-bold text-slate-800 pl-6">Forgot Password</td>
-                            <td><code onclick="copyText('/auth/ui/forgot-password')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/auth/ui/forgot-password</code></td>
-                            <td class="text-sm text-slate-500 pr-6"><code>client_id</code></td>
-                        </tr>
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="font-bold text-slate-800 pl-6">Verify OTP</td>
-                            <td><code onclick="copyText('/auth/ui/verify-otp')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/auth/ui/verify-otp</code></td>
-                            <td class="text-sm text-slate-500 pr-6"><code>verification_id</code>, <code>client_id</code></td>
-                        </tr>
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="font-bold text-slate-800 pl-6">Reset Password</td>
-                            <td><code onclick="copyText('/auth/ui/reset-password')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/auth/ui/reset-password</code></td>
-                            <td class="text-sm text-slate-500 pr-6"><code>client_id</code></td>
-                        </tr>
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="font-bold text-slate-800 pl-6">SSO Login (Google, etc.)</td>
-                            <td><code onclick="copyText('/auth/ui/sso/<provider>/login')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/auth/ui/sso/&lt;provider&gt;/login</code></td>
-                            <td class="text-sm text-slate-500 pr-6"><code>client_id</code></td>
-                        </tr>
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="font-bold text-slate-800 pl-6">Activate Account</td>
-                            <td><code onclick="copyText('/auth/ui/set-password')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/auth/ui/set-password</code></td>
-                            <td class="text-sm text-slate-500 pr-6"><code>verification_id</code>, <code>client_id</code></td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <section id="auth-api" class="mb-24 scroll-mt-24">
-                <h2 class="text-3xl font-bold mb-8 flex items-center gap-4 text-slate-900">
-                    <span class="bg-indigo-600 text-white w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold shadow-md shadow-indigo-200">3</span>
-                    Client API
-                </h2>
-                <p class="mb-8 text-slate-600">Headless endpoints for custom frontends. No Basic Auth required.</p>
-
+                <!-- 01 Overview -->
                 <div class="space-y-4">
-                    <!-- GET /health -->
-                    <div class="collapse collapse-arrow border border-slate-200 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                        <input type="checkbox" />
-                        <div class="collapse-title text-lg font-medium flex gap-4 items-center p-4">
-                            <span class="badge badge-info text-xs font-bold py-3 px-3 text-white">GET</span>
-                            <code onclick="copyText('/health')" class="font-mono text-sm text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">/health</code>
-                        </div>
-                        <div class="collapse-content px-4 pb-4">
-                            <div class="payload-block response">
-                                <pre><code class="language-json">{ "status": "ok", "message": "Bifrost IdP operational." }</code></pre>
-                            </div>
-                        </div>
-                    </div>
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">01</span>
+                        Platform Architecture Overview
+                    </h3>
+                    <p class="text-sm text-on-surface-variant">
+                        Bifrost strictly separates the **Control Plane** (MongoDB central storage holding application secrets, webhook tokens, custom domain mappings, and staff roles) from the **Tenant Data Plane** (independent PostgreSQL/Supabase databases holding end-user records, transactions, and content).
+                    </p>
 
-                    <!-- POST /auth/api/check-email -->
-                    <div class="collapse collapse-arrow border border-slate-200 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                        <input type="checkbox" />
-                        <div class="collapse-title text-lg font-medium flex gap-4 items-center p-4">
-                            <span class="badge badge-success text-xs font-bold py-3 px-3 text-white">POST</span>
-                            <code onclick="copyText('/auth/api/check-email')" class="font-mono text-sm text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">/auth/api/check-email</code>
-                        </div>
-                        <div class="collapse-content px-4 pb-4">
-                            <div class="payload-block">
-                                <pre><code class="language-json">{ "email": "user@example.com" }</code></pre>
-                            </div>
-                            <div class="mt-2"></div>
-                            <div class="payload-block response">
-                                <pre><code class="language-json">{ "exists": true, "provider": "email" }</code></pre>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- POST /auth/api/request-email-otp -->
-                    <div class="collapse collapse-arrow border border-slate-200 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                        <input type="checkbox" />
-                        <div class="collapse-title text-lg font-medium flex gap-4 items-center p-4">
-                            <span class="badge badge-success text-xs font-bold py-3 px-3 text-white">POST</span>
-                            <code onclick="copyText('/auth/api/request-email-otp')" class="font-mono text-sm text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">/auth/api/request-email-otp</code>
-                        </div>
-                        <div class="collapse-content px-4 pb-4">
-                            <div class="payload-block">
-                                <pre><code class="language-json">{ "email": "user@example.com", "client_id": "your_client_id" }</code></pre>
-                            </div>
-                            <div class="mt-2"></div>
-                            <div class="payload-block response">
-                                <pre><code class="language-json">{ "status": "sent", "message": "OTP sent to email." }</code></pre>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- POST /auth/api/verify-email-otp -->
-                    <div class="collapse collapse-arrow border border-slate-200 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                        <input type="checkbox" />
-                        <div class="collapse-title text-lg font-medium flex gap-4 items-center p-4">
-                            <span class="badge badge-success text-xs font-bold py-3 px-3 text-white">POST</span>
-                            <code onclick="copyText('/auth/api/verify-email-otp')" class="font-mono text-sm text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">/auth/api/verify-email-otp</code>
-                        </div>
-                        <div class="collapse-content px-4 pb-4">
-                            <div class="payload-block">
-                                <pre><code class="language-json">{ "verification_id": "...", "code": "123456" }</code></pre>
-                            </div>
-                            <div class="mt-2"></div>
-                            <div class="payload-block response">
-                                <pre><code class="language-json">{ "status": "verified", "proof_token": "pt_abc123..." }</code></pre>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- POST /auth/api/request-phone-otp -->
-                    <div class="collapse collapse-arrow border border-slate-200 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                        <input type="checkbox" />
-                        <div class="collapse-title text-lg font-medium flex gap-4 items-center p-4">
-                            <span class="badge badge-success text-xs font-bold py-3 px-3 text-white">POST</span>
-                            <code onclick="copyText('/auth/api/request-phone-otp')" class="font-mono text-sm text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">/auth/api/request-phone-otp</code>
-                        </div>
-                        <div class="collapse-content px-4 pb-4">
-                            <p class="text-xs text-slate-500 mb-2">Sends an OTP via SMS (Twilio).</p>
-                            <div class="payload-block">
-                                <pre><code class="language-json">{ "phone_number": "+85512345678", "client_id": "your_client_id" }</code></pre>
-                            </div>
-                            <div class="mt-2"></div>
-                            <div class="payload-block response">
-                                <pre><code class="language-json">{ "message": "SMS OTP sent successfully", "verification_id": "..." }</code></pre>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- POST /auth/api/verify-phone-otp -->
-                    <div class="collapse collapse-arrow border border-slate-200 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                        <input type="checkbox" />
-                        <div class="collapse-title text-lg font-medium flex gap-4 items-center p-4">
-                            <span class="badge badge-success text-xs font-bold py-3 px-3 text-white">POST</span>
-                            <code onclick="copyText('/auth/api/verify-phone-otp')" class="font-mono text-sm text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">/auth/api/verify-phone-otp</code>
-                        </div>
-                        <div class="collapse-content px-4 pb-4">
-                            <div class="payload-block">
-                                <pre><code class="language-json">{ "verification_id": "...", "code": "123456" }</code></pre>
-                            </div>
-                            <div class="mt-2"></div>
-                            <div class="payload-block response">
-                                <pre><code class="language-json">{ "success": true, "proof_token": "pt_abc123...", "phone_number": "+85512345678" }</code></pre>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- POST /auth/api/complete-registration -->
-                    <div class="collapse collapse-arrow border border-slate-200 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                        <input type="checkbox" />
-                        <div class="collapse-title text-lg font-medium flex gap-4 items-center p-4">
-                            <span class="badge badge-success text-xs font-bold py-3 px-3 text-white">POST</span>
-                            <code onclick="copyText('/auth/api/complete-registration')" class="font-mono text-sm text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">/auth/api/complete-registration</code>
-                        </div>
-                        <div class="collapse-content px-4 pb-4">
-                            <div class="payload-block">
-                            <pre><code class="language-json">{
-    "proof_token": "...",
-    "password": "new_password",
-    "display_name": "John Doe",
-    "username": "johndoe",
-    "client_id": "your_client_id"
-}</code></pre>
-                            </div>
-                            <div class="mt-2"></div>
-                            <div class="payload-block response">
-                            <pre><code class="language-json">{
-    "status": "created",
-    "token": "eyJhb...",
-    "user": { "id": "...", "email": "user@example.com" }
-}</code></pre>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- POST /auth/api/reset-password -->
-                    <div class="collapse collapse-arrow border border-slate-200 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                        <input type="checkbox" />
-                        <div class="collapse-title text-lg font-medium flex gap-4 items-center p-4">
-                            <span class="badge badge-success text-xs font-bold py-3 px-3 text-white">POST</span>
-                            <code onclick="copyText('/auth/api/reset-password')" class="font-mono text-sm text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">/auth/api/reset-password</code>
-                        </div>
-                        <div class="collapse-content px-4 pb-4">
-                            <div class="payload-block">
-                                <pre><code class="language-json">{ "proof_token": "...", "password": "new_password" }</code></pre>
-                            </div>
-                            <div class="mt-2"></div>
-                            <div class="payload-block response">
-                                <pre><code class="language-json">{ "status": "success", "message": "Password updated." }</code></pre>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- POST /auth/api/login -->
-                    <div class="collapse collapse-arrow border border-slate-200 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                        <input type="checkbox" />
-                        <div class="collapse-title text-lg font-medium flex gap-4 items-center p-4">
-                            <span class="badge badge-success text-xs font-bold py-3 px-3 text-white">POST</span>
-                            <code onclick="copyText('/auth/api/login')" class="font-mono text-sm text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">/auth/api/login</code>
-                        </div>
-                        <div class="collapse-content px-4 pb-4">
-                            <div class="payload-block">
-                            <pre><code class="language-json">{
-    "client_id": "YOUR_CLIENT_ID",
-    "identifier": "user@example.com",
-    "password": "secret_password"
-}</code></pre>
-                            </div>
-                            <div class="mt-2"></div>
-                            <div class="payload-block response">
-                            <pre><code class="language-json">{
-    "token": "eyJhb...",
-    "user": { "id": "...", "email": "user@example.com", "role": "user" }
-}</code></pre>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- POST /auth/api/verify-otp-login -->
-                    <div class="collapse collapse-arrow border border-slate-200 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                        <input type="checkbox" />
-                        <div class="collapse-title text-lg font-medium flex gap-4 items-center p-4">
-                            <span class="badge badge-success text-xs font-bold py-3 px-3 text-white">POST</span>
-                            <code onclick="copyText('/auth/api/verify-otp-login')" class="font-mono text-sm text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">/auth/api/verify-otp-login</code>
-                        </div>
-                        <div class="collapse-content px-4 pb-4">
-                            <div class="payload-block">
-                                <pre><code class="language-json">{ "client_id": "...", "code": "123456" }</code></pre>
-                            </div>
-                            <div class="mt-2"></div>
-                            <div class="payload-block response">
-                            <pre><code class="language-json">{
-    "token": "eyJhb...",
-    "user": { "id": "...", "email": "user@example.com", "role": "user" }
-}</code></pre>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- POST /auth/api/telegram-login -->
-                    <div class="collapse collapse-arrow border border-slate-200 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                        <input type="checkbox" />
-                        <div class="collapse-title text-lg font-medium flex gap-4 items-center p-4">
-                            <span class="badge badge-success text-xs font-bold py-3 px-3 text-white">POST</span>
-                            <code onclick="copyText('/auth/api/telegram-login')" class="font-mono text-sm text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">/auth/api/telegram-login</code>
-                        </div>
-                        <div class="collapse-content px-4 pb-4">
-                            <div class="payload-block">
-                            <pre><code class="language-json">{
-    "client_id": "YOUR_CLIENT_ID",
-    "telegram_data": { "id": 12345, "first_name": "...", "hash": "..." }
-}</code></pre>
-                            </div>
-                            <div class="mt-2"></div>
-                            <div class="payload-block response">
-                            <pre><code class="language-json">{
-    "token": "eyJhb...",
-    "user": { "id": "...", "telegram_id": "12345", "role": "user" }
-}</code></pre>
-                            </div>
-                        </div>
+                    <!-- Architecture Diagram -->
+                    <div class="glass-panel p-6 overflow-x-auto">
+                        <pre class="text-xs text-primary font-mono leading-normal">
+                  +-----------------------------------+
+                  |      Bifrost Control Plane        |
+                  |  - App Registry (Client IDs)      |
+                  |  - Webhook Secrets (HMAC Keys)    |
+                  |  - Vault Secrets (Encrypted API)  |
+                  |  - MongoDB (Central Storage)      |
+                  +-----------------+-----------------+
+                                    |
+                                    | Proxies Writes Live
+                                    v
+                  +-----------------------------------+
+                  |       Tenant Data Plane           |
+                  |  - PostgreSQL / Supabase Tables   |
+                  |  - users, payments, entitlements  |
+                  +----------------+------------------+
+                        </pre>
                     </div>
                 </div>
-            </section>
 
-            <section id="internal-api" class="mb-24 scroll-mt-24">
-                <h2 class="text-3xl font-bold mb-8 flex items-center gap-4 text-slate-900">
-                    <span class="bg-indigo-600 text-white w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold shadow-md shadow-indigo-200">4</span>
-                    Internal API (S2S)
-                </h2>
-                <div class="alert alert-warning bg-amber-50 border-amber-200 text-amber-900 shadow-sm mb-6">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333 .192 3 1.732 3z" /></svg>
-                    <div class="text-xs font-medium">
-                        <strong>Auth Required:</strong> <code>Username = Client ID</code>, <code>Password = Client Secret</code>.
+                <!-- 02 Python SDK -->
+                <div id="part1-sdk" class="space-y-4 pt-4">
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">02</span>
+                        Python SDK &amp; Environment Injection
+                    </h3>
+                    <p class="text-sm text-on-surface-variant">
+                        Downstream Python client applications should use the `bifrost_client` SDK to bootstrap secrets into `os.environ` at boot time, or use `bifrost_ai` for Google Vertex AI / Cloud Vision client factories.
+                    </p>
+                    <div class="space-y-2">
+                        <div class="text-xs font-mono text-on-surface-variant">Bootstrap Credentials (`bifrost_client`):</div>
+                        <pre><code class="language-python">from bifrost_client import BifrostClient
+
+# Bootstrapping credentials into os.environ at client startup:
+BifrostClient(
+    client_id="ministry_exam_prep",
+    webhook_secret="your_configured_webhook_secret",
+    bifrost_url="https://bifrost.wkc.kh"
+)
+# Automatically decrypts and injects DB_CONNECTION, JWT_SECRET, etc. into os.environ
+</code></pre>
                     </div>
                 </div>
-                <div class="overflow-hidden bg-white border border-slate-200 rounded-2xl shadow-sm">
-                    <table class="table w-full">
+
+                <!-- 03 Direct HTTP Config -->
+                <div id="part1-config" class="space-y-4 pt-4">
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">03</span>
+                        Direct HTTP Config Fetching
+                    </h3>
+                    <p class="text-sm text-on-surface-variant">
+                        Non-Python applications can query the Bifrost config REST endpoint directly during startup.
+                    </p>
+                    <div class="glass-panel p-4 space-y-2">
+                        <div class="flex items-center gap-2">
+                            <span class="px-2 py-0.5 rounded text-xs font-bold badge-get">GET</span>
+                            <code class="text-sm text-primary">/api/v1/config</code>
+                        </div>
+                        <div class="text-xs text-on-surface-variant">
+                            <strong>Headers Required:</strong> `X-Client-ID: <client_id>` and `X-Webhook-Secret: <webhook_secret>`
+                        </div>
+                    </div>
+                    <pre><code class="language-bash">curl -X GET https://bifrost.wkc.kh/api/v1/config \
+  -H "X-Client-ID: ministry_exam_prep" \
+  -H "X-Webhook-Secret: your_webhook_secret_key"</code></pre>
+                </div>
+
+                <!-- 04 Service Segmentation -->
+                <div id="part1-services" class="space-y-4 pt-4">
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">04</span>
+                        Service Segmentation &amp; Feature Flags
+                    </h3>
+                    <p class="text-sm text-on-surface-variant">
+                        Each registered tenant can toggle individual services on or off inside their MongoDB application document using the `enabled_services` dictionary:
+                    </p>
+                    <table class="doc-table">
                         <thead>
-                        <tr class="bg-slate-50 text-slate-700 uppercase text-xs font-bold tracking-wider">
-                            <th class="py-4 pl-6">Endpoint</th>
-                            <th class="py-4">Method</th>
-                            <th class="py-4 pr-6">Example Payload/Description</th>
-                        </tr>
+                            <tr>
+                                <th>Service Flag</th>
+                                <th>Default</th>
+                                <th>Description</th>
+                            </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-100">
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="pl-6"><code onclick="copyText('/internal/validate-token')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/internal/validate-token</code></td>
-                            <td><span class="badge badge-success badge-xs font-bold text-white">POST</span></td>
-                            <td class="text-xs font-mono text-slate-500 pr-6">
-                                <div>Payload: <code>{ "jwt": "..." }</code></div>
-                                <div class="mt-1 text-green-600">Response: <code>{ "is_valid": true, "account_id": "...", "role": "admin" }</code></div>
-                            </td>
-                        </tr>
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="pl-6"><code onclick="copyText('/internal/users/<id>')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/internal/users/&lt;id&gt;</code></td>
-                            <td><span class="badge badge-info badge-xs font-bold text-white">GET</span></td>
-                            <td class="text-xs font-mono text-slate-500 pr-6">
-                                <div>Fetch basic user profile</div>
-                                <div class="mt-1 text-green-600">Response: <code>{ "id": "...", "email": "...", "role": "user" }</code></div>
-                            </td>
-                        </tr>
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="pl-6"><code onclick="copyText('/internal/generate-link-token')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/internal/generate-link-token</code></td>
-                            <td><span class="badge badge-success badge-xs font-bold text-white">POST</span></td>
-                            <td class="text-xs font-mono text-slate-500 pr-6">
-                                <div>Payload: <code>{ "account_id": "..." }</code></div>
-                                <div class="mt-1 text-green-600">Response: <code>{ "link_token": "lt_789...", "expires_in": 300 }</code></div>
-                            </td>
-                        </tr>
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="pl-6"><code onclick="copyText('/internal/link-account')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/internal/link-account</code></td>
-                            <td><span class="badge badge-success badge-xs font-bold text-white">POST</span></td>
-                            <td class="text-xs font-mono text-slate-500 pr-6">
-                                <div>Payload: <code>{ "link_token": "...", "telegram_id": "..." }</code></div>
-                                <div class="mt-1 text-green-600">Response: <code>{ "status": "linked", "account_id": "..." }</code></div>
-                            </td>
-                        </tr>
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="pl-6"><code onclick="copyText('/internal/generate-otp')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/internal/generate-otp</code></td>
-                            <td><span class="badge badge-success badge-xs font-bold text-white">POST</span></td>
-                            <td class="text-xs font-mono text-slate-500 pr-6">
-                                <div>Payload: <code>{ "telegram_id": "123456" }</code></div>
-                                <div class="mt-1 text-green-600">Response: <code>{ "otp": "123456", "expires_in": 300 }</code></div>
-                            </td>
-                        </tr>
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="pl-6"><code onclick="copyText('/internal/get-role')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/internal/get-role</code></td>
-                            <td><span class="badge badge-success badge-xs font-bold text-white">POST</span></td>
-                            <td class="text-xs font-mono text-slate-500 pr-6">
-                                <div>Payload: <code>{ "telegram_id": "123456" }</code></div>
-                                <div class="mt-1 text-green-600">Response: <code>{ "role": "premium_user", "expires_at": "..." }</code></div>
-                            </td>
-                        </tr>
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="pl-6"><code onclick="copyText('/internal/get-roles-bulk')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/internal/get-roles-bulk</code></td>
-                            <td><span class="badge badge-success badge-xs font-bold text-white">POST</span></td>
-                            <td class="text-xs font-mono text-slate-500 pr-6">
-                                <div>Payload: <code>{ "account_ids": ["65a...", "65b..."] }</code></div>
-                                <div class="mt-1 text-green-600">Response: <code>{ "roles": { "65a...": { "role": "premium", "has_used_trial": false } } }</code></div>
-                            </td>
-                        </tr>
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="pl-6"><code onclick="copyText('/internal/users/<id>/update')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/internal/users/&lt;id&gt;/update</code></td>
-                            <td><span class="badge badge-success badge-xs font-bold text-white">POST</span></td>
-                            <td class="text-xs font-mono text-slate-500 pr-6">
-                                <div>Payload: <code>{ "display_name": "...", "email": "...", "username": "..." }</code> (any subset)</div>
-                                <div class="mt-1 text-green-600">Response: <code>{ "success": true, "message": "..." }</code></div>
-                            </td>
-                        </tr>
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="pl-6"><code onclick="copyText('/internal/auth/users/<id>')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/internal/auth/users/&lt;id&gt;</code></td>
-                            <td><span class="badge badge-error badge-xs font-bold text-white">DELETE</span></td>
-                            <td class="text-xs font-mono text-slate-500 pr-6">
-                                <div>Permanently deletes a core identity</div>
-                                <div class="mt-1 text-green-600">Response: <code>{ "success": true }</code></div>
-                            </td>
-                        </tr>
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="pl-6"><code onclick="copyText('/internal/set-credentials')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/internal/set-credentials</code></td>
-                            <td><span class="badge badge-success badge-xs font-bold text-white">POST</span></td>
-                            <td class="text-xs font-mono text-slate-500 pr-6">
-                                <div>Payload: <code>{ "email": "...", "password": "...", "proof_token": "..." }</code></div>
-                                <div class="mt-1 text-green-600">Response: <code>{ "success": true, "mode": "created|updated|linked" }</code></div>
-                            </td>
-                        </tr>
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="pl-6"><code onclick="copyText('/internal/payments/status/<id>')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 inline-block font-mono">/internal/payments/status/&lt;id&gt;</code></td>
-                            <td><span class="badge badge-info badge-xs font-bold text-white">GET</span></td>
-                            <td class="text-xs font-mono text-slate-500 pr-6">
-                                <div>Check payment status (Polling)</div>
-                                <div class="mt-1 text-green-600">Response: <code>{ "status": "completed", "amount": 9.99 }</code></div>
-                            </td>
-                        </tr>
+                        <tbody>
+                            <tr>
+                                <td><code class="text-xs text-primary">secrets_vault</code></td>
+                                <td><span class="text-success">true</span></td>
+                                <td>Allows client applications to fetch decrypted configuration keys.</td>
+                            </tr>
+                            <tr>
+                                <td><code class="text-xs text-primary">payment_bot</code></td>
+                                <td><span class="text-success">true</span></td>
+                                <td>Enables Telegram receipt submission &amp; SLA alert bots.</td>
+                            </tr>
+                            <tr>
+                                <td><code class="text-xs text-primary">oauth_sso</code></td>
+                                <td><span class="text-success">true</span></td>
+                                <td>Enables Google/Facebook OAuth SSO login endpoints.</td>
+                            </tr>
+                            <tr>
+                                <td><code class="text-xs text-primary">sms_otp</code></td>
+                                <td><span class="text-success">true</span></td>
+                                <td>Enables Phone SMS OTP verification endpoints.</td>
+                            </tr>
+                            <tr>
+                                <td><code class="text-xs text-primary">email_otp</code></td>
+                                <td><span class="text-success">true</span></td>
+                                <td>Enables Email verification code endpoints.</td>
+                            </tr>
                         </tbody>
                     </table>
+                    <p class="text-xs text-warning flex items-center gap-1">
+                        <span class="material-symbols-outlined text-sm">warning</span>
+                        If a service is set to <code>false</code>, the Bifrost gateway automatically rejects calls to those endpoints with a <code>403 Forbidden</code> response.
+                    </p>
                 </div>
             </section>
 
-            <section id="payments-api" class="mb-24 scroll-mt-24">
-                <h2 class="text-3xl font-bold mb-8 flex items-center gap-4 text-slate-900">
-                    <span class="bg-indigo-600 text-white w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold shadow-md shadow-indigo-200">5</span>
-                    Payments API
-                </h2>
-                <p class="mb-6 text-slate-600">Supports tamper-proof intents. Apps can set custom QR codes (app_qr_url) via Backoffice for Bot payments.</p>
-
-                <div class="space-y-6">
-                    <!-- Secure Payment Intent -->
-                    <div class="card bg-white border border-slate-200 shadow-sm feature-card">
-                        <div class="card-body p-6">
-                            <div class="flex justify-between items-start">
-                                <h3 class="card-title text-base text-slate-800">Secure Payment Intent</h3>
-                                <span class="badge badge-success text-xs font-bold text-white">POST</span>
-                            </div>
-                            <code onclick="copyText('/internal/payments/secure-intent')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 block mb-2 mt-2 font-mono">/internal/payments/secure-intent</code>
-                            <div class="payload-block">
-                            <pre><code class="language-json">{
-    "amount": 9.99,
-    "currency": "USD",
-    "target_role": "premium",
-    "duration": "1m",
-    "client_ref_id": "INV-1001"
-}</code></pre>
-                            </div>
-                            <div class="mt-2"></div>
-                            <div class="payload-block response">
-                            <pre><code class="language-json">{
-    "transaction_id": "tx-123...",
-    "payment_url": "https://t.me/BifrostBot?start=tx-123..."
-}</code></pre>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Check Payment Status -->
-                    <div class="card bg-white border border-slate-200 shadow-sm feature-card">
-                        <div class="card-body p-6">
-                            <div class="flex justify-between items-start">
-                                <h3 class="card-title text-base text-slate-800">Check Payment Status (Polling)</h3>
-                                <span class="badge badge-info text-xs font-bold text-white">GET</span>
-                            </div>
-                            <p class="text-xs text-slate-500 my-2">Check if a transaction has been completed (real-time alternative to webhooks).</p>
-                            <code onclick="copyText('/internal/payments/status/<transaction_id>')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 block mb-2 font-mono">/internal/payments/status/&lt;transaction_id&gt;</code>
-                            <div class="payload-block response">
-                            <pre><code class="language-json">{
-    "transaction_id": "tx-123...",
-    "status": "completed",
-    "amount": 9.99
-}</code></pre>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Universal Claim -->
-                    <div class="card bg-white border border-slate-200 shadow-sm feature-card">
-                        <div class="card-body p-6">
-                            <div class="flex justify-between items-start">
-                                <h3 class="card-title text-base text-slate-800">Universal Claim</h3>
-                                <span class="badge badge-success text-xs font-bold text-white">POST</span>
-                            </div>
-                            <p class="text-xs text-slate-500 my-2">Manually claim a transaction (found via bank logs, etc.) for a specific user.</p>
-                            <code onclick="copyText('/internal/payments/claim')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 block mb-2 font-mono">/internal/payments/claim</code>
-                            <div class="payload-block">
-                            <pre><code class="language-json">{
-    "trx_input": "ABA_123456789",
-    "target_app_id": "your_client_id_here",
-    "identity_type": "telegram_id",
-    "identity_value": "9988776655"
-}</code></pre>
-                            </div>
-                            <div class="mt-2"></div>
-                            <div class="payload-block response">
-                                <pre><code class="language-json">{ "status": "claimed", "account_id": "65a..." }</code></pre>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Admin Grant -->
-                    <div class="card bg-white border border-slate-200 shadow-sm feature-card">
-                        <div class="card-body p-6">
-                            <div class="flex justify-between items-start">
-                                <h3 class="card-title text-base text-slate-800">Admin Grant (Manual Upgrade)</h3>
-                                <span class="badge badge-success text-xs font-bold text-white">POST</span>
-                            </div>
-                            <p class="text-xs text-slate-500 my-2">Forcefully upgrade a user's role without payment.</p>
-                            <code onclick="copyText('/internal/grant-role')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 block mb-2 font-mono">/internal/grant-role</code>
-                            <div class="payload-block">
-                            <pre><code class="language-json">{
-    "telegram_id": "123456789",
-    "target_client_id": "optional_if_cross_app",
-    "target_role": "premium_user",
-    "duration": "1m"
-}</code></pre>
-                            </div>
-                            <div class="mt-2"></div>
-                            <div class="payload-block response">
-                            <pre><code class="language-json">{
-    "status": "granted",
-    "new_role": "premium_user",
-    "expires_at": "..."
-}</code></pre>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Activate Free Trial -->
-                    <div class="card bg-white border border-slate-200 shadow-sm feature-card">
-                        <div class="card-body p-6">
-                            <div class="flex justify-between items-start">
-                                <h3 class="card-title text-base text-slate-800">Activate Free Trial</h3>
-                                <span class="badge badge-success text-xs font-bold text-white">POST</span>
-                            </div>
-                            <p class="text-xs text-slate-500 my-2">Grants a one-time free trial to a user. Fails if the trial was already used.</p>
-                            <code onclick="copyText('/internal/payments/activate-trial')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 block mb-2 font-mono">/internal/payments/activate-trial</code>
-                            <div class="payload-block">
-                            <pre><code class="language-json">{
-    "account_id": "65a...",
-    "target_client_id": "optional_if_cross_app",
-    "duration": "14d"
-}</code></pre>
-                            </div>
-                            <div class="mt-2"></div>
-                            <div class="payload-block response">
-                                <pre><code class="language-json">{ "success": true, "message": "Trial activated." }</code></pre>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Submit Proof (Web) -->
-                    <div class="card bg-white border border-slate-200 shadow-sm feature-card">
-                        <div class="card-body p-6">
-                            <div class="flex justify-between items-start">
-                                <h3 class="card-title text-base text-slate-800">Submit Proof (Web Upload)</h3>
-                                <span class="badge badge-success text-xs font-bold text-white">POST</span>
-                            </div>
-                            <p class="text-xs text-slate-500 my-2">Forwards proof to Telegram admin group for approval (supports app admins).</p>
-                            <code onclick="copyText('/internal/payments/submit-proof')" class="endpoint-copy text-xs bg-slate-100 text-slate-600 p-2 rounded border border-slate-200 block mb-2 font-mono">/internal/payments/submit-proof</code>
-                            <div class="payload-block">
-                            <pre><code class="language-text">Multipart Form Data:
-> file: (binary_image_data)
-> account_id: "65a..."
-> transaction_id: "tx-..." (optional)</code></pre>
-                            </div>
-                            <div class="mt-2"></div>
-                            <div class="payload-block response">
-                                <pre><code class="language-json">{ "status": "submitted", "message": "Proof forwarded." }</code></pre>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section id="webhooks" class="mb-24 scroll-mt-24">
-                <h2 class="text-3xl font-bold mb-8 flex items-center gap-4 text-slate-900">
-                    <span class="bg-indigo-600 text-white w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold shadow-md shadow-indigo-200">6</span>
-                    Webhooks
-                </h2>
-                <p class="text-slate-600 mb-6">Bifrost sends real-time notifications to your configured webhook URL. Verify signature using `X-Bifrost-Signature`.</p>
-
-                <div class="collapse collapse-plus bg-white border border-slate-200 rounded-xl mb-4">
-                    <input type="radio" name="webhook-accordion" checked="checked" />
-                    <div class="collapse-title text-md font-bold text-indigo-600">subscription_success</div>
-                    <div class="collapse-content">
-                        <div class="payload-block">
-                        <pre><code class="language-json">{
-  "event": "subscription_success",
-  "account_id": "65a...",
-  "amount": 9.99,
-  "role": "premium_user",
-  "duration": "1m",
-  "expires_at": "2026-03-01T12:00:00Z"
-}</code></pre>
-                        </div>
-                    </div>
+            <!-- PART II -->
+            <section id="part2-vault" class="space-y-10 doc-section">
+                <div class="border-b border-border-subtle pb-4">
+                    <div class="text-xs font-bold text-primary uppercase tracking-widest">Part II</div>
+                    <h2 class="text-2xl font-bold text-on-background mt-1">Secrets Vault &amp; Services API</h2>
                 </div>
 
-                <div class="collapse collapse-plus bg-white border border-slate-200 rounded-xl mb-4">
-                    <input type="radio" name="webhook-accordion" />
-                    <div class="collapse-title text-md font-bold text-rose-600">subscription_expired</div>
-                    <div class="collapse-content">
-                        <div class="payload-block">
-                        <pre><code class="language-json">{
-  "event": "subscription_expired",
-  "account_id": "65a...",
-  "new_role": "user"
-}</code></pre>
+                <!-- 05 Secrets Vault -->
+                <div class="space-y-4">
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">05</span>
+                        Secrets Vault Bulk Injection
+                    </h3>
+                    <p class="text-sm text-on-surface-variant">
+                        Tenant app owners can upload or retrieve key-value secrets encrypted at rest in the Bifrost Control Plane.
+                    </p>
+                    <div class="glass-panel p-4 space-y-3">
+                        <div class="flex items-center gap-2">
+                            <span class="px-2 py-0.5 rounded text-xs font-bold badge-post">POST</span>
+                            <code class="text-sm text-primary">/api/v1/config/bulk</code>
                         </div>
-                    </div>
-                </div>
-
-                <div class="collapse collapse-plus bg-white border border-slate-200 rounded-xl mb-4">
-                    <input type="radio" name="webhook-accordion" />
-                    <div class="collapse-title text-md font-bold text-emerald-600">account_update</div>
-                    <div class="collapse-content">
-                        <div class="payload-block">
+                        <p class="text-xs text-on-surface-variant">Upload bulk secrets as a JSON dictionary.</p>
                         <pre><code class="language-json">{
-  "event": "account_update",
-  "account_id": "65a...",
-  "extra_data": {
-    "telegram_id": "123456",
-    "email": "user@example.com"
+  "secrets": {
+    "DB_CONNECTION": "postgresql://user:pass@ep-prod.supabase.co:5432/postgres",
+    "TELEGRAM_BOT_TOKEN": "123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ",
+    "JWT_SECRET": "super-secret-jwt-key-2026"
   }
 }</code></pre>
+                    </div>
+                </div>
+
+                <!-- 06 OTP Services -->
+                <div id="part2-otp" class="space-y-4 pt-4">
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">06</span>
+                        Phone &amp; Email OTP Authentication
+                    </h3>
+                    <p class="text-sm text-on-surface-variant">
+                        Bifrost handles SMS and Email OTP verification code generation, expiration, and validation.
+                    </p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="glass-panel p-4 space-y-2">
+                            <div class="flex items-center gap-2">
+                                <span class="px-2 py-0.5 rounded text-xs font-bold badge-post">POST</span>
+                                <code class="text-xs text-primary">/api/auth/send-otp</code>
+                            </div>
+                            <p class="text-xs text-on-surface-variant">Sends 6-digit verification code to phone number or email.</p>
+                        </div>
+                        <div class="glass-panel p-4 space-y-2">
+                            <div class="flex items-center gap-2">
+                                <span class="px-2 py-0.5 rounded text-xs font-bold badge-post">POST</span>
+                                <code class="text-xs text-primary">/api/auth/verify-otp</code>
+                            </div>
+                            <p class="text-xs text-on-surface-variant">Validates OTP code and returns verified user payload.</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="collapse collapse-plus bg-white border border-slate-200 rounded-xl mb-4">
-                    <input type="radio" name="webhook-accordion" />
-                    <div class="collapse-title text-md font-bold text-purple-600">account_role_change</div>
-                    <div class="collapse-content">
-                        <div class="payload-block">
+                <!-- 07 Hosted SSO Pages -->
+                <div id="part2-sso" class="space-y-4 pt-4">
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">07</span>
+                        Hosted SSO &amp; Password Reset Pages
+                    </h3>
+                    <p class="text-sm text-on-surface-variant">
+                        Bifrost provides hosted OAuth login and password reset flows for client applications.
+                    </p>
+                    <table class="doc-table">
+                        <thead>
+                            <tr>
+                                <th>Endpoint</th>
+                                <th>Method</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code class="text-xs text-primary">/auth/sso/login</code></td>
+                                <td><span class="px-1.5 py-0.5 rounded text-[10px] badge-get">GET</span></td>
+                                <td>Renders hosted OAuth SSO page (Google / Facebook).</td>
+                            </tr>
+                            <tr>
+                                <td><code class="text-xs text-primary">/auth/reset-password</code></td>
+                                <td><span class="px-1.5 py-0.5 rounded text-[10px] badge-post">POST</span></td>
+                                <td>Processes password reset request from emailed token.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 08 Roles & Accounts -->
+                <div id="part2-roles" class="space-y-4 pt-4">
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">08</span>
+                        Account Management &amp; Roles API
+                    </h3>
+                    <p class="text-sm text-on-surface-variant">
+                        Endpoints for fetching staff roles in bulk, updating user profiles, or deleting accounts.
+                    </p>
+                    <div class="glass-panel p-4 space-y-2">
+                        <div class="flex items-center gap-2">
+                            <span class="px-2 py-0.5 rounded text-xs font-bold badge-post">POST</span>
+                            <code class="text-sm text-primary">/api/v1/users/get-roles-bulk</code>
+                        </div>
+                        <p class="text-xs text-on-surface-variant">Fetch roles for a list of user emails in a single request.</p>
                         <pre><code class="language-json">{
-  "event": "account_role_change",
-  "account_id": "65a...",
-  "new_role": "premium_user"
+  "emails": ["staff1@wkc.kh", "staff2@wkc.kh"]
 }</code></pre>
-                        </div>
                     </div>
                 </div>
             </section>
 
-            <section id="secrets-vault" class="mb-24 scroll-mt-24">
-                <h2 class="text-3xl font-bold mb-8 flex items-center gap-4 text-slate-900">
-                    <span class="bg-indigo-600 text-white w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold shadow-md shadow-indigo-200">7</span>
-                    Secrets Vault
-                </h2>
-                <p class="text-slate-600 mb-6">Store your app's API keys encrypted in Bifrost and fetch them at runtime — no <code>.env</code> files to distribute. Authenticate with <code>X-Client-ID</code> and <code>X-Webhook-Secret</code> headers.</p>
+            <!-- PART III -->
+            <section id="part3-architecture" class="space-y-10 doc-section">
+                <div class="border-b border-border-subtle pb-4">
+                    <div class="text-xs font-bold text-primary uppercase tracking-widest">Part III</div>
+                    <h2 class="text-2xl font-bold text-on-background mt-1">Webhook Integration &amp; Security</h2>
+                </div>
 
+                <!-- 09 Dispatch System -->
                 <div class="space-y-4">
-                    <div class="collapse collapse-arrow border border-slate-200 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                        <input type="checkbox" />
-                        <div class="collapse-title text-lg font-medium flex gap-4 items-center p-4">
-                            <span class="badge badge-info text-xs font-bold py-3 px-3 text-white">GET</span>
-                            <code onclick="copyText('/api/v1/config')" class="font-mono text-sm text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">/api/v1/config</code>
-                        </div>
-                        <div class="collapse-content px-4 pb-4">
-                            <p class="text-xs text-slate-500 mb-2">Returns all stored keys, decrypted server-side for the authenticated app.</p>
-                            <div class="payload-block response">
-                                <pre><code class="language-json">{ "status": "success", "data": { "api_keys": { "OPENAI_KEY": "sk-..." } } }</code></pre>
-                            </div>
-                        </div>
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">09</span>
+                        Webhook Dispatch System
+                    </h3>
+                    <p class="text-sm text-on-surface-variant">
+                        Whenever a customer payment is approved, rejected, or refunded in the console, Bifrost triggers a `POST` webhook request to the client application's configured `webhook_url`.
+                    </p>
+                </div>
+
+                <!-- 10 Signature Verification -->
+                <div id="part3-signature" class="space-y-4 pt-4">
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">10</span>
+                        HMAC-SHA256 Signature Verification
+                    </h3>
+                    <p class="text-sm text-on-surface-variant">
+                        Client applications **must** verify the `X-Bifrost-Signature` header before processing webhook entitlement payloads to prevent forged requests.
+                    </p>
+
+                    <!-- Python Verification Code -->
+                    <div class="space-y-2">
+                        <div class="text-xs font-mono text-on-surface-variant">Python Flask Signature Verification Example:</div>
+                        <pre><code class="language-python">import hmac
+import hashlib
+from flask import Flask, request, abort
+
+app = Flask(__name__)
+WEBHOOK_SECRET = b"your_configured_webhook_secret"
+
+@app.route('/bifrost-webhook', methods=['POST'])
+def handle_webhook():
+    signature = request.headers.get('X-Bifrost-Signature')
+    if not signature:
+        abort(403, "Missing signature header")
+        
+    expected_signature = hmac.new(
+        WEBHOOK_SECRET,
+        request.data,
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(expected_signature, signature):
+        abort(403, "Invalid HMAC signature")
+
+    payload = request.get_json()
+    event_type = payload.get('event')
+    # Process entitlement change...
+    return "OK", 200
+</code></pre>
                     </div>
 
-                    <div class="collapse collapse-arrow border border-slate-200 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                        <input type="checkbox" />
-                        <div class="collapse-title text-lg font-medium flex gap-4 items-center p-4">
-                            <span class="badge badge-success text-xs font-bold py-3 px-3 text-white">POST</span>
-                            <code onclick="copyText('/api/v1/config/bulk-upload')" class="font-mono text-sm text-slate-700 hover:bg-slate-100 px-2 py-1 rounded transition-colors">/api/v1/config/bulk-upload</code>
-                        </div>
-                        <div class="collapse-content px-4 pb-4">
-                            <div class="payload-block">
-                                <pre><code class="language-json">{ "keys": { "OPENAI_KEY": "sk-...", "STRIPE_KEY": "..." } }</code></pre>
-                            </div>
-                            <div class="mt-2"></div>
-                            <div class="payload-block response">
-                                <pre><code class="language-json">{ "status": "success", "message": "Successfully encrypted and uploaded 2 keys to Bifrost Vault." }</code></pre>
-                            </div>
-                        </div>
+                    <!-- Node.js Verification Code -->
+                    <div class="space-y-2">
+                        <div class="text-xs font-mono text-on-surface-variant">Node.js Express Signature Verification Example:</div>
+                        <pre><code class="language-javascript">const crypto = require('crypto');
+const express = require('express');
+const app = express();
+
+const WEBHOOK_SECRET = "your_configured_webhook_secret";
+
+app.post('/bifrost-webhook', express.raw({ type: 'application/json' }), (req, res) => {
+    const signature = req.headers['x-bifrost-signature'];
+    const expectedSignature = crypto
+        .createHmac('sha256', WEBHOOK_SECRET)
+        .update(req.body)
+        .digest('hex');
+
+    if (!crypto.timingSafeEqual(Buffer.from(signature || ''), Buffer.from(expectedSignature))) {
+        return res.status(403).send('Invalid signature');
+    }
+
+    const payload = JSON.parse(req.body.toString());
+    // Handle payload...
+    res.status(200).send('OK');
+});
+</code></pre>
+                    </div>
+                </div>
+
+                <!-- 11 Webhook Event Payloads -->
+                <div id="part3-payloads" class="space-y-4 pt-4">
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">11</span>
+                        Webhook Event Payloads
+                    </h3>
+                    <div class="glass-panel p-4 space-y-2">
+                        <div class="text-xs font-mono text-primary font-bold">Event: payment_approved</div>
+                        <pre><code class="language-json">{
+  "event": "payment_approved",
+  "payment_id": "66a5c123abc4567890def123",
+  "user_email": "student@aupp.edu.kh",
+  "amount": 25.00,
+  "txn_ref": "ABA-987654321",
+  "granted_scope": "exam_track_grade_12",
+  "timestamp": "2026-07-28T11:00:00Z"
+}</code></pre>
                     </div>
                 </div>
             </section>
 
-            <section id="advanced" class="mb-32 scroll-mt-24">
-                <h2 class="text-3xl font-bold mb-8 flex items-center gap-4 text-slate-900">
-                    <span class="bg-indigo-600 text-white w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold shadow-md shadow-indigo-200">8</span>
-                    Advanced Features
-                </h2>
-                <p class="text-lg text-slate-600 mb-12 leading-relaxed max-w-3xl">
-                    Bifrost includes powerful tools to enhance security, branding, and user management. Below, we dive into each feature with practical examples.
-                </p>
-
-                <div class="space-y-16">
-
-                    <!-- FEATURE 1: Bifrost Bot -->
-                    <div class="card bg-white border border-slate-200 shadow-xl overflow-hidden rounded-3xl">
-                        <div class="card-body p-0 flex flex-col md:flex-row">
-                            <div class="p-10 md:w-1/2 flex flex-col justify-center bg-white">
-                                <h3 class="text-2xl font-bold mb-4 flex items-center gap-3 text-slate-900">
-                                <span class="bg-indigo-100 text-indigo-600 p-2.5 rounded-xl">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                                </span>
-                                    Bifrost Bot
-                                </h3>
-                                <p class="text-slate-600 leading-relaxed mb-8 text-lg">
-                                    The central hub for authentication and payments. It supports deep links for seamless account linking and the <code>/pay</code> command.
-                                    <br><br>
-                                    <strong>Admins</strong> receive real-time approval requests directly in chat, with inline buttons to instantly Approve or Reject payment proofs.
-                                </p>
-                                <div class="flex flex-wrap gap-2">
-                                    <div class="badge badge-lg py-3 px-4 bg-slate-100 border-slate-200 text-slate-600">Deep Linking</div>
-                                    <div class="badge badge-lg py-3 px-4 bg-slate-100 border-slate-200 text-slate-600">Payments</div>
-                                    <div class="badge badge-lg py-3 px-4 bg-slate-100 border-slate-200 text-slate-600">Admin Tools</div>
-                                </div>
-                            </div>
-
-                            <!-- Visual: Phone Mockup -->
-                            <div class="bg-slate-50 md:w-1/2 p-10 flex items-center justify-center border-l border-slate-100">
-                                <div class="mockup-phone border-slate-800 shadow-2xl">
-                                    <div class="camera"></div>
-                                    <div class="display">
-                                        <div class="artboard artboard-demo phone-1 bg-slate-900 text-sm p-4 overflow-y-auto justify-start block">
-                                            <div class="chat chat-start mt-6">
-                                                <div class="chat-header text-slate-500 mb-1 text-xs">User</div>
-                                                <div class="chat-bubble bg-slate-800 text-slate-200">/pay your_app_id</div>
-                                            </div>
-                                            <div class="chat chat-end mt-2">
-                                                <div class="chat-header text-slate-500 mb-1 text-xs">Bifrost Bot</div>
-                                                <div class="chat-bubble bg-indigo-600 text-white shadow-md">
-                                                    <p class="font-bold mb-2">Upgrade to Premium</p>
-                                                    <p class="mb-3 text-xs opacity-90">Scan below to pay <strong>$9.99</strong></p>
-                                                    <div class="bg-white p-2 rounded-lg inline-block shadow-sm">
-                                                        <img src="{{ url_for('static', filename='qr.jpg') }}" alt="QR" class="w-20 h-20 opacity-90">
-                                                    </div>
-                                                    <p class="text-[10px] mt-2 opacity-70 font-mono">Ref: INV-9988</p>
-                                                </div>
-                                            </div>
-                                            <div class="chat chat-start mt-2">
-                                                <div class="chat-bubble bg-slate-800 text-slate-200 flex items-center gap-2 text-xs">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                                    [Image Uploaded]
-                                                </div>
-                                            </div>
-                                            <div class="chat chat-end mt-2">
-                                                <div class="chat-bubble bg-emerald-600 text-white text-xs font-medium">Payment Approved! You are now a Premium Member.</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="divider text-slate-300"></div>
-
-                    <!-- FEATURE 2: Custom QR Branding -->
-                    <div class="grid md:grid-cols-2 gap-12 items-center">
-                        <div>
-                            <h3 class="text-2xl font-bold mb-4 flex items-center gap-3 text-slate-900">
-                                <span class="w-1.5 h-8 bg-pink-500 rounded-full"></span>
-                                Custom QR Branding
-                            </h3>
-                            <p class="text-slate-600 leading-relaxed mb-6 text-lg">
-                                Personalize the payment experience by uploading your own QR code (e.g., for ABA or ACLEDA) in the Backoffice under app settings.
-                            </p>
-                            <p class="text-slate-600 leading-relaxed">
-                                When users trigger <code>/pay</code> in the Bifrost Bot for your app, they'll see your specific QR instead of the system default, creating a fully white-labeled flow that aligns with your brand identity.
-                            </p>
-                        </div>
-
-                        <!-- Visual: Backoffice Settings Simulator -->
-                        <div class="mockup-window border border-slate-300 bg-slate-50 shadow-xl w-full">
-                            <div class="bg-white p-8 border-t border-slate-200">
-                                <div class="text-xs font-bold uppercase text-slate-400 tracking-wider mb-6">Backoffice Settings</div>
-
-                                <div class="form-control w-full">
-                                    <label class="label mb-1">
-                                        <span class="label-text font-bold text-slate-700">Payment QR Code</span>
-                                        <span class="badge badge-success badge-sm text-white font-bold">Active</span>
-                                    </label>
-                                    <div class="flex items-center gap-5 p-5 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer group">
-                                        <div class="w-20 h-20 bg-white rounded-lg border border-slate-200 flex items-center justify-center overflow-hidden shadow-sm group-hover:scale-105 transition-transform">
-                                            <img src="{{ url_for('static', filename='qr.jpg') }}" class="w-full h-full object-cover">
-                                        </div>
-                                        <div class="flex-1">
-                                            <div class="text-sm font-bold text-slate-800">my_shop_aba.png</div>
-                                            <div class="text-xs text-slate-500 mt-1">245 KB • PNG • Uploaded just now</div>
-                                        </div>
-                                        <button class="btn btn-sm btn-outline border-slate-300 text-slate-600 hover:bg-slate-800 hover:text-white hover:border-slate-800">Replace</button>
-                                    </div>
-                                    <div class="label mt-2">
-                                        <span class="label-text-alt text-slate-400">This image will be shown to users during the /pay flow.</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="divider text-slate-300"></div>
-
-                    <!-- FEATURE 3: Enhanced Permissions -->
-                    <div class="grid md:grid-cols-2 gap-12 items-center">
-                        <!-- Visual: Logic Code Block -->
-                        <div class="order-2 md:order-1">
-                            <div class="payload-block mt-0 shadow-lg">
-                            <pre><code class="language-python"># Pseudo-code: Decentralized Admin Approval Logic
-
-def handle_admin_approval(admin_user, transaction):
-    # 1. Global Super Admins can access everything
-    if admin_user.role == 'super_admin':
-        return allow_action()
-
-    # 2. App Admins are restricted to their own App ID
-    if admin_user.role == 'admin':
-        if admin_user.app_id == transaction.app_id:
-            return allow_action()
-        else:
-            # Prevent interference with other apps
-            raise PermissionError("Access Denied: Wrong App")
-
-    return deny_access()</code></pre>
-                            </div>
-                        </div>
-
-                        <div class="order-1 md:order-2">
-                            <h3 class="text-2xl font-bold mb-4 flex items-center gap-3 text-slate-900">
-                                <span class="w-1.5 h-8 bg-amber-500 rounded-full"></span>
-                                Enhanced Permissions
-                            </h3>
-                            <p class="text-slate-600 leading-relaxed mb-6 text-lg">
-                                Bifrost implements a decentralized permission model. App-specific admins gain targeted control, allowing them to review and approve payment proofs <strong>only for their own application</strong> via the Bifrost Bot.
-                            </p>
-                            <p class="text-slate-600 leading-relaxed">
-                                This ensures that an admin for "App A" cannot interfere with "App B" transactions, while Global Super Admins retain oversight of the entire ecosystem.
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="divider text-slate-300"></div>
-
-                    <!-- FEATURE 4: Smart Invites -->
-                    <div class="grid md:grid-cols-2 gap-12 items-center">
-                        <div>
-                            <h3 class="text-2xl font-bold mb-4 flex items-center gap-3 text-slate-900">
-                                <span class="w-1.5 h-8 bg-sky-500 rounded-full"></span>
-                                Smart Invites
-                            </h3>
-                            <p class="text-slate-600 leading-relaxed mb-6 text-lg">
-                                Streamline onboarding with automated, branded email invitations sent directly from the Backoffice.
-                            </p>
-                            <p class="text-slate-600 leading-relaxed">
-                                When adding new users or admins, Bifrost generates a unique activation link embedded in the email. Users can click to set their password directly without needing an OTP, simplifying the process while maintaining high security.
-                            </p>
-                        </div>
-
-                        <!-- Visual: Email Card -->
-                        <div class="card bg-white text-slate-800 shadow-xl border border-slate-200 overflow-hidden transform rotate-1 hover:rotate-0 transition-all duration-300 hover:shadow-2xl">
-                            <div class="bg-slate-50 border-b border-slate-200 p-4 flex justify-between items-center">
-                                <span class="text-xs font-mono text-slate-500">Subject: Invitation to join <strong>Savvify</strong></span>
-                                <div class="flex gap-1.5 opacity-50"><div class="w-2.5 h-2.5 rounded-full bg-red-400"></div><div class="w-2.5 h-2.5 rounded-full bg-yellow-400"></div><div class="w-2.5 h-2.5 rounded-full bg-green-400"></div></div>
-                            </div>
-                            <div class="p-8">
-                                <div class="flex items-center gap-4 mb-8">
-                                    <div class="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-200">S</div>
-                                    <div>
-                                        <div class="font-bold text-lg text-slate-900">Savvify</div>
-                                        <div class="text-xs text-slate-500 font-medium">via Bifrost IdP</div>
-                                    </div>
-                                </div>
-                                <h4 class="text-xl font-bold mb-3 text-slate-900">You've been invited!</h4>
-                                <p class="text-sm text-slate-600 mb-8 leading-relaxed">An administrator has created an account for you on Savvify. Click the button below to set your password and activate your account instantly.</p>
-                                <button class="btn btn-primary w-full normal-case shadow-lg shadow-primary/30">Activate Account</button>
-                                <div class="text-[10px] text-center text-slate-400 mt-6">Link expires in 24 hours. • Secured by Bifrost</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="divider text-slate-300"></div>
-
-                    <!-- FEATURE 5: Passkeys (Future) -->
-                    <div class="grid md:grid-cols-2 gap-12 items-center">
-                        <!-- Visual: DB Model Code -->
-                        <div class="order-2 md:order-1">
-                            <div class="mockup-code bg-[#282c34] text-xs shadow-lg">
-                                <pre class="text-gray-400"><code>class User(Document):</code></pre>
-                                <pre class="text-gray-400"><code>    email = StringField(required=True)</code></pre>
-                                <pre class="text-gray-400"><code>    password = StringField()</code></pre>
-                                <pre class="block bg-yellow-900/30 -mx-4 px-4 my-1 border-l-4 border-yellow-500"><code>    # Future Implementation: WebAuthn</code></pre>
-                                <pre class="block bg-yellow-900/30 -mx-4 px-4 my-1 border-l-4 border-yellow-500 text-yellow-100"><code>    webauthn_credentials = ListField(</code></pre>
-                                <pre class="block bg-yellow-900/30 -mx-4 px-4 my-1 border-l-4 border-yellow-500 text-yellow-100"><code>        EmbeddedDocumentField(WebAuthnCred)</code></pre>
-                                <pre class="block bg-yellow-900/30 -mx-4 px-4 my-1 border-l-4 border-yellow-500 text-yellow-100"><code>    )</code></pre>
-                            </div>
-                        </div>
-
-                        <div class="order-1 md:order-2">
-                            <h3 class="text-2xl font-bold mb-4 flex items-center gap-3 text-slate-900">
-                                <span class="w-1.5 h-8 bg-slate-800 rounded-full"></span>
-                                Passkeys (Future)
-                            </h3>
-                            <p class="text-slate-600 leading-relaxed mb-6 text-lg">
-                                Bifrost is prepared for passwordless authentication with built-in support for <strong>WebAuthn</strong> credentials in the database models.
-                            </p>
-                            <p class="text-slate-600 leading-relaxed mb-4">
-                                Once fully implemented, this feature will enable seamless, secure logins using biometrics (TouchID, FaceID) or hardware keys (YubiKey), eliminating the need for passwords entirely.
-                            </p>
-                            <div class="badge badge-neutral font-bold py-3">Coming Soon</div>
-                        </div>
-                    </div>
-
+            <!-- PART IV -->
+            <section id="part4-proxy" class="space-y-10 doc-section">
+                <div class="border-b border-border-subtle pb-4">
+                    <div class="text-xs font-bold text-primary uppercase tracking-widest">Part IV</div>
+                    <h2 class="text-2xl font-bold text-on-background mt-1">CMS Onboarding &amp; Database Proxying</h2>
                 </div>
+
+                <!-- 12 Proxy Architecture -->
+                <div class="space-y-4">
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">12</span>
+                        Database Proxy Architecture
+                    </h3>
+                    <p class="text-sm text-on-surface-variant">
+                        The console holds no customer data locally. It connects directly to your PostgreSQL database using `ThreadedConnectionPool` and context managers (`get_tenant_db`). Queries are executed dynamically to remain resilient to minor schema deviations.
+                    </p>
+                </div>
+
+                <!-- 13 3-Step Wizard -->
+                <div id="part4-wizard" class="space-y-4 pt-4">
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">13</span>
+                        The 3-Step CMS Onboarding Wizard
+                    </h3>
+                    <p class="text-sm text-on-surface-variant">
+                        When launching the Backoffice console for a new application (`/backoffice/app/<app_id>/onboarding`), a 3-step setup wizard initializes the workspace:
+                    </p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="glass-panel p-4 space-y-2">
+                            <div class="w-7 h-7 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs">1</div>
+                            <div class="font-bold text-sm text-on-surface">Connect Database</div>
+                            <p class="text-xs text-on-surface-variant">Input PostgreSQL connection string. Connection details are encrypted before saving.</p>
+                        </div>
+                        <div class="glass-panel p-4 space-y-2">
+                            <div class="w-7 h-7 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs">2</div>
+                            <div class="font-bold text-sm text-on-surface">Smart Schema Detection</div>
+                            <p class="text-xs text-on-surface-variant">Introspects schema, auto-hides plumbing tables (`migrations`, `tokens`, `logs`), and proposes friendly labels (`users` &rarr; `Customers`).</p>
+                        </div>
+                        <div class="glass-panel p-4 space-y-2">
+                            <div class="w-7 h-7 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs">3</div>
+                            <div class="font-bold text-sm text-on-surface">Invite Team</div>
+                            <p class="text-xs text-on-surface-variant">Assign staff roles (`content_manager`, `operations`, `admin`) by email before launching.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 14 Schema Customization -->
+                <div id="part4-schema" class="space-y-4 pt-4">
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">14</span>
+                        Tenant-Agnostic Queue Schema Mapping
+                    </h3>
+                    <p class="text-sm text-on-surface-variant">
+                        If your tenant database uses custom table or column names, describe them in CMS Settings under `payment_queue` (`cms_config.payment_queue`):
+                    </p>
+                    <pre><code class="language-json">{
+  "payment_queue": {
+    "table": "orders",
+    "id": "order_id",
+    "subject_key": "customer_id",
+    "amount": "total",
+    "reference": "ref",
+    "receipt": "proof_url",
+    "status": "state",
+    "open_states": ["awaiting_review"],
+    "settled": ["paid", "refunded"],
+    "actions": { "approve": "paid", "reject": "declined", "refund": "refunded" },
+    "grant": {
+      "table": "access_grants",
+      "subject_key": "cid",
+      "scope_key": "plan_id",
+      "on_approve": "active",
+      "on_revoke": "revoked"
+    }
+  }
+}</code></pre>
+                </div>
+            </section>
+
+            <!-- PART V -->
+            <section id="part5-rbac" class="space-y-10 doc-section">
+                <div class="border-b border-border-subtle pb-4">
+                    <div class="text-xs font-bold text-primary uppercase tracking-widest">Part V</div>
+                    <h2 class="text-2xl font-bold text-on-background mt-1">Console Operator's Manual</h2>
+                </div>
+
+                <!-- 15 Roles Matrix -->
+                <div class="space-y-4">
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">15</span>
+                        Console Roles &amp; Permissions Matrix
+                    </h3>
+                    <table class="doc-table">
+                        <thead>
+                            <tr>
+                                <th>Role</th>
+                                <th>Content</th>
+                                <th>Publish</th>
+                                <th>Payments</th>
+                                <th>Users &amp; Access</th>
+                                <th>Settings</th>
+                                <th>Audit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code class="text-xs text-primary font-bold">owner</code></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="text-xs text-primary font-bold">super_admin</code></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="text-xs text-primary font-bold">admin</code></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="text-xs text-primary font-bold">content_manager</code></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-danger">No</span></td>
+                                <td><span class="text-danger">No</span></td>
+                                <td><span class="text-danger">No</span></td>
+                                <td><span class="text-warning">Read Only</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="text-xs text-primary font-bold">operations</code></td>
+                                <td><span class="text-danger">No</span></td>
+                                <td><span class="text-danger">No</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-warning">Read Only</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="text-xs text-primary font-bold">billing_agent</code></td>
+                                <td><span class="text-danger">No</span></td>
+                                <td><span class="text-danger">No</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                                <td><span class="text-warning">Read Only</span></td>
+                                <td><span class="text-success">Yes</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 16 Payment Queue & SLA Clock -->
+                <div id="part5-queue" class="space-y-4 pt-4">
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">16</span>
+                        Payment Verification Queue &amp; SLA Clock
+                    </h3>
+                    <p class="text-sm text-on-surface-variant">
+                        Every submitted receipt enters the human verification queue. The real age clock monitors progress against the 6-hour SLA promise:
+                    </p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="glass-panel p-4 space-y-1">
+                            <div class="text-xs font-bold text-success">Age &lt; 4h 30m</div>
+                            <div class="text-sm font-bold text-on-surface">On Time</div>
+                            <p class="text-xs text-on-surface-variant">Payment is comfortably within the service window.</p>
+                        </div>
+                        <div class="glass-panel p-4 space-y-1">
+                            <div class="text-xs font-bold text-warning">4h 30m – 6h</div>
+                            <div class="text-sm font-bold text-on-surface">Approaching SLA</div>
+                            <p class="text-xs text-on-surface-variant">Alert dispatched to Telegram channel. Deal with immediately.</p>
+                        </div>
+                        <div class="glass-panel p-4 space-y-1">
+                            <div class="text-xs font-bold text-danger">Over 6h</div>
+                            <div class="text-sm font-bold text-on-surface">Breached SLA</div>
+                            <p class="text-xs text-on-surface-variant">Service promise is broken. Priority resolution required.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 17 Approval State Machine -->
+                <div id="part5-statemachine" class="space-y-4 pt-4">
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">17</span>
+                        Payment State Machine &amp; Actions
+                    </h3>
+                    <p class="text-sm text-on-surface-variant">
+                        Payments strictly transition between states (`FREE` &rarr; `PENDING` &rarr; `PREMIUM` / `REJECTED`, `PREMIUM` &rarr; `REFUNDED`).
+                    </p>
+                    <div class="space-y-3">
+                        <div class="glass-panel p-4 space-y-1">
+                            <div class="text-sm font-bold text-success flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-base">check_circle</span>
+                                Approving
+                            </div>
+                            <p class="text-xs text-on-surface-variant">Atomically marks payment approved, unlocks track entitlements in Postgres, and triggers client webhooks as one transaction. Duplicate references are rejected.</p>
+                        </div>
+                        <div class="glass-panel p-4 space-y-1">
+                            <div class="text-sm font-bold text-warning flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-base">cancel</span>
+                                Rejecting
+                            </div>
+                            <p class="text-xs text-on-surface-variant">Requires reason code (`wrong_amount`, `unreadable`, `duplicate_reference`, `other`). Allows customer to re-submit a fresh receipt.</p>
+                        </div>
+                        <div class="glass-panel p-4 space-y-1">
+                            <div class="text-sm font-bold text-danger flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-base">undo</span>
+                                Refunding
+                            </div>
+                            <p class="text-xs text-on-surface-variant">Allowed only on approved payments. Revokes only the entitlement unlocked by that specific transaction.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 18 Publish Gatekeeper -->
+                <div id="part5-publish" class="space-y-4 pt-4">
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">18</span>
+                        Exam Question Automated Publish Quality Gate
+                    </h3>
+                    <p class="text-sm text-on-surface-variant">
+                        Publishing exam content (`review` &rarr; `published`) is restricted to Admins/Owners and is automatically blocked by the server unless all 4 criteria pass:
+                    </p>
+                    <div class="glass-panel p-6 space-y-3">
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-success text-xl">check_box</span>
+                            <span class="text-xs text-on-surface"><strong>Exactly 4 choices</strong> defined on the question.</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-success text-xl">check_box</span>
+                            <span class="text-xs text-on-surface"><strong>Exactly 1 choice</strong> marked as correct.</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-success text-xl">check_box</span>
+                            <span class="text-xs text-on-surface"><strong>Bilingual explanations</strong> (Khmer &amp; English) present on the correct choice.</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-success text-xl">check_box</span>
+                            <span class="text-xs text-on-surface"><strong>Non-empty `source_ref`</strong> tracing the question to an official source document.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 19 Audit Log -->
+                <div id="part5-audit" class="space-y-4 pt-4">
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">19</span>
+                        Audit Log &amp; User Suspensions
+                    </h3>
+                    <p class="text-sm text-on-surface-variant">
+                        Every mutation (approvals, rejections, refunds, content edits, manual overrides) is permanently recorded in the immutable audit log with actor ID, timestamp, and before/after JSON diffs. Suspensions lock user accounts while preserving paid entitlements.
+                    </p>
+                </div>
+
+                <!-- 20 Core Guarantees -->
+                <div id="part5-safeguards" class="space-y-4 pt-4">
+                    <h3 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                        <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">20</span>
+                        Operational Safeguards &amp; Guarantees
+                    </h3>
+                    <div class="glass-panel p-6 space-y-4 text-xs text-on-surface-variant">
+                        <div class="flex items-start gap-3">
+                            <span class="material-symbols-outlined text-primary text-lg">shield</span>
+                            <div>
+                                <strong class="text-on-surface">No Passwords in Plaintext:</strong> Passwords are never stored in plaintext or requested by staff.
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="material-symbols-outlined text-primary text-lg">account_balance</span>
+                            <div>
+                                <strong class="text-on-surface">Money Movement Outside Console:</strong> The console records verification decisions; actual bank wire transfers and cash refunds occur through tenant banks.
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="material-symbols-outlined text-primary text-lg">history_edu</span>
+                            <div>
+                                <strong class="text-on-surface">Immutable Timeline:</strong> Nothing is deleted quietly. Every change is logged with full before and after states.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </section>
 
         </main>
     </div>
 
-    <div class="drawer-side z-40">
-        <label for="docs-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
-        <aside class="bg-slate-50 w-80 min-h-full flex flex-col border-r border-slate-200">
-
-            <div class="p-6 border-b border-slate-200 bg-white">
-                <div class="flex items-center gap-3">
-                    <img src="{{ url_for('static', filename='logo.png') }}" alt="Bifrost" class="h-8 w-auto">
-                    <span class="font-bold text-xl tracking-tight text-slate-800">Bifrost API</span>
-                </div>
-                <div class="badge badge-success badge-outline mt-4 font-bold gap-2 w-full py-3 bg-green-50">
-                    <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                    System Operational
-                </div>
-            </div>
-
-            <ul class="menu p-4 w-full text-slate-600 font-medium gap-1">
-                <li class="menu-title opacity-60 uppercase tracking-widest text-xs mt-2 font-bold text-slate-400">Getting Started</li>
-                <li><a href="#introduction" class="nav-link hover:bg-slate-100 hover:text-indigo-600 rounded-lg">Introduction</a></li>
-                <li><a href="#get-started" class="nav-link hover:bg-slate-100 hover:text-indigo-600 rounded-lg">Get Started</a></li>
-                <li><a href="#roles-hierarchy" class="nav-link hover:bg-slate-100 hover:text-indigo-600 rounded-lg">Role Hierarchy</a></li>
-
-                <li class="menu-title opacity-60 uppercase tracking-widest text-xs mt-6 font-bold text-slate-400">Guides</li>
-                <li><a href="#flows-guides" class="nav-link hover:bg-slate-100 hover:text-indigo-600 rounded-lg">Flows & Guides</a></li>
-
-                <li class="menu-title opacity-60 uppercase tracking-widest text-xs mt-6 font-bold text-slate-400">Authentication</li>
-                <li><a href="#auth-hosted" class="nav-link hover:bg-slate-100 hover:text-indigo-600 rounded-lg">Hosted UI</a></li>
-                <li><a href="#auth-api" class="nav-link hover:bg-slate-100 hover:text-indigo-600 rounded-lg">Client API</a></li>
-
-                <li class="menu-title opacity-60 uppercase tracking-widest text-xs mt-6 font-bold text-slate-400">Backend Integration</li>
-                <li><a href="#internal-api" class="nav-link hover:bg-slate-100 hover:text-indigo-600 rounded-lg">Internal API (S2S)</a></li>
-                <li><a href="#payments-api" class="nav-link hover:bg-slate-100 hover:text-indigo-600 rounded-lg">Payments</a></li>
-                <li><a href="#webhooks" class="nav-link hover:bg-slate-100 hover:text-indigo-600 rounded-lg">Webhooks</a></li>
-                <li><a href="#secrets-vault" class="nav-link hover:bg-slate-100 hover:text-indigo-600 rounded-lg">Secrets Vault</a></li>
-                <li><a href="#advanced" class="nav-link hover:bg-slate-100 hover:text-indigo-600 rounded-lg text-indigo-600 bg-indigo-50">Advanced Features</a></li>
-
-                <li class="mt-8">
-                    <a href="{{ url_for('changelog_page') }}" class="btn btn-warning btn-sm btn-outline w-full justify-start normal-case gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-4 h-4 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path></svg>
-                        System Changelog
-                    </a>
-                </li>
-            </ul>
-
-            <div class="mt-auto p-4 border-t border-slate-200 bg-white">
-                <a href="/backoffice" class="btn btn-neutral w-full shadow-lg shadow-slate-300/50">← Back to Portal</a>
-            </div>
-        </aside>
-    </div>
-</div>
-
-<script>
-    function copyText(text) {
-        if (!text) return;
-        navigator.clipboard.writeText(text).then(() => {
-            const toast = document.createElement('div');
-            toast.className = 'alert alert-success text-white text-xs py-2 px-4 shadow-lg rounded-xl fixed bottom-4 right-4 z-[9999]';
-            toast.innerText = 'Copied to clipboard!';
-
-            const container = document.getElementById('toast-container');
-            container.appendChild(toast);
-            setTimeout(() => {
-                toast.remove();
-            }, 2000);
-        }).catch(err => {
-            console.error('Failed to copy: ', err);
-        });
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        const sections = document.querySelectorAll('section');
-        const navLinks = document.querySelectorAll('.nav-link');
-
-        // Scroll Spy
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    navLinks.forEach(link => {
-                        link.classList.remove('bg-indigo-50', 'text-indigo-600');
-                    });
-                    const id = entry.target.getAttribute('id');
-                    const activeLink = document.querySelector(`.nav-link[href="#${id}"]`);
-                    if (activeLink) {
-                        activeLink.classList.add('bg-indigo-50', 'text-indigo-600');
-                    }
+    <!-- Interactive Filtering & Copy Tooltips JS -->
+    <script>
+        function filterDocs() {
+            const input = document.getElementById('docSearch').value.toLowerCase();
+            const sections = document.querySelectorAll('.doc-section > div');
+            sections.forEach(sec => {
+                const text = sec.innerText.toLowerCase();
+                if (text.includes(input)) {
+                    sec.style.display = 'block';
+                } else {
+                    sec.style.display = 'none';
                 }
             });
-        }, { rootMargin: '-20% 0px -60% 0px' });
+        }
 
-        sections.forEach(section => observer.observe(section));
-    });
-</script>
+        // Active TOC Scrollspy
+        window.addEventListener('scroll', () => {
+            const sections = document.querySelectorAll('.doc-section');
+            const navLinks = document.querySelectorAll('.toc-item');
+            let current = '';
+
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop - 100;
+                if (window.scrollY >= sectionTop) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
 </body>
 </html>
