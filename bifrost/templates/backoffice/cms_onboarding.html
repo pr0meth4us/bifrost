@@ -213,12 +213,18 @@
 </div>
 <!-- Actions Footer -->
 <div class="px-8 py-5 border-t border-outline-variant/10 bg-surface/30 flex justify-between items-center">
-<button type="submit" name="action" value="customize" class="flex items-center gap-2 px-4 py-2 rounded-DEFAULT border border-outline-variant/30 text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface transition-all font-body-sm text-body-sm">
+<div class="flex items-center gap-3">
+<button type="submit" name="action" value="customize" class="flex items-center gap-2 px-4 py-2 rounded-DEFAULT border border-outline-variant/30 text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface transition-all font-body-sm text-body-sm cursor-pointer">
 <span class="material-symbols-outlined text-sm">edit</span>
     Customize everything
 </button>
+<button type="button" onclick="openJsonModal()" class="flex items-center gap-2 px-4 py-2 rounded-DEFAULT border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-all font-body-sm text-body-sm font-semibold cursor-pointer">
+<span class="font-mono font-bold text-sm">{ }</span>
+    Raw JSON Editor
+</button>
+</div>
 <div class="flex items-center gap-4">
-<button type="submit" name="action" value="continue" class="flex items-center gap-2 px-6 py-2 rounded-DEFAULT bg-inverse-primary text-on-background hover:bg-inverse-primary/90 hover:shadow-[0_0_15px_rgba(73,75,214,0.4)] transition-all font-body-sm text-body-sm font-semibold">
+<button type="submit" name="action" value="continue" class="flex items-center gap-2 px-6 py-2 rounded-DEFAULT bg-inverse-primary text-on-background hover:bg-inverse-primary/90 hover:shadow-[0_0_15px_rgba(73,75,214,0.4)] transition-all font-body-sm text-body-sm font-semibold cursor-pointer">
     Confirm &amp; Continue
     <span class="material-symbols-outlined text-sm">arrow_forward</span>
 </button>
@@ -227,4 +233,81 @@
 </form>
 </section>
 </main>
+
+<!-- Raw JSON Editor Modal -->
+<div id="jsonModal" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.6); backdrop-filter:blur(10px); align-items:center; justify-content:center; padding:20px;">
+  <div style="background:var(--bg2, #1c1c1e); border:1px solid rgba(255,255,255,0.1); border-radius:16px; width:100%; max-width:800px; max-height:85vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.6); color:#f5f5f7;">
+    <div style="padding:16px 24px; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; justify-content:space-between; align-items:center;">
+      <div style="font-weight:700; font-size:16px; display:flex; align-items:center; gap:8px;">
+        <span style="font-family:monospace; color:#494bd6; font-weight:800;">{ }</span> Raw Schema Configuration JSON
+      </div>
+      <button type="button" onclick="closeJsonModal()" style="background:none; border:none; color:#98989d; font-size:22px; cursor:pointer;">&times;</button>
+    </div>
+    <div style="padding:20px; flex:1; display:flex; flex-direction:column; gap:12px; overflow:hidden;">
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#98989d;">
+        <span>Edit or paste raw <code style="font-family:monospace; color:#8083ff; font-weight:600;">cms_config</code> JSON below. Changes apply directly to MongoDB.</span>
+        <span id="jsonStatus" style="font-weight:700; color:#30d158;">✓ Valid JSON</span>
+      </div>
+      <textarea id="jsonEditorArea" style="width:100%; flex:1; min-height:360px; font-family:'JetBrains Mono', Monaco, monospace; font-size:13px; line-height:1.5; padding:16px; background:#121316; color:#e2e2e9; border:1px solid rgba(255,255,255,0.1); border-radius:10px; outline:none; resize:none;" oninput="validateJsonInput()"></textarea>
+    </div>
+    <div style="padding:16px 24px; border-top:1px solid rgba(255,255,255,0.1); background:#121316; display:flex; justify-content:space-between; align-items:center;">
+      <button type="button" onclick="copyJsonText()" style="padding:8px 14px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#1c1c1e; font-size:12px; font-weight:600; cursor:pointer; color:#f5f5f7;">Copy JSON</button>
+      <div style="display:flex; gap:10px;">
+        <button type="button" onclick="closeJsonModal()" style="padding:8px 16px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:#1c1c1e; font-size:13px; font-weight:600; cursor:pointer; color:#f5f5f7;">Cancel</button>
+        <button type="button" onclick="applyAndSubmitJson()" style="padding:8px 20px; border-radius:6px; background:#494bd6; color:white; border:none; font-size:13px; font-weight:700; cursor:pointer;">Apply JSON</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function openJsonModal() {
+    const rawInput = document.querySelector('input[name="cms_config_json"]');
+    try {
+      const parsed = JSON.parse(rawInput.value || '{}');
+      document.getElementById('jsonEditorArea').value = JSON.stringify(parsed, null, 2);
+    } catch(e) {
+      document.getElementById('jsonEditorArea').value = rawInput.value;
+    }
+    document.getElementById('jsonModal').style.display = 'flex';
+    validateJsonInput();
+  }
+
+  function closeJsonModal() {
+    document.getElementById('jsonModal').style.display = 'none';
+  }
+
+  function validateJsonInput() {
+    const txt = document.getElementById('jsonEditorArea').value;
+    const status = document.getElementById('jsonStatus');
+    try {
+      JSON.parse(txt);
+      status.innerText = '✓ Valid JSON';
+      status.style.color = '#30d158';
+      return true;
+    } catch(e) {
+      status.innerText = '✗ Syntax Error: ' + e.message;
+      status.style.color = '#ff453a';
+      return false;
+    }
+  }
+
+  function copyJsonText() {
+    const txt = document.getElementById('jsonEditorArea').value;
+    navigator.clipboard.writeText(txt);
+    alert('Raw JSON copied to clipboard!');
+  }
+
+  function applyAndSubmitJson() {
+    if(!validateJsonInput()) {
+      alert('Please fix JSON syntax errors before applying.');
+      return;
+    }
+    const txt = document.getElementById('jsonEditorArea').value;
+    document.querySelector('input[name="cms_config_json"]').value = txt;
+    closeJsonModal();
+    alert('JSON configuration updated! Click "Confirm & Continue" or "Customize Everything" to save.');
+  }
+</script>
 </body></html>
+

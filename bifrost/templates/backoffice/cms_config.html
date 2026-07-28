@@ -111,14 +111,42 @@
 
 <nav class="topnav">
   <div class="topnav-left">
-    <a class="btn-back" href="/backoffice/app/{{ app._id }}/cms">← Content Editor</a>
+    <a class="btn-back" href="/backoffice/cms">← Content Editor</a>
     <div class="topnav-sep"></div>
-    <a class="btn-back" href="/backoffice/app/{{ app._id }}/cms/rbac">Roles & Permissions</a>
+    <a class="btn-back" href="/backoffice/app/{{ app._id }}/cms/rbac">Roles &amp; Permissions</a>
   </div>
-  <div>
+  <div style="display:flex; gap:10px; align-items:center;">
+    <button class="btn" style="border:1px solid var(--hair); background:var(--bg); color:var(--ink); padding:8px 14px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;" onclick="openJsonModal()">{ } Raw JSON Editor</button>
     <button class="btn btn-primary" onclick="submitConfig()">Save configuration</button>
   </div>
 </nav>
+
+<!-- Raw JSON Editor Modal -->
+<div id="jsonModal" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.6); backdrop-filter:blur(10px); align-items:center; justify-content:center; padding:20px;">
+  <div style="background:var(--bg); border:1px solid var(--hair); border-radius:16px; width:100%; max-width:800px; max-height:85vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.4);">
+    <div style="padding:16px 24px; border-bottom:1px solid var(--hair); display:flex; justify-content:space-between; align-items:center;">
+      <div style="font-weight:700; font-size:16px; display:flex; align-items:center; gap:8px;">
+        <span style="font-family:monospace; color:var(--accent); font-weight:800;">{ }</span> Raw Schema Configuration JSON
+      </div>
+      <button onclick="closeJsonModal()" style="background:none; border:none; color:var(--sub); font-size:22px; cursor:pointer;">&times;</button>
+    </div>
+    <div style="padding:20px; flex:1; display:flex; flex-direction:column; gap:12px; overflow:hidden;">
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--sub);">
+        <span>Edit or paste raw <code style="font-family:monospace; color:var(--accent); font-weight:600;">cms_config</code> JSON below. Changes apply directly to MongoDB.</span>
+        <span id="jsonStatus" style="font-weight:700; color:var(--good);">✓ Valid JSON</span>
+      </div>
+      <textarea id="jsonEditorArea" style="width:100%; flex:1; min-height:360px; font-family:'JetBrains Mono', Monaco, monospace; font-size:13px; line-height:1.5; padding:16px; background:var(--bg2); color:var(--ink); border:1px solid var(--hair); border-radius:10px; outline:none; resize:none;" oninput="validateJsonInput()"></textarea>
+    </div>
+    <div style="padding:16px 24px; border-top:1px solid var(--hair); background:var(--bg2); display:flex; justify-content:space-between; align-items:center;">
+      <button onclick="copyJsonText()" style="padding:8px 14px; border-radius:6px; border:1px solid var(--hair); background:var(--bg); font-size:12px; font-weight:600; cursor:pointer; color:var(--ink);">Copy JSON</button>
+      <div style="display:flex; gap:10px;">
+        <button onclick="closeJsonModal()" style="padding:8px 16px; border-radius:6px; border:1px solid var(--hair); background:var(--bg); font-size:13px; font-weight:600; cursor:pointer; color:var(--ink);">Cancel</button>
+        <button onclick="applyAndSubmitJson()" style="padding:8px 20px; border-radius:6px; background:var(--accent); color:white; border:none; font-size:13px; font-weight:700; cursor:pointer;">Apply &amp; Save JSON</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 <div class="main">
   <div class="left-pane">
@@ -346,7 +374,7 @@
     });
   }
 
-  function submitConfig() {
+  function buildConfigObject() {
     const config = {
       is_onboarded: true,
       hidden_tables: [],
@@ -394,11 +422,56 @@
       config.tables[t] = tblData;
     });
 
-    // Retain roles which are managed in rbac
     const existingRoles = {{ cms_config.get('roles', {}) | tojson | forceescape }};
     config.roles = existingRoles;
+    return config;
+  }
 
+  function submitConfig() {
+    const config = buildConfigObject();
     document.getElementById('configJsonInput').value = JSON.stringify(config);
+    document.getElementById('configForm').submit();
+  }
+
+  function openJsonModal() {
+    const config = buildConfigObject();
+    document.getElementById('jsonEditorArea').value = JSON.stringify(config, null, 2);
+    document.getElementById('jsonModal').style.display = 'flex';
+    validateJsonInput();
+  }
+
+  function closeJsonModal() {
+    document.getElementById('jsonModal').style.display = 'none';
+  }
+
+  function validateJsonInput() {
+    const txt = document.getElementById('jsonEditorArea').value;
+    const status = document.getElementById('jsonStatus');
+    try {
+      JSON.parse(txt);
+      status.innerText = '✓ Valid JSON';
+      status.style.color = 'var(--good)';
+      return true;
+    } catch(e) {
+      status.innerText = '✗ Syntax Error: ' + e.message;
+      status.style.color = 'var(--bad)';
+      return false;
+    }
+  }
+
+  function copyJsonText() {
+    const txt = document.getElementById('jsonEditorArea').value;
+    navigator.clipboard.writeText(txt);
+    alert('Raw JSON copied to clipboard!');
+  }
+
+  function applyAndSubmitJson() {
+    if(!validateJsonInput()) {
+      alert('Please fix JSON syntax errors before saving.');
+      return;
+    }
+    const txt = document.getElementById('jsonEditorArea').value;
+    document.getElementById('configJsonInput').value = txt;
     document.getElementById('configForm').submit();
   }
 
@@ -406,3 +479,4 @@
 </script>
 </body>
 </html>
+
