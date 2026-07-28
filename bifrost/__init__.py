@@ -161,6 +161,10 @@ def create_app(config_class):
     csrf.exempt(internal_bp)
     csrf.exempt(bot_webhook_bp)
     csrf.exempt(config_api_bp)
+    # Machine-to-machine receipt notification: authenticated by X-Webhook-Secret,
+    # has no browser session to protect, and cannot supply a CSRF token.
+    from .backoffice.tenant_routes import api_notify_new_payment
+    csrf.exempt(api_notify_new_payment)
 
     from .scheduler import start_scheduler
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':

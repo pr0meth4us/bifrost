@@ -1,0 +1,31 @@
+{# Khmer typography — SOW 3.2, a hard acceptance requirement.
+
+   Khmer combining characters and subscript consonants (ជើង) are drawn below the
+   baseline and get vertically clipped at the default line-height, so the grid, the
+   drawer and any preview must carry both the font stack AND the 1.8 line-height.
+   Applied to cells and form controls rather than to <body>, so the surrounding
+   chrome keeps its own metrics.
+
+   TODO (Phase 2, with CSP): self-host these two families under /static/fonts and
+   drop the fonts.googleapis.com origin. #}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;500;600;700&family=Noto+Sans+Khmer:wght@400;500;600&display=swap">
+<style>
+  :root { --kh-stack: 'Kantumruy Pro', 'Noto Sans Khmer', sans-serif; }
+
+  /* Grid cells, drawer fields, previews and every editable control. */
+  table td, table th,
+  input[type="text"], input[type="search"], textarea, select,
+  .kh, .kh-cell, [data-lang="kh"] {
+    font-family: var(--kh-stack);
+    line-height: 1.8;
+  }
+
+  /* Khmer needs vertical room even in single-line inputs. */
+  input[type="text"], input[type="search"], select { min-height: 2.75rem; }
+  table td { padding-top: .55rem; padding-bottom: .55rem; }
+
+  /* Never let a Khmer cell clip its diacritics behind an ellipsis. */
+  .kh, .kh-cell { overflow: visible; text-overflow: clip; }
+</style>

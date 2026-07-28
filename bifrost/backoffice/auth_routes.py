@@ -1,58 +1,117 @@
 # bifrost/backoffice/auth_routes.py
+from datetime import datetime, timezone
 from flask import render_template, request, redirect, url_for, session, flash
 from werkzeug.security import check_password_hash, generate_password_hash
-from ..services.email_service import send_invite_email, send_reset_email
+from ..services.email_service import send_invite_email, send_reset_email, send_otp_email
 from . import backoffice_bp, get_db
+
+# Admin login rate limit (SOW 4.7). Per source IP, short window.
+LOGIN_MAX_ATTEMPTS = 10
+LOGIN_WINDOW_SECONDS = 300
+
+
+def _login_rate_limited():
+    """True when this IP has burned its login attempts. Fails open if Redis is down —
+    availability of the console during an approval SLA window beats a hard lockout."""
+    from .. import redis_client
+    if not redis_client:
+        return False
+    key = f"bo:login:{request.headers.get('X-Forwarded-For', request.remote_addr)}"
+    try:
+        attempts = redis_client.incr(key)
+        if attempts == 1:
+            redis_client.expire(key, LOGIN_WINDOW_SECONDS)
+        return attempts > LOGIN_MAX_ATTEMPTS
+    except Exception:
+        return False
+
+
+def _start_mfa(db, user_doc, is_heimdall, tenant_app):
+    """Password checked — now send the second factor. No session is issued yet."""
+    email = (user_doc.get('email') or '').lower()
+    if not email:
+        flash("This account has no email address and cannot complete MFA. Contact an owner.", "danger")
+        return redirect(url_for('backoffice.login'))
+
+    otp, _ = db.create_otp(email, channel="backoffice_mfa", account_id=user_doc['_id'])
+    send_otp_email(email, otp, app_name="Bifrost Console")
+    session['mfa_pending'] = {
+        "user_id": str(user_doc['_id']),
+        "email": email,
+        "is_heimdall": is_heimdall,
+        "app_id": str(tenant_app['_id']) if tenant_app else None,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+    }
+    return redirect(url_for('backoffice.mfa'))
+
+
+def _resolve_tenant_app(db):
+    from flask import g
+    if hasattr(g, 'tenant_app'):
+        return g.tenant_app
+    client_id = request.args.get('client_id')
+    return db.db.applications.find_one({"client_id": client_id}) if client_id else None
+
 
 @backoffice_bp.route('/login', methods=['GET', 'POST'])
 def login():
     db = get_db()
-    tenant_app = None
-
-    # Detect Custom Domain / Query Param context
-    from flask import g
-    if hasattr(g, 'tenant_app'):
-        tenant_app = g.tenant_app
-    else:
-        client_id = request.args.get('client_id')
-        if client_id:
-            tenant_app = db.db.applications.find_one({"client_id": client_id})
+    tenant_app = _resolve_tenant_app(db)
 
     if request.method == 'POST':
-        identifier = request.form.get('email').strip()
+        if _login_rate_limited():
+            flash("Too many sign-in attempts. Try again in a few minutes.", "danger")
+            return render_template('backoffice/login.html', tenant_app=tenant_app)
+
+        identifier = (request.form.get('email') or '').strip()
         password = request.form.get('password')
 
         # 1. Heimdall Check
         admin_doc = db.db.admins.find_one({"email": identifier.lower()})
         if admin_doc and check_password_hash(admin_doc['password_hash'], password):
             if admin_doc.get('role') == 'heimdall':
-                session['backoffice_user'] = str(admin_doc['_id'])
-                session['is_heimdall'] = True
-                session['role'] = 'Heimdall'
-                return redirect(url_for('backoffice.dashboard'))
-            else:
-                flash("Role deprecated. Update to 'heimdall'.", "warning")
+                return _start_mfa(db, admin_doc, True, tenant_app)
+            flash("Role deprecated. Update to 'heimdall'.", "warning")
 
         # 2. App Tenant Check
         user = db.find_account_by_email(identifier)
-        if not user: user = db.find_account_by_username(identifier)
+        if not user:
+            user = db.find_account_by_username(identifier)
 
         if user and user.get('password_hash') and check_password_hash(user['password_hash'], password):
-            managed_apps = db.get_managed_apps(user['_id'])
-            if managed_apps:
-                session['backoffice_user'] = str(user['_id'])
-                session['is_heimdall'] = False
-                session['role'] = 'Tenant'  # General label
-                
-                if tenant_app:
-                    return redirect(url_for('backoffice.view_cms_grid', app_id=str(tenant_app['_id'])))
-                return redirect(url_for('backoffice.dashboard'))
-            else:
-                flash("Access Denied: You do not manage any apps.", "danger")
+            if db.get_managed_apps(user['_id']):
+                return _start_mfa(db, user, False, tenant_app)
+            flash("Access Denied: You do not manage any apps.", "danger")
         else:
             flash("Invalid credentials.", "danger")
 
     return render_template('backoffice/login.html', tenant_app=tenant_app)
+
+
+@backoffice_bp.route('/mfa', methods=['GET', 'POST'])
+def mfa():
+    """Second factor for every console account, every role, no exceptions (SOW 4.1)."""
+    pending = session.get('mfa_pending')
+    if not pending:
+        return redirect(url_for('backoffice.login'))
+
+    if request.method == 'POST':
+        db = get_db()
+        if db.verify_otp(identifier=pending['email'], code=request.form.get('otp')):
+            now = datetime.now(timezone.utc).isoformat()
+            session.pop('mfa_pending', None)
+            session['backoffice_user'] = pending['user_id']
+            session['is_heimdall'] = pending['is_heimdall']
+            session['role'] = 'Heimdall' if pending['is_heimdall'] else 'Tenant'
+            session['session_started_at'] = now
+            session['last_seen_at'] = now
+            session.permanent = True
+            if pending.get('app_id'):
+                return redirect(url_for('backoffice.view_cms_grid', app_id=pending['app_id']))
+            return redirect(url_for('backoffice.dashboard'))
+        flash("Invalid or expired code.", "danger")
+
+    return render_template('backoffice/mfa.html', email=pending['email'])
 
 
 @backoffice_bp.route('/logout')

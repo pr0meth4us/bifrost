@@ -15,6 +15,7 @@
         }
     </style>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+{% include 'backoffice/_khmer_font.html' %}
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
 <nav class="bg-slate-950 border-b border-slate-800 px-6 py-4">
@@ -76,8 +77,17 @@
                                     {% else %}bg-indigo-950 text-indigo-400 border border-indigo-800{% endif %}">
                                     {{ p.status }}
                                 </span>
-                                <!-- Simulated SLA age -->
-                                <span class="text-[10px] font-semibold text-slate-500">Pending < 2h</span>
+                                {% if p.sla_state in ('ok', 'warn', 'breach') %}
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold tabular-nums
+                                        {% if p.sla_state == 'breach' %}bg-red-950 text-red-300 border border-red-700
+                                        {% elif p.sla_state == 'warn' %}bg-amber-950 text-amber-300 border border-amber-700
+                                        {% else %}text-slate-500{% endif %}"
+                                        title="Waiting {{ p.age_hours }}h against a {{ sla_hours }}h SLA">
+                                        {% if p.sla_state == 'breach' %}⚠ {% endif %}{{ p.age_hours }}h
+                                    </span>
+                                {% elif p.sla_state == 'unknown' %}
+                                    <span class="text-[10px] font-semibold text-slate-600" title="payments.created_at is missing">age n/a</span>
+                                {% endif %}
                             </div>
                         </div>
                     {% endfor %}
@@ -150,21 +160,34 @@
                             <!-- Pending Actions: Approve or Reject -->
                             <div x-show="selectedPayment.status === 'pending' || selectedPayment.status === 'unclaimed'" class="space-y-4">
                                 <form :action="'/backoffice/app/{{ app._id }}/payments/' + selectedPayment.id + '/approve'" method="POST" class="space-y-3">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <div>
                                         <label class="block text-xs font-bold text-slate-400 uppercase mb-1.5">Grant Entitlement Track</label>
-                                        <select name="track_id" class="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl outline-none font-bold text-xs text-slate-300">
-                                            <option value="1" selected>Ministry Exam Prep - MFAIC</option>
-                                            <option value="2">Ministry of Health Prep</option>
+                                        <select name="track_id" required class="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl outline-none font-bold text-xs text-slate-300">
+                                            <option value="">— select a track —</option>
+                                            {% for t in tracks %}
+                                                <option value="{{ t.id }}">{{ t.ministry }} — {{ t.name }}</option>
+                                            {% endfor %}
                                         </select>
+                                        {% if not tracks %}
+                                            <p class="text-[10px] text-amber-400 mt-1.5 font-semibold">No active exam tracks found in the tenant database.</p>
+                                        {% endif %}
                                     </div>
-                                    <button type="submit" class="w-full py-3.5 bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl transition shadow-lg shadow-indigo-950/50">
-                                        Verify & Approve
+                                    <button type="submit" {% if not can_approve %}disabled{% endif %} class="w-full py-3.5 bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 disabled:opacity-40 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl transition shadow-lg shadow-indigo-950/50">
+                                        Verify &amp; Approve
                                     </button>
                                 </form>
 
                                 <form :action="'/backoffice/app/{{ app._id }}/payments/' + selectedPayment.id + '/reject'" method="POST" class="flex gap-2">
-                                    <input type="text" name="reason" placeholder="Reason for rejection..." class="flex-grow p-3 bg-slate-900 border border-slate-800 text-slate-100 placeholder-slate-500 rounded-xl outline-none text-xs focus:border-red-500 font-medium" required>
-                                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-bold px-5 rounded-xl text-xs transition">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <select name="reason_code" required class="p-3 bg-slate-900 border border-slate-800 rounded-xl outline-none text-xs font-bold text-slate-300">
+                                        <option value="">Reason…</option>
+                                        {% for code in reject_reasons %}
+                                            <option value="{{ code }}">{{ code.replace('_', ' ')|title }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <input type="text" name="reason_text" placeholder="Notes (required for 'other')" class="flex-grow p-3 bg-slate-900 border border-slate-800 text-slate-100 placeholder-slate-500 rounded-xl outline-none text-xs focus:border-red-500 font-medium">
+                                    <button type="submit" {% if not can_approve %}disabled{% endif %} class="bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white font-bold px-5 rounded-xl text-xs transition">
                                         Reject
                                     </button>
                                 </form>
@@ -173,12 +196,20 @@
                             <!-- Approved Actions: Allow Refund -->
                             <div x-show="selectedPayment.status === 'approved'">
                                 <form :action="'/backoffice/app/{{ app._id }}/payments/' + selectedPayment.id + '/refund'" method="POST" class="space-y-3">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <div class="text-[11px] font-bold text-amber-400 bg-amber-950/20 border border-amber-800/40 p-3 rounded-lg leading-normal">
-                                        ⚠️ Refunding will immediately revoke the premium access credentials on the tenant application.
+                                        ⚠️ Refunding immediately revokes access to the track this payment unlocked
+                                        (<span x-text="'track #' + (selectedPayment.exam_track_id || 'auto-detected')"></span>).
                                     </div>
                                     <div class="flex gap-2">
-                                        <input type="text" name="reason" placeholder="Refund reason..." class="flex-grow p-3 bg-slate-900 border border-slate-800 text-slate-100 placeholder-slate-500 rounded-xl outline-none text-xs focus:border-amber-500 font-medium" required>
-                                        <button type="submit" class="bg-amber-600 hover:bg-amber-700 text-slate-900 font-extrabold px-5 rounded-xl text-xs transition">
+                                        <select name="reason_code" required class="p-3 bg-slate-900 border border-slate-800 rounded-xl outline-none text-xs font-bold text-slate-300">
+                                            <option value="">Reason…</option>
+                                            {% for code in refund_reasons %}
+                                                <option value="{{ code }}">{{ code.replace('_', ' ')|title }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <input type="text" name="reason_text" placeholder="Notes…" class="flex-grow p-3 bg-slate-900 border border-slate-800 text-slate-100 placeholder-slate-500 rounded-xl outline-none text-xs focus:border-amber-500 font-medium">
+                                        <button type="submit" {% if not can_approve %}disabled{% endif %} class="bg-amber-600 hover:bg-amber-700 disabled:opacity-40 text-slate-900 font-extrabold px-5 rounded-xl text-xs transition">
                                             Issue Refund
                                         </button>
                                     </div>

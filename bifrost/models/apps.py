@@ -289,11 +289,12 @@ class AppMixin:
         return admin and admin.get('role') == 'heimdall'
 
     def get_managed_apps(self, account_id):
-        """Returns apps where user is admin, super_admin, or owner."""
+        """Returns apps this user may open the console for."""
+        from ..backoffice import CONSOLE_ROLES
         # STRICT: check app_specific_role
         links = self.db.app_links.find({
             "account_id": ObjectId(account_id),
-            "app_specific_role": {"$in": ["admin", "super_admin", "owner"]}
+            "app_specific_role": {"$in": list(CONSOLE_ROLES)}
         })
         app_ids = [link['app_id'] for link in links]
         return list(self.db.applications.find({"_id": {"$in": app_ids}}))
