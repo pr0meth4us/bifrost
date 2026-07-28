@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bifrost | Helm Ecosystem Identity</title>
+    <title>Bifrost | Identity & Payments Platform</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -17,77 +17,46 @@
         <img src="{{ url_for('static', filename='logo.png') }}" alt="Bifrost" class="h-24 w-auto mx-auto mb-8 drop-shadow-xl">
 
         <h1 class="text-5xl font-extrabold text-slate-900 tracking-tight mb-6">
-            Bifrost <span class="text-indigo-600">Identity Provider</span>
+            Bifrost <span class="text-indigo-600">Identity & Payments</span>
         </h1>
         <p class="text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">
-            Bifrost is a dedicated Identity Provider (IdP) built to <strong>centralize authentication</strong>
-            and security across the <strong>Helm</strong> digital product family. It ensures seamless,
-            secure access for every service in our ecosystem.
+            A multi-tenant Identity Provider and Payment Gateway. Bifrost handles
+            <strong>authentication, roles, subscriptions, and payments</strong> so your
+            applications don't have to.
         </p>
+
+        <div class="flex flex-col sm:flex-row gap-4 justify-center mt-10">
+            <a href="/backoffice"
+               class="py-4 px-8 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-200">
+                Backoffice Console
+            </a>
+            <a href="/docs"
+               class="py-4 px-8 bg-white text-slate-700 font-bold rounded-2xl border border-slate-200 hover:bg-slate-50 transition-all">
+                Developer Docs
+            </a>
+        </div>
     </div>
 </div>
 
 <div class="max-w-7xl mx-auto px-6 py-16 flex-grow">
-    <h2 class="text-sm font-black uppercase tracking-[0.2em] text-slate-400 mb-10 text-center">The Helm Product Family</h2>
-
-    {% if apps %}
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {% for product in apps %}
-        <div class="bg-white rounded-[2rem] p-8 border border-slate-200 hover:shadow-2xl transition-all duration-300 flex flex-col h-full">
-            <div class="flex items-center space-x-4 mb-8">
-                <div class="h-14 w-14 bg-slate-50 rounded-2xl flex items-center justify-center p-2 shadow-inner">
-                    {% if product.app_logo_url %}
-                    <img src="{{ product.app_logo_url }}" alt="Logo" class="h-full w-full object-contain">
-                    {% else %}
-                    <span class="text-xl font-bold text-indigo-600">{{ product.app_name[0] }}</span>
-                    {% endif %}
-                </div>
-                <div>
-                    <h3 class="text-xl font-bold text-slate-900">{{ product.app_name }}</h3>
-                    <p class="text-xs font-bold text-indigo-500 uppercase tracking-widest">Helm Ecosystem</p>
-                </div>
-            </div>
-
-            {% if product.app_web_url %}
-            <p class="text-slate-500 mb-10 flex-grow">
-                Integrated with Bifrost for secure SSO and centralized user management.
-            </p>
-
-            <div class="flex flex-col space-y-3">
-                <a href="{{ product.app_web_url }}" target="_blank"
-                   class="w-full py-4 bg-slate-900 text-white text-center font-bold rounded-2xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-200">
-                    Visit {{ product.app_name }}
-                </a>
-
-                <a href="{{ url_for('auth_ui.login', client_id=product.client_id) }}"
-                   class="w-full py-3 bg-white text-slate-500 text-center font-bold rounded-2xl border border-slate-200 hover:bg-slate-50 transition-all text-sm">
-                    Sign In with Bifrost
-                </a>
-            </div>
-            {% else %}
-            <p class="text-slate-500 mb-10 flex-grow">
-                A backend service or local tool securely managing its configuration via the Bifrost Vault.
-            </p>
-
-            <div class="flex flex-col space-y-3">
-                <div class="w-full py-4 bg-slate-50 text-slate-400 text-center font-bold rounded-2xl border border-slate-200 border-dashed select-none">
-                    No Public Frontend
-                </div>
-            </div>
-            {% endif %}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div class="bg-white rounded-[2rem] p-8 border border-slate-200">
+            <h3 class="text-xl font-bold text-slate-900 mb-3">Unified Login</h3>
+            <p class="text-slate-500">Single Sign-On via email, phone, or Telegram — hosted UI or headless API.</p>
         </div>
-        {% endfor %}
+        <div class="bg-white rounded-[2rem] p-8 border border-slate-200">
+            <h3 class="text-xl font-bold text-slate-900 mb-3">Payments</h3>
+            <p class="text-slate-500">Tamper-proof payment intents, subscriptions, trials, and webhook notifications.</p>
+        </div>
+        <div class="bg-white rounded-[2rem] p-8 border border-slate-200">
+            <h3 class="text-xl font-bold text-slate-900 mb-3">Secrets Vault</h3>
+            <p class="text-slate-500">Encrypted per-app configuration and API key storage, fetched at runtime.</p>
+        </div>
     </div>
-    {% else %}
-    <div class="bg-white rounded-[2rem] p-20 text-center border-2 border-dashed border-slate-200">
-        <p class="text-slate-400 font-medium">No products registered in the Helm family yet.</p>
-        <a href="/backoffice" class="text-indigo-600 font-bold hover:underline mt-4 inline-block">Manage via Bifrost Admin</a>
-    </div>
-    {% endif %}
 </div>
 
 <footer class="mt-auto py-12 border-t border-slate-200 text-center bg-white">
-    <p class="text-slate-400 text-sm font-medium">© 2026 Helm Digital Products. Powering identity via Bifrost IdP.</p>
+    <p class="text-slate-400 text-sm font-medium">© 2026 Bifrost. Identity & payments infrastructure.</p>
 </footer>
 
 </body>
