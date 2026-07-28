@@ -8,9 +8,16 @@ from ..models.payments import (
 from ..models.queue_schema import QueueSchema
 
 def get_tenant_db_conn_str(app):
+    if not app:
+        return None
+    db_mode = app.get('db_mode')
+    from config import Config
+    if db_mode == 'managed':
+        return Config.MANAGED_POSTGRES_URL
+
     db_conn = app.get('db_connection')
     if not db_conn:
-        return None
+        return Config.MANAGED_POSTGRES_URL
     if isinstance(db_conn, dict):
         db_conn = db_conn.get('url')
         
@@ -19,6 +26,7 @@ def get_tenant_db_conn_str(app):
         db_conn = decrypt_value(db_conn, app.get('webhook_secret', ''))
         
     return str(db_conn)
+
 
 def locked_tables_for(app):
     """Tables the console must never let a tenant edit.

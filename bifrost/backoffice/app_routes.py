@@ -100,8 +100,10 @@ def update_app_settings(app_id):
         'app_qr_url': request.form.get('qr_url'),
         'telegram_bot_token': request.form.get('telegram_bot_token'),
         'db_connection': raw_db_conn,
+        'db_mode': request.form.get('db_mode', 'custom'),
         'enabled_services': enabled_services
     }
+
 
     if db.update_app_details(app_id, data):
         flash("Settings updated.", "success")
