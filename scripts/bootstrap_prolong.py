@@ -97,9 +97,9 @@ def bootstrap_prolong():
             "client_id": client_id,
             "app_name": app_name,
             "webhook_secret": webhook_secret,
-            "bifrost_url": "https://bifrost.wkc.kh",
-            "backoffice_url": f"https://bifrost.wkc.kh/backoffice/app/{app_id}",
-            "cms_onboarding_url": f"https://bifrost.wkc.kh/backoffice/app/{app_id}/cms/onboarding"
+            "bifrost_url": "https://melted-felipa-aupp-33e78e3e.koyeb.app",
+            "backoffice_url": f"https://melted-felipa-aupp-33e78e3e.koyeb.app/backoffice/app/{app_id}",
+            "cms_onboarding_url": f"https://melted-felipa-aupp-33e78e3e.koyeb.app/backoffice/app/{app_id}/cms/onboarding"
         }
         
         with open(prolong_config_path, "w", encoding="utf-8") as f:
@@ -110,7 +110,7 @@ def bootstrap_prolong():
         print(f"App ID:         {app_id}")
         print(f"Client ID:      {client_id}")
         print(f"Webhook Secret: {webhook_secret}")
-        print(f"CMS Setup URL:  https://bifrost.wkc.kh/backoffice/app/{app_id}/cms/onboarding")
+        print(f"CMS Setup URL:  https://melted-felipa-aupp-33e78e3e.koyeb.app/backoffice/app/{app_id}/cms/onboarding")
 
 if __name__ == "__main__":
     bootstrap_prolong()
