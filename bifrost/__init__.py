@@ -161,6 +161,10 @@ def create_app(config_class):
     csrf.exempt(internal_bp)
     csrf.exempt(bot_webhook_bp)
     csrf.exempt(config_api_bp)
+    # Machine-to-machine receipt notification: authenticated by X-Webhook-Secret,
+    # has no browser session to protect, and cannot supply a CSRF token.
+    from .backoffice.tenant_routes import api_notify_new_payment
+    csrf.exempt(api_notify_new_payment)
 
     from .scheduler import start_scheduler
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
@@ -193,13 +197,7 @@ def create_app(config_class):
         from flask import g, redirect, url_for
         if hasattr(g, 'tenant_app_id'):
             return redirect(url_for('backoffice.view_app', app_id=g.tenant_app_id))
-        try:
-            db_name = current_app.config.get('DB_NAME', 'bifrost_db')
-            db = mongo.cx[db_name]
-            apps = list(db.applications.find({}))
-            return render_template('index.html', apps=apps, app=None)
-        except Exception as e:
-            return jsonify(status="error", message=f"Portal error: {e}"), 500
+        return render_template('index.html')
 
     @app.route('/favicon.ico')
     def favicon():

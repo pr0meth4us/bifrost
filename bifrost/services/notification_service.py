@@ -36,17 +36,54 @@ def send_telegram_notification(bot_token, chat_id, message, photo_url=None):
         logger.error(f"Failed to send Telegram notification: {e}")
         return False
 
-def dispatch_sla_alert(app, payment_ref, customer_email, amount, receipt_url=None):
-    """
-    Dispatches a Telegram SLA notification to the tenant channel.
-    """
-    config = app.get('notification_configs', {})
-    if not config or config.get('channel') != 'telegram':
+def _send_email_notification(config, subject, message):
+    from .email_service import send_email
+    to = config.get('email')
+    if not to:
+        logger.warning("Email notification skipped: no recipient configured.")
         return False
-        
-    bot_token = config.get('bot_token')
-    chat_id = config.get('chat_id')
-    
+    text = message.replace('<b>', '').replace('</b>', '').replace('<code>', '').replace('</code>', '')
+    return bool(send_email(to, subject, f"<pre>{message}</pre>", text, "Bifrost Console"))
+
+
+def _send_webhook_notification(config, message, payload):
+    url = config.get('url')
+    if not url:
+        logger.warning("Webhook notification skipped: no URL configured.")
+        return False
+    try:
+        res = requests.post(url, json={"message": message, **(payload or {})}, timeout=10)
+        res.raise_for_status()
+        return True
+    except Exception as e:
+        logger.error(f"Failed to POST notification webhook: {e}")
+        return False
+
+
+def dispatch_notification(app, message, photo_url=None, subject="Bifrost Console alert", payload=None):
+    """Sends an operational alert over whichever channel the tenant configured.
+
+    Channel is configuration, not code: telegram | email | webhook. Adding a fourth
+    means adding a branch here, not touching any caller.
+    """
+    config = app.get('notification_configs') or {}
+    channel = config.get('channel', 'telegram')
+
+    if channel == 'telegram':
+        return send_telegram_notification(
+            config.get('bot_token'), config.get('chat_id'), message, photo_url=photo_url
+        )
+    if channel == 'email':
+        return _send_email_notification(config, subject, message)
+    if channel == 'webhook':
+        return _send_webhook_notification(config, message, payload)
+
+    logger.warning(f"Unknown notification channel '{channel}' for app {app.get('app_name')}.")
+    return False
+
+
+def dispatch_sla_alert(app, payment_ref, customer_email, amount, receipt_url=None):
+    """New-receipt alert. Preserves the existing Telegram bot flow."""
     app_name = app.get('app_name', 'Tenant App')
     message = (
         f"🚨 <b>[{app_name}] New Payment Uploaded</b>\n\n"
@@ -55,5 +92,10 @@ def dispatch_sla_alert(app, payment_ref, customer_email, amount, receipt_url=Non
         f"• <b>Amount:</b> ${amount} USD\n\n"
         f"Please verify this payment in the Bifrost Console."
     )
-    
-    return send_telegram_notification(bot_token, chat_id, message, photo_url=receipt_url)
+    # Receipts move to a private bucket (SOW 4.8), so signed URLs will not render in
+    # Telegram. Only attach the image while the bucket is still public.
+    return dispatch_notification(
+        app, message, photo_url=receipt_url if app.get('receipts_public') else None,
+        subject=f"[{app_name}] New payment uploaded",
+        payload={"txn_ref": payment_ref, "email": customer_email, "amount": amount},
+    )

@@ -145,6 +145,7 @@
 
                     <div class="pt-6 mt-6 border-t border-slate-100">
                         <form :action="'/backoffice/users/' + user?.id + '/delete'" method="POST" onsubmit="return confirm('⚠️ DANGER: This will permanently delete this user and all their links/history from the database. This cannot be undone.');">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <button type="submit" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 rounded-xl transition border border-red-200">
                                 Permanently Delete Global Account
                             </button>

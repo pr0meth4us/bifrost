@@ -1,5 +1,40 @@
 # Changelog
 
+## [2026-07-28]
+Admin Console ("Control Room") Phase 1 + 1.5, against the Ministry Exam Prep scope of
+work. Gap analysis and vendor reply in `docs/scope-response-admin-console.md`;
+operator runbook in `docs/console-onboarding.md`.
+
+### Fixed
+- **CSRF tokens were missing from every backoffice form.** `CSRFProtect` had been enabled without them, so approve, reject, refund and all CMS writes were returning 400. Tokens added to all 10 templates; `/api/tenant/<app_id>/payments/notify-new` explicitly exempted (machine-to-machine, secret-authenticated) and its secret comparison made constant-time.
+- **Refund could never succeed** — the route required a `track_id` the form never sent. The track is now derived from the payment itself, never from a form field.
+- **The approval webhook silently never fired** — a tenant Postgres `user_id` was passed where a Bifrost `ObjectId` was expected and the `InvalidId` was swallowed. The payer is now resolved from their email, and a failure to resolve is surfaced instead of reported as success.
+- **Exam tracks were hard-coded in the template** and approval fell back to track `1`. Options now come from `exam_tracks WHERE is_active`; approval refuses without an explicit track.
+- **The SLA age badge was a literal string** (`Pending < 2h` on every row). Real age from `created_at`, with ok/warn/breach states.
+- **Any role with `read:config` could read the payment queue**, including payer emails and receipts. The queue now requires `payments:view`.
+- **Role-hidden columns were serialised into the page** by the drawer's `row | tojson`. Hidden columns are stripped server-side before render.
+- **Suspending a user destroyed their purchase** — all entitlements were revoked while reinstate only restored `users.status`. Suspension no longer touches entitlements.
+- `assert`-based SQL identifier guards replaced with `safe_ident()` raising `ValueError` (asserts vanish under `python -O`).
+
+### Added
+- **Payment state machine** enforced server-side: `FREE → PENDING → PREMIUM | REJECTED`, `PREMIUM → REFUNDED`, with `SELECT … FOR UPDATE`, mandatory reason codes, and actor/timestamp/reason on every transition.
+- **Duplicate `txn_ref` rejection** inside the approving transaction, surfacing the earlier payment; duplicate-receipt detection by checksum (or URL where the column is absent).
+- **MFA on all console accounts** — emailed 6-digit second factor, no session issued until it verifies. Plus admin session policy (30 min idle / 8 h max, HttpOnly/SameSite/Secure) and Redis-backed login rate limiting.
+- **Audit log for every mutation** — content, payments, users, entitlements — with before/after JSON, and a filterable timeline UI at `/backoffice/app/<app_id>/audit`. No TTL: retention is a minimum of one year.
+- **Publish workflow**: only `content:publish` holders may publish, and publishing is blocked unless the question has exactly 4 choices, exactly 1 correct, bilingual explanations on the correct choice, and a non-empty `source_ref`.
+- **Console roles** `content_manager` and `operations` alongside admin/owner, enforced by a single `@requires(permission)` decorator that returns 403 on mutations rather than redirecting.
+- **SLA sweep** every 15 minutes alerting on payments approaching or past the 6h threshold, once per payment per state.
+- **Pluggable notification channels** — telegram | email | webhook, selected by tenant configuration rather than code.
+- **Khmer typography** (`Kantumruy Pro`, `Noto Sans Khmer`, line-height 1.8) applied to grid cells, drawer fields and form controls.
+- **Connection pooling** for tenant Postgres (`ThreadedConnectionPool` per connection string), replacing a fresh connect per query.
+- **Manual entitlement override** endpoint for support cases, audit-logged.
+- `migrations/001_console_phase1.sql` — proposed schema additions (`payments.exam_track_id`, unique `txn_ref`, `receipt_checksum`, `created_at`, entitlement uniqueness, `users.status`, `questions.question_source`) plus the restricted `console_agent` role grants.
+- `tests/test_console_phase1.py` — 27 tests covering approve→entitlement, refund→revocation, duplicate `txn_ref`, the state machine, publish validation, identifier guards, and server-side role enforcement.
+
+## [2026-07-24]
+### Added
+- `sdk/python/bifrost_ai.py` — Google AI client factories (`get_genai_client` for Vertex Gemini, `get_vision_client` for Cloud Vision) built on bifrost's own credential resolution. Bifrost now owns "talk to Google AI + handle credentials" for all consumers; downstream repos import these instead of hand-rolling `genai.Client(vertexai=True, …)`. google libs are imported lazily so `bifrost_client` (secrets-only) stays dependency-light.
+
 ## [2026-07-09]
 ### Added
 - Multi-Tenant UI Configuration: App Owners can now input and update their `db_connection` (PostgreSQL/Supabase) string directly from the Configuration tab in the Bifrost Backoffice.

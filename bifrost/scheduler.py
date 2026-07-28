@@ -125,6 +125,53 @@ def run_expiration_warning_check(app):
                 }
             )
 
+def run_payment_sla_check(app):
+    """Alerts on manual payments approaching or past the approval SLA (SOW 3.1).
+
+    Fires once per payment per state so the channel doesn't get spammed every sweep.
+    """
+    from .backoffice.tenant_routes import get_tenant_db_conn_str
+    from .services.notification_service import dispatch_notification
+    from .models.payments import SLA_HOURS
+    from .models.queue_schema import QueueSchema
+
+    with app.app_context():
+        db = BifrostDB(mongo.cx, app.config['DB_NAME'])
+        for app_doc in db.db.applications.find({"db_connection": {"$exists": True}}):
+            conn_str = get_tenant_db_conn_str(app_doc)
+            if not conn_str:
+                continue
+            try:
+                queue = QueueSchema.from_config(db.get_cms_config(str(app_doc['_id'])))
+                # Every state the tenant calls "open", not just the word 'pending' —
+                # the SLA clock already treats them all as in-SLA.
+                pending = db.get_manual_payments(conn_str, status_filter=list(queue.open_states),
+                                                 queue=queue)
+            except Exception as e:
+                log.error(f"SLA sweep: cannot read payments for {app_doc.get('app_name')}: {e}")
+                continue
+
+            for p in pending:
+                state = p.get('sla_state')
+                if state not in ('warn', 'breach'):
+                    continue
+                key = {"app_id": app_doc['_id'], "payment_id": p['id'], "state": state}
+                if db.db.sla_alerts.find_one(key):
+                    continue
+                db.db.sla_alerts.insert_one({**key, "sent_at": datetime.now(UTC)})
+
+                icon = "🔴" if state == 'breach' else "🟠"
+                verb = f"has BREACHED the {SLA_HOURS}h SLA" if state == 'breach' else "is approaching the SLA"
+                dispatch_notification(app_doc, (
+                    f"{icon} <b>Payment {verb}</b>\n\n"
+                    f"• <b>Ref:</b> <code>{p.get('txn_ref')}</code>\n"
+                    f"• <b>Customer:</b> {p.get('email') or 'unknown'}\n"
+                    f"• <b>Amount:</b> ${p.get('amount')}\n"
+                    f"• <b>Waiting:</b> {p.get('age_hours')}h\n\n"
+                    f"Review it in the Bifrost Console."
+                ))
+
+
 def start_scheduler(app):
     """Starts the scheduler in a background thread."""
     import threading
@@ -137,10 +184,13 @@ def start_scheduler(app):
     # Run every 60 minutes
     schedule.every(60).minutes.do(run_expiration_check, app)
     schedule.every(60).minutes.do(run_expiration_warning_check, app)
+    # SLA is measured in hours; sweep often enough that "approaching" means something.
+    schedule.every(15).minutes.do(run_payment_sla_check, app)
 
     # Also run immediately on startup
     run_expiration_check(app)
     run_expiration_warning_check(app)
+    run_payment_sla_check(app)
 
     t = threading.Thread(target=job, daemon=True)
     t.start()
