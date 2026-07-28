@@ -69,6 +69,7 @@ tailwind.config = {
   .status-menu-item { padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; border-radius: 4px; transition: background 0.15s; color: #e2e2e9; }
   .status-menu-item:hover { background: #282a2f; }
 </style>
+{% include 'backoffice/_khmer_font.html' %}
 </head>
 <body class="font-body-md text-body-md antialiased overflow-hidden flex h-screen w-screen">
 
@@ -267,6 +268,7 @@ tailwind.config = {
           <div class="flex justify-end items-center gap-2">
             <button class="hover:text-primary transition-colors" onclick='openEdit({{ row | tojson | safe }})'><span class="material-symbols-outlined text-[18px]">edit</span></button>
             <form method="POST" action="/backoffice/app/{{ app._id }}/cms/{{ selected_table }}/delete/{{ row.id }}" onsubmit="return confirm('Delete this row permanently?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
               <button type="submit" class="hover:text-error transition-colors"><span class="material-symbols-outlined text-[18px]">delete</span></button>
             </form>
           </div>
@@ -312,6 +314,7 @@ tailwind.config = {
   </div>
 </div>
 <form id="drawerForm" method="POST" action="/backoffice/app/{{ app._id }}/cms/{{ selected_table }}/create" class="flex flex-col h-full overflow-hidden">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
   <div class="flex-1 overflow-y-auto p-6 space-y-6" id="drawerFields">
     <!-- Fields will be dynamically injected here for edit, or rendered directly for create -->
   </div>

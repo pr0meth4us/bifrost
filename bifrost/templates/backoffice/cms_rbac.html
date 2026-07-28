@@ -178,6 +178,7 @@
 </div>
 
 <form id="saveForm" method="POST" action="{{ url_for('backoffice.cms_rbac', app_id=app._id) }}" style="display:none;">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
   <input type="hidden" name="cms_rbac_json" id="rbacJsonInput">
 </form>
 

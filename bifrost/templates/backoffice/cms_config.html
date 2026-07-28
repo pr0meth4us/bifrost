@@ -105,6 +105,7 @@
   .btn-primary { background: var(--accent); color: white; }
 
 </style>
+{% include 'backoffice/_khmer_font.html' %}
 </head>
 <body>
 
@@ -229,6 +230,7 @@
 </div>
 
 <form id="configForm" method="POST" action="/backoffice/app/{{ app._id }}/cms/settings" style="display:none;">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
   <input type="hidden" name="cms_config_json" id="configJsonInput">
 </form>
 
