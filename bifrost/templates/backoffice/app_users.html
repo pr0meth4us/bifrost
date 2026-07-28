@@ -166,7 +166,7 @@
               <input type="radio" name="db_mode" value="managed" x-model="dbMode"
                      {{ 'disabled' if is_disabled }}>
               <span>
-                <span class="block font-medium">Managed Bifrost DB</span>
+                <span class="block font-medium">Managed database</span>
                 <span class="block muted text-[12px]">Hosted for you, no setup</span>
               </span>
             </label>
@@ -187,7 +187,7 @@
                      placeholder="postgresql://user:password@host:5432/db"
                      aria-describedby="s-db-hint">
               <p class="hint" id="s-db-hint">
-                Bifrost proxies this database. Use a role with only the privileges it needs.
+                This database is proxied for you. Use a role with only the privileges it needs.
               </p>
             </div>
           </div>
