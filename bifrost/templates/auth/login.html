@@ -50,6 +50,7 @@
 
         <div id="credentialsForm" class="space-y-5">
             <form action="{{ url_for('auth_ui.login', client_id=app.client_id) }}" method="POST" class="space-y-5">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div>
                     <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Email or Username</label>
                     <input type="text" name="email" required class="w-full px-6 py-4 bg-white/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 outline-none transition-all">
@@ -80,6 +81,7 @@
 
         <div id="phoneForm" class="hidden space-y-5">
             <form action="{{ url_for('auth_ui.request_phone_otp_ui') }}" method="POST" class="space-y-5">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="client_id" value="{{ app.client_id }}">
                 <div>
                     <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Phone Number</label>
