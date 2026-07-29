@@ -15,7 +15,7 @@
 
 <body>
 <main id="main" class="min-h-screen flex flex-col items-center justify-center p-6">
-  <div class="w-full max-w-sm">
+  <div class="w-full {% block shell_width %}max-w-sm{% endblock %}">
 
     <div class="flex items-center gap-2.5 mb-6">
       {% if tenant_app and tenant_app.app_logo_url %}

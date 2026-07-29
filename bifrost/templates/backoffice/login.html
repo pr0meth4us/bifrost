@@ -37,6 +37,13 @@
 
   <button type="submit" class="btn btn-primary w-full">Sign in</button>
 </form>
+
+{% if not tenant_app %}
+  <p class="muted text-[13px] text-center mt-5">
+    No application yet?
+    <a class="text-accent hover:underline" href="{{ url_for('backoffice.request_tenancy') }}">Request one</a>
+  </p>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}

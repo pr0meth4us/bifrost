@@ -54,7 +54,8 @@ class AppMixin:
 
     def update_app_details(self, app_id, data):
         """Updates non-sensitive app details."""
-        allowed_fields = ['app_name', 'app_callback_url', 'app_web_url', 'app_api_url', 'app_logo_url', 'app_qr_url', 'telegram_bot_token', 'enabled_services', 'custom_domain', 'db_connection', 'db_mode', 'notification_configs']
+        allowed_fields = ['app_name', 'app_callback_url', 'app_web_url', 'app_api_url', 'app_logo_url', 'app_qr_url', 'telegram_bot_token', 'enabled_services', 'custom_domain', 'db_connection', 'db_mode', 'db_schema',
+                          'notification_configs', 'platform_locked_tables', 'payment_methods']
         updates = {k: v for k, v in data.items() if k in allowed_fields}
 
         if updates:
@@ -338,3 +339,51 @@ class AppMixin:
         if link:
             return self.db.accounts.find_one({"_id": link['account_id']})
         return None
+    # ---------------------------------------------------------
+    # TENANT INTAKE (request -> approval -> application)
+    # ---------------------------------------------------------
+    # A request is inert: it creates no application, no account and no
+    # credentials until a platform admin approves it. That is the whole point of
+    # having it — the intake form is public, so nothing it says can be trusted
+    # until a human at Bifrost has looked at it.
+    REQUEST_FIELDS = ('app_name', 'callback_url', 'web_url', 'api_url', 'logo_url',
+                      'admin_email', 'payments_enabled', 'pay_payway', 'pay_manual',
+                      'qr_url', 'notes')
+
+    def create_tenant_request(self, form):
+        """Stores an intake form verbatim (minus anything secret) as pending."""
+        doc = {k: (form.get(k) or '').strip() for k in self.REQUEST_FIELDS}
+        doc.update({
+            "status": "pending",
+            "created_at": datetime.now(UTC),
+            "decided_at": None,
+            "decided_by": None,
+            "decision_reason": None,
+            "client_id": None,
+        })
+        return str(self.db.tenant_requests.insert_one(doc).inserted_id)
+
+    def list_tenant_requests(self, status=None):
+        query = {"status": status} if status else {}
+        return list(self.db.tenant_requests.find(query).sort("created_at", -1))
+
+    def get_tenant_request(self, request_id):
+        return self.db.tenant_requests.find_one({"_id": ObjectId(request_id)})
+
+    def decide_tenant_request(self, request_id, status, actor, reason=None, client_id=None):
+        """Records a decision. Only a pending request can be decided.
+
+        The status guard is what makes approval idempotent: a double-submitted
+        approve cannot provision the same tenant twice.
+        """
+        res = self.db.tenant_requests.update_one(
+            {"_id": ObjectId(request_id), "status": "pending"},
+            {"$set": {
+                "status": status,
+                "decided_at": datetime.now(UTC),
+                "decided_by": actor,
+                "decision_reason": reason,
+                "client_id": client_id,
+            }}
+        )
+        return res.modified_count == 1

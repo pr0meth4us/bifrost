@@ -235,7 +235,16 @@ def _inject_rbac():
         except Exception:
             return False
 
-    return {"can": can}
+    # Pending-intake count for the sidebar badge. Platform admins only — nobody
+    # else has the menu item, so nobody else pays for the query.
+    pending_requests = 0
+    if session.get('is_heimdall'):
+        try:
+            pending_requests = get_db().db.tenant_requests.count_documents({"status": "pending"})
+        except Exception:
+            pending_requests = 0
+
+    return {"can": can, "pending_requests": pending_requests}
 
 
 from . import (auth_routes, app_routes, heimdall_routes, user_routes, tenant_routes,

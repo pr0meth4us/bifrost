@@ -54,6 +54,21 @@ PAGES = {
         "display_name": "<script>alert(1)</script>", "auth_providers": ["email"],
     }], query=""),
     "global_api_keys.html": dict(apps=[APP]),
+    "request_tenancy.html": dict(form={}),
+    "tenant_requests.html": dict(
+        pending=[{
+            "_id": ObjectId(), "app_name": "Ministry Exam Prep",
+            "admin_email": "owner@example.com", "created_at": datetime.now(timezone.utc),
+            "web_url": "https://example.com", "callback_url": "", "api_url": "", "logo_url": "",
+            "payments_enabled": "on", "pay_payway": "", "pay_manual": "on",
+            "notes": "<script>alert(1)</script>",
+        }],
+        decided=[{
+            "_id": ObjectId(), "app_name": "Old App", "admin_email": "x@example.com",
+            "status": "rejected", "decision_reason": "duplicate", "client_id": None,
+        }],
+        current_role="heimdall",
+    ),
     "audit_log.html": dict(
         app=APP, entries=[{
             "action": "DELETE", "table": "questions", "row_id": 3,

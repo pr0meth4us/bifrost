@@ -6,6 +6,12 @@
       "runtimeExecutable": ".venv/bin/python",
       "runtimeArgs": ["run.py"],
       "port": 5001
+    },
+    {
+      "name": "bifrost-dev",
+      "runtimeExecutable": "./dev.sh",
+      "runtimeArgs": [],
+      "port": 5001
     }
   ]
 }

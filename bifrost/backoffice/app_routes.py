@@ -20,33 +20,151 @@ def dashboard():
     return render_template('backoffice/dashboard.html', apps=apps, title=title)
 
 
+def _save_payment_setup(db, app_doc, form):
+    """Records how a new app collects money. Both methods can run side by side.
+
+    'payway'  — the tenant's own ABA merchant. Credentials go straight into that
+                app's vault; Bifrost never holds a shared merchant (see payway.py).
+    'manual'  — Bifrost's KHQR image + receipt approval queue, no bank API needed.
+
+    Returns the stored method list so onboarding can tell the operator what is
+    still missing.
+    """
+    if not app_doc:
+        return []
+    if not form.get('payments_enabled'):
+        db.update_app_details(app_doc['_id'], {'payment_methods': []})
+        return []
+
+    methods = [m for m in ('payway', 'manual') if form.get(f'pay_{m}')]
+    updates = {'payment_methods': methods}
+
+    if 'manual' in methods and form.get('qr_url'):
+        updates['app_qr_url'] = form.get('qr_url').strip()
+    db.update_app_details(app_doc['_id'], updates)
+
+    if 'payway' in methods:
+        vault = app_doc.get('api_keys') or {}
+        missing = []
+        for field, key in (('payway_merchant_id', 'PAYWAY_MERCHANT_ID'),
+                           ('payway_api_key', 'PAYWAY_API_KEY')):
+            value = (form.get(field) or '').strip()
+            if value:
+                db.add_app_api_key(app_doc['_id'], key, value)
+            elif not vault.get(key):
+                # Blank means "unchanged", matching the DB connection field — so
+                # only a credential that is absent from the vault too is missing.
+                missing.append(key)
+        if missing:
+            flash(f"Bank API selected but {' and '.join(missing)} not set — "
+                  f"checkout will fail until they're in the vault.", "warning")
+
+    return methods
+
+
+def _provision_application(db, form):
+    """Creates an application, its payment setup and its owner from one form.
+
+    Deliberately takes a plain mapping, not a request: the intake queue replays a
+    stored request through here, so an approved tenant is provisioned from what
+    they already typed instead of a platform admin re-keying it into a second form.
+    """
+    app_name = form.get('app_name')
+    creds = db.register_application(app_name, form.get('callback_url'),
+                                    web_url=form.get('web_url'),
+                                    api_url=form.get('api_url'),
+                                    logo_url=form.get('logo_url'))
+
+    app_doc = db.get_app_by_client_id(creds['client_id'])
+    _save_payment_setup(db, app_doc, form)
+
+    admin_email = (form.get('admin_email') or '').strip().lower()
+    if admin_email:
+        user = db.find_account_by_email(admin_email)
+        if not user:
+            user_id = db.create_account(
+                {"email": admin_email, "display_name": admin_email.split('@')[0], "auth_providers": ["email"]})
+            otp, vid = db.create_otp(admin_email, channel="email")
+            send_invite_email(admin_email, otp, app_name, vid, creds['client_id'])
+        else:
+            user_id = user['_id']
+        db.link_user_to_app(user_id, app_doc['_id'], role="owner", duration_str="lifetime")
+
+    return creds, app_doc
+
+
 @backoffice_bp.route('/apps/create', methods=['GET', 'POST'])
 @login_required
 @heimdall_required
 def create_app():
     if request.method == 'POST':
-        db = get_db()
-        app_name = request.form.get('app_name')
-        callback_url = request.form.get('callback_url')
-        creds = db.register_application(app_name, callback_url, web_url=request.form.get('web_url'),
-                                        api_url=request.form.get('api_url'), logo_url=request.form.get('logo_url'))
-
-        admin_email = request.form.get('admin_email').strip().lower()
-        if admin_email:
-            app_doc = db.get_app_by_client_id(creds['client_id'])
-            user = db.find_account_by_email(admin_email)
-            if not user:
-                new_id = db.create_account(
-                    {"email": admin_email, "display_name": admin_email.split('@')[0], "auth_providers": ["email"]})
-                otp, vid = db.create_otp(admin_email, channel="email")
-                send_invite_email(admin_email, otp, app_name, vid, creds['client_id'])
-                user_id = new_id
-            else:
-                user_id = user['_id']
-            db.link_user_to_app(user_id, app_doc['_id'], role="owner", duration_str="lifetime")
-
+        _provision_application(get_db(), request.form)
         return redirect(url_for('backoffice.dashboard'))
     return render_template('backoffice/create_app.html')
+
+
+@backoffice_bp.route('/request', methods=['GET', 'POST'])
+def request_tenancy():
+    """Public intake. Creates a request, never an application.
+
+    No login: the people who need this do not have a console account yet — that
+    was the gap. Nothing here provisions anything, so an abusive submission costs
+    a row in tenant_requests and a platform admin clicking Reject.
+    """
+    if request.method == 'POST':
+        db = get_db()
+        if not (request.form.get('app_name') or '').strip() or not (request.form.get('admin_email') or '').strip():
+            flash("Application name and contact email are required.", "danger")
+            return render_template('backoffice/request_tenancy.html', form=request.form)
+        db.create_tenant_request(request.form)
+        return render_template('backoffice/request_tenancy.html', submitted=True)
+    return render_template('backoffice/request_tenancy.html', form={})
+
+
+@backoffice_bp.route('/heimdall/requests')
+@login_required
+@heimdall_required
+def tenant_requests():
+    db = get_db()
+    requests_all = db.list_tenant_requests()
+    return render_template(
+        'backoffice/tenant_requests.html',
+        pending=[r for r in requests_all if r.get('status') == 'pending'],
+        decided=[r for r in requests_all if r.get('status') != 'pending'],
+    )
+
+
+@backoffice_bp.route('/heimdall/requests/<request_id>/<decision>', methods=['POST'])
+@login_required
+@heimdall_required
+def decide_tenant_request(request_id, decision):
+    if decision not in ('approve', 'reject'):
+        flash("Unknown decision.", "danger")
+        return redirect(url_for('backoffice.tenant_requests'))
+
+    db = get_db()
+    req = db.get_tenant_request(request_id)
+    if not req or req.get('status') != 'pending':
+        flash("That request has already been decided.", "warning")
+        return redirect(url_for('backoffice.tenant_requests'))
+
+    if decision == 'reject':
+        db.decide_tenant_request(request_id, 'rejected', session.get('backoffice_user'),
+                                 reason=(request.form.get('reason') or '').strip() or None)
+        flash(f"Rejected '{req.get('app_name')}'.", "success")
+        return redirect(url_for('backoffice.tenant_requests'))
+
+    # Claim the request BEFORE provisioning: the status guard is what stops a
+    # double-clicked Approve from registering the same tenant twice.
+    if not db.decide_tenant_request(request_id, 'approved', session.get('backoffice_user')):
+        flash("That request has already been decided.", "warning")
+        return redirect(url_for('backoffice.tenant_requests'))
+
+    creds, app_doc = _provision_application(db, req)
+    db.db.tenant_requests.update_one({"_id": req["_id"]}, {"$set": {"client_id": creds['client_id']}})
+    flash(f"Approved '{req.get('app_name')}' — client_id {creds['client_id']}. "
+          f"An invite was sent to {req.get('admin_email')}.", "success")
+    return redirect(url_for('backoffice.select_app', app_id=str(app_doc['_id'])))
 
 
 @backoffice_bp.route('/select-app/<app_id>')
@@ -122,7 +240,6 @@ def update_app_settings(app_id):
         'app_callback_url': request.form.get('callback_url'),
         'app_api_url': request.form.get('api_url'),
         'app_logo_url': request.form.get('logo_url'),
-        'app_qr_url': request.form.get('qr_url'),
         'telegram_bot_token': request.form.get('telegram_bot_token'),
         'db_mode': request.form.get('db_mode', 'custom'),
         'enabled_services': enabled_services
@@ -130,11 +247,23 @@ def update_app_settings(app_id):
     if raw_db_conn:
         data['db_connection'] = raw_db_conn
 
+    # Platform-super-admin only. An owner must not be able to unlock their own
+    # ledger tables, so this field is ignored on a tenant's own POST rather than
+    # merely hidden from their form.
+    if session.get('is_heimdall') or session.get('is_pr0meth4us'):
+        data['platform_locked_tables'] = [
+            t.strip() for t in (request.form.get('platform_locked_tables') or '').split(',') if t.strip()
+        ]
+
 
     if db.update_app_details(app_id, data):
         flash("Settings updated.", "success")
     else:
         flash("Failed to update.", "danger")
+
+    # Same handler as onboarding — the QR URL, the method list and the merchant
+    # credentials are one setting, not three, so they are edited by one function.
+    _save_payment_setup(db, db.db.applications.find_one({"_id": ObjectId(app_id)}), request.form)
 
     return redirect(url_for('backoffice.view_app', app_id=app_id))
 
