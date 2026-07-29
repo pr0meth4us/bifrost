@@ -15,7 +15,11 @@ def get_app_config(client_id):
 
 @oidc_bp.route('/.well-known/openid-configuration')
 def openid_configuration():
-    base_url = current_app.config.get('BIFROST_PUBLIC_URL', request.host_url.rstrip('/'))
+    # Dynamically build the exact public URL from proxy headers to ensure Issuer matches Supabase
+    host = request.headers.get('X-Forwarded-Host', request.host)
+    proto = request.headers.get('X-Forwarded-Proto', 'https' if not request.host.startswith('localhost') else 'http')
+    base_url = f"{proto}://{host}"
+    
     return jsonify({
         "issuer": base_url,
         "authorization_endpoint": f"{base_url}/oidc/authorize",
@@ -92,7 +96,10 @@ def token():
     # Delete code so it can't be reused
     db.db.auth_codes.delete_one({"_id": auth_code_doc['_id']})
     
-    base_url = current_app.config.get('BIFROST_PUBLIC_URL', request.host_url.rstrip('/'))
+    # Dynamically build the exact public URL from proxy headers to ensure Issuer matches Supabase
+    host = request.headers.get('X-Forwarded-Host', request.host)
+    proto = request.headers.get('X-Forwarded-Proto', 'https' if not request.host.startswith('localhost') else 'http')
+    base_url = f"{proto}://{host}"
     
     # Create RS256 ID Token
     now = int(time.time())
