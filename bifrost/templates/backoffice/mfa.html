@@ -20,6 +20,11 @@
            autocomplete="one-time-code" autofocus required>
   </div>
 
+  <label class="flex items-center gap-2 text-[13px] muted" for="remember_device">
+    <input type="checkbox" id="remember_device" name="remember_device" value="1">
+    Trust this device for 30 days
+  </label>
+
   <button type="submit" class="btn btn-primary w-full">Verify and sign in</button>
 </form>
 {% endblock %}
