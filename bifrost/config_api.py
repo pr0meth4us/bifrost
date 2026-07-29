@@ -7,6 +7,34 @@ def get_db():
 
 config_api_bp = Blueprint('config_api', __name__, url_prefix='/api/v1')
 
+@config_api_bp.route('/public/branding/<client_id>', methods=['GET'])
+def get_public_branding(client_id):
+    """Unauthenticated branding for a tenant frontend: logo and payment QR.
+
+    Only fields an end user already sees on screen. The paywall reads
+    payment_qr_url from here so ops can swap the receiving ABA account in the
+    console without a frontend deploy.
+    """
+    app = get_db().get_app_by_client_id(client_id)
+    if not app:
+        return jsonify({"error": "Application not found"}), 404
+
+    resp = jsonify({
+        "status": "success",
+        "data": {
+            "app_name": app.get("app_name"),
+            "logo_url": app.get("app_logo_url") or None,
+            "payment_qr_url": app.get("app_qr_url") or None,
+            # Which checkout the paywall should render: 'payway' (live bank API),
+            # 'manual' (static QR + receipt upload), both, or neither.
+            "payment_methods": app.get("payment_methods") or [],
+        }
+    })
+    resp.headers['Cache-Control'] = 'public, max-age=300'
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    return resp
+
+
 @config_api_bp.route('/config', methods=['GET'])
 def get_config():
     """

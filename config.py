@@ -17,23 +17,23 @@ class Config:
     EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD')
     SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
     SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
-    SENDER_EMAIL = 'bifrostbyhelm@gmail.com'
+    SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'bifrostbyhelm@gmail.com')
 
     # --- PUBLIC URL ---
     BIFROST_PUBLIC_URL = os.environ.get('BIFROST_PUBLIC_URL', 'http://localhost:5000')
 
     # --- ABA PAYWAY ---
+    # Endpoint only. Merchant ID and API key are per-tenant and live in each app's
+    # vault (PAYWAY_MERCHANT_ID / PAYWAY_API_KEY); see services/payway.py. A shared
+    # platform merchant would pay every tenant's revenue into one ABA account.
     PAYWAY_API_URL = os.environ.get('PAYWAY_API_URL', 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase')
-    PAYWAY_MERCHANT_ID = os.environ.get('PAYWAY_MERCHANT_ID', 'ec462892')
-    PAYWAY_API_KEY = os.environ.get('PAYWAY_API_KEY', '8f43f99f4b8bfb7b050f55f0c2b79858cc237dcb')
 
     # --- ABA RECURRING PAYMENTS ---
     # Placeholder key/token for recurring auto-renewal integration (Sandbox/Preview)
     ABA_RECURRING_API_TOKEN = os.environ.get('ABA_RECURRING_API_TOKEN')
 
     # --- GUMROAD (International) ---
-    # NO DEFAULT. Must be passed by client or set explicitly in ENV.
-    GUMROAD_PRODUCT_PERMALINK = os.environ.get('GUMROAD_PRODUCT_PERMALINK')
+    # Product permalink is per-tenant (vault key GUMROAD_PRODUCT_PERMALINK).
     GUMROAD_BASE_URL = "https://gumroad.com/l"
 
     # --- SSO OAUTH PROVIDERS ---
@@ -62,10 +62,11 @@ class Config:
     SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'true').lower() != 'false'
 
     # --- PLATFORM DATA LOCKS (CMS) ---
-    # Platform-level floor only. A tenant may lock MORE tables via
-    # `platform_locked_tables` on its app document; see locked_tables_for() in
-    # backoffice/tenant_routes.py. The two are unioned, never overridden, so nothing
-    # here can be unlocked by config.
+    # LEGACY SEED ONLY — do not add tenants here. Locks now live on the app document
+    # as `platform_locked_tables`, editable by a platform super-admin in the console,
+    # so onboarding a tenant no longer needs a deploy. These two entries stay so the
+    # existing apps keep their locks whether or not anyone re-saves them; the two
+    # sources are unioned, never overridden, in locked_tables_for().
     PLATFORM_LOCKED_TABLES = {
         'finance-bot': ['transactions', 'user_balances', 'ledger', 'bank_accounts'],
         'savvify': ['transactions', 'user_balances', 'ledger', 'bank_accounts']

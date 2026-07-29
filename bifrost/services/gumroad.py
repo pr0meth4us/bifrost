@@ -6,9 +6,12 @@ log = logging.getLogger(__name__)
 
 
 class GumroadService:
-    def __init__(self):
-        # Load the default fallback from config
-        self.default_permalink = current_app.config.get('GUMROAD_PRODUCT_PERMALINK')
+    def __init__(self, app_doc=None):
+        # Per-tenant product, from that app's vault. No platform-wide default:
+        # a shared permalink would sell one tenant's upgrade through another
+        # tenant's Gumroad account.
+        from ..utils.encryption import app_secret
+        self.default_permalink = app_secret(app_doc, 'GUMROAD_PRODUCT_PERMALINK')
         self.base_url = current_app.config.get('GUMROAD_BASE_URL', "https://gumroad.com/l")
 
     def generate_checkout_url(self, transaction_id, email, product_permalink=None):
