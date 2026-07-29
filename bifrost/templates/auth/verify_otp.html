@@ -1,71 +1,18 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verify Code - {{ app.app_name }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; }
-        .glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); }
-    </style>
+{% extends 'backoffice/base_auth.html' %}
+{% set tenant_app = app %}
 
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-</head>
-<body class="flex items-center justify-center min-h-screen p-6">
-<div class="w-full max-w-md">
-    <div class="glass rounded-[2.5rem] shadow-2xl p-8 sm:p-12">
-        <div class="text-center mb-8">
-            <div class="h-16 w-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-6">🔐</div>
-            <h1 class="text-3xl font-extrabold text-slate-900">Enter Code</h1>
-            <p class="text-slate-500 mt-2">{{ description or "Check your email for a 6-digit code." }}</p>
-        </div>
+{% block title %}Verify Device{% endblock %}
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        {% for category, message in messages %}
-        <div class="mb-6 p-4 rounded-2xl text-sm font-bold {% if category == 'danger' %}bg-red-50 text-red-600{% else %}bg-green-50 text-green-600{% endif %}">
-            {{ message }}
-        </div>
-        {% endfor %}
-        {% endif %}
-        {% endwith %}
-
-        <form id="otpForm" action="{{ action_url or url_for('auth_ui.verify_otp', verification_id=verification_id, client_id=app.client_id) }}" method="POST" class="space-y-6">
-    <input type=\"hidden\" name=\"csrf_token\" value=\"{{ csrf_token() }}\"/>
-            <input type="text" name="otp" maxlength="6" required placeholder="000000" autofocus
-                   class="w-full text-center text-4xl tracking-[0.5em] font-black py-5 bg-white/50 border-2 border-slate-100 rounded-2xl focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 outline-none transition-all">
-
-            <button type="submit" id="submitBtn" class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-2xl shadow-lg shadow-indigo-200 transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
-                Verify & Continue
-            </button>
-        </form>
-
-        <div class="text-center mt-6">
-            <a href="{{ resend_url or url_for('auth_ui.forgot_password', client_id=app.client_id) }}" class="text-xs font-bold text-slate-400 hover:text-indigo-600 uppercase tracking-wider">
-                Resend Code
-            </a>
-        </div>
+{% block content %}
+<form action="{{ url_for('auth_ui.verify_otp', client_id=app.client_id) }}" method="POST" class="space-y-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    
+    <div class="form-control">
+        <label class="label">6-Digit Code</label>
+        <input type="text" name="otp" maxlength="6" required placeholder="000000" autofocus class="input text-center text-2xl tracking-[0.4em] font-black">
+        <p class="text-xs text-muted mt-2 ml-1">We sent a verification code to your device</p>
     </div>
-</div>
-
-<script>
-    document.getElementById('otpForm').addEventListener('submit', function(e) {
-        const btn = document.getElementById('submitBtn');
-
-        // Ensure input is not empty before disabling
-        const input = document.querySelector('input[name="otp"]');
-        if(input.value.length < 1) return;
-
-        // Change button text and disable to prevent double submission
-        btn.innerHTML = 'Verifying...';
-        btn.classList.add('opacity-75', 'cursor-not-allowed');
-        // Small timeout to allow the form to actually submit first
-        setTimeout(() => {
-            btn.disabled = true;
-        }, 50);
-    });
-</script>
-</body>
-</html>
+    
+    <button type="submit" class="btn btn-primary w-full mt-2">Verify & Sign In</button>
+</form>
+{% endblock %}
