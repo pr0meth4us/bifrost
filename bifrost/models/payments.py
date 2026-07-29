@@ -747,11 +747,11 @@ class PaymentMixin:
         return errors
 
     def get_tenant_tables(self, db_conn_str):
-        """Fetches the list of tables in the tenant's PostgreSQL database public schema."""
+        """Fetches the tenant's tables from whichever schema its connection is pinned to."""
         from bifrost.utils.tenant_db import get_tenant_db
         sql = """
             SELECT table_name FROM information_schema.tables
-            WHERE table_schema='public' AND table_type='BASE TABLE'
+            WHERE table_schema=current_schema() AND table_type='BASE TABLE'
             ORDER BY table_name
         """
         with get_tenant_db(db_conn_str) as conn:
@@ -786,7 +786,7 @@ class PaymentMixin:
                 WHERE tc.constraint_type = 'FOREIGN KEY'
                   AND tc.table_name = %s
             ) fk ON c.column_name = fk.column_name
-            WHERE c.table_schema = 'public' AND c.table_name = %s
+            WHERE c.table_schema = current_schema() AND c.table_name = %s
             ORDER BY c.ordinal_position
         """
         with get_tenant_db(db_conn_str) as conn:

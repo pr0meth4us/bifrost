@@ -237,7 +237,7 @@ def _table_columns(cur, table_name):
     """Introspected column list for a table. Empty list if the table does not exist."""
     cur.execute(
         "SELECT column_name FROM information_schema.columns "
-        "WHERE table_schema='public' AND table_name=%s",
+        "WHERE table_schema=current_schema() AND table_name=%s",
         [table_name]
     )
     return [r[0] for r in cur.fetchall()]

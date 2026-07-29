@@ -7,17 +7,61 @@ from ..models.payments import (
 )
 from ..models.queue_schema import QueueSchema
 
+def managed_schema_for(app):
+    """Postgres schema holding one tenant's tables inside the managed database.
+
+    Managed mode is one physical database shared by every tenant, so `public` is
+    not a tenancy boundary — two tenants with a `questions` table would read and
+    write each other's rows. Each app gets its own schema instead.
+    """
+    name = app.get('db_schema') or f"tenant_{app.get('client_id', '')}"
+    return ''.join(c if (c.isalnum() or c == '_') else '_' for c in name.lower())[:63]
+
+
+def _with_schema(url, schema):
+    """Pins search_path on the connection itself, via libpq options.
+
+    Doing it in the DSN rather than per query means every existing call site is
+    scoped without touching any of them — and since the pool is keyed by the
+    connection string, one tenant's pooled connections can never be handed to
+    another. `public` is deliberately absent from the path.
+    """
+    from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
+    parts = urlsplit(url)
+    query = [(k, v) for k, v in parse_qsl(parts.query) if k != 'options']
+    query.append(('options', f'-c search_path={schema}'))
+    return urlunsplit(parts._replace(query=urlencode(query)))
+
+
+_ensured_schemas = set()
+
+
+def _ensure_schema(base_url, schema):
+    # ponytail: process-local memo, so a fresh worker pays one CREATE SCHEMA IF NOT
+    # EXISTS per tenant and nothing after that. Move it to onboarding if that ever shows up.
+    if schema in _ensured_schemas:
+        return
+    from psycopg2 import sql
+    from ..utils.tenant_db import get_tenant_db
+    with get_tenant_db(base_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(sql.Identifier(schema)))
+        conn.commit()
+    _ensured_schemas.add(schema)
+
+
 def get_tenant_db_conn_str(app):
     if not app:
         return None
     db_mode = app.get('db_mode')
     from config import Config
-    if db_mode == 'managed':
-        return Config.MANAGED_POSTGRES_URL
-
     db_conn = app.get('db_connection')
-    if not db_conn:
-        return Config.MANAGED_POSTGRES_URL
+
+    if db_mode == 'managed' or not db_conn:
+        # Tenant brings no database of its own: give it an isolated schema in ours.
+        schema = managed_schema_for(app)
+        _ensure_schema(Config.MANAGED_POSTGRES_URL, schema)
+        return _with_schema(Config.MANAGED_POSTGRES_URL, schema)
     if isinstance(db_conn, dict):
         db_conn = db_conn.get('url')
         
