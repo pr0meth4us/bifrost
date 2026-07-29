@@ -43,6 +43,38 @@ def login():
 
         if user and user.get('password_hash') and check_password_hash(user['password_hash'], password):
             db.link_user_to_app(user['_id'], app_config['_id'])
+            
+            # Check if this is an OIDC login flow
+            oidc_context = session.get('oidc_auth')
+            if oidc_context and oidc_context.get('client_id') == client_id:
+                # Generate authorization code
+                import secrets
+                import time
+                code = secrets.token_urlsafe(32)
+                
+                db.db.auth_codes.insert_one({
+                    "code": code,
+                    "client_id": client_id,
+                    "user_id": user['_id'],
+                    "nonce": oidc_context.get('nonce'),
+                    "expires_at": time.time() + 600  # 10 minutes
+                })
+                
+                # Clear session
+                session.pop('oidc_auth', None)
+                
+                redirect_uri = oidc_context.get('redirect_uri')
+                state = oidc_context.get('state')
+                
+                params = {"code": code}
+                if state:
+                    params["state"] = state
+                
+                separator = '&' if '?' in redirect_uri else '?'
+                query_string = urllib.parse.urlencode(params)
+                return redirect(f"{redirect_uri}{separator}{query_string}")
+
+            # Standard Bifrost login flow
             token = create_session_token(user, client_id, db, app_config)
             callback_url = app_config.get('app_callback_url')
             separator = '&' if '?' in callback_url else '?'
