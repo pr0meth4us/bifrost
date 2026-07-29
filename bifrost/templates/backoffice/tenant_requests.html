@@ -1,0 +1,116 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}Tenant requests{% endblock %}
+{% block page_title %}Tenant requests{% endblock %}
+
+{% block head %}
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>[x-cloak]{display:none !important}</style>
+{% endblock %}
+
+{% block content %}
+<div class="main-pad max-w-4xl space-y-6">
+
+  <section>
+    <h2 class="font-semibold mb-1">Pending ({{ pending|length }})</h2>
+    <p class="muted text-[13px] mb-3">
+      Approving registers the application, sets up the payment methods they asked
+      for and emails an owner invite — all from what they already filled in.
+    </p>
+
+    {% if not pending %}
+      <div class="card card-pad muted">Nothing waiting.</div>
+    {% endif %}
+
+    {% for r in pending %}
+      <div class="card card-pad mb-3" x-data="{ rejecting: false }">
+        <div class="flex items-start gap-3 flex-wrap">
+          <div class="min-w-0 flex-1">
+            <div class="font-medium">{{ r.app_name }}</div>
+            <div class="muted text-[13px]">{{ r.admin_email }}</div>
+            <div class="muted text-[12px] mt-1">
+              Requested {{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at }} UTC
+            </div>
+          </div>
+
+          <div class="flex gap-2">
+            <form method="POST"
+                  action="{{ url_for('backoffice.decide_tenant_request', request_id=r._id, decision='approve') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <button class="btn btn-primary" type="submit">Approve</button>
+            </form>
+            <button class="btn" type="button" x-on:click="rejecting = !rejecting">Reject</button>
+          </div>
+        </div>
+
+        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 mt-4 text-[13px]">
+          {% for label, value in [('Web', r.web_url), ('Callback', r.callback_url),
+                                  ('API', r.api_url), ('Logo', r.logo_url)] %}
+            {% if value %}
+              <div class="flex gap-2 min-w-0">
+                <dt class="muted shrink-0">{{ label }}</dt>
+                <dd class="mono truncate" title="{{ value }}">{{ value }}</dd>
+              </div>
+            {% endif %}
+          {% endfor %}
+          <div class="flex gap-2">
+            <dt class="muted shrink-0">Payments</dt>
+            <dd>
+              {% if not r.payments_enabled %}None
+              {% elif r.pay_payway and r.pay_manual %}Direct bank API, Bifrost queue
+              {% elif r.pay_payway %}Direct bank API
+              {% elif r.pay_manual %}Bifrost queue
+              {% else %}Enabled, no method chosen
+              {% endif %}
+            </dd>
+          </div>
+        </dl>
+
+        {% if r.notes %}
+          <p class="mt-3 text-[13px] whitespace-pre-wrap">{{ r.notes }}</p>
+        {% endif %}
+
+        <form method="POST" x-show="rejecting" x-cloak class="mt-4 flex gap-2"
+              action="{{ url_for('backoffice.decide_tenant_request', request_id=r._id, decision='reject') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <input class="input" name="reason" type="text" placeholder="Reason (recorded, not emailed)">
+          <button class="btn btn-danger" type="submit">Confirm reject</button>
+        </form>
+      </div>
+    {% endfor %}
+  </section>
+
+  {% if decided %}
+    <section>
+      <h2 class="font-semibold mb-3">Decided</h2>
+      <div class="card overflow-x-auto">
+        <table class="w-full text-[13px]">
+          <thead>
+            <tr class="text-left muted">
+              <th class="p-3">Application</th>
+              <th class="p-3">Contact</th>
+              <th class="p-3">Status</th>
+              <th class="p-3">client_id</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in decided %}
+              <tr class="border-t border-border">
+                <td class="p-3">{{ r.app_name }}</td>
+                <td class="p-3 muted">{{ r.admin_email }}</td>
+                <td class="p-3">
+                  <span class="badge {{ 'badge-success' if r.status == 'approved' else 'badge-danger' }}">
+                    {{ r.status }}
+                  </span>
+                  {% if r.decision_reason %}<span class="muted"> — {{ r.decision_reason }}</span>{% endif %}
+                </td>
+                <td class="p-3 mono">{{ r.client_id or '—' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+</div>
+{% endblock %}

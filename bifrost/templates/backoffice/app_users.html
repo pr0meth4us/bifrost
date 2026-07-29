@@ -1,11 +1,13 @@
 {% extends "backoffice/base.html" %}
 {% from "backoffice/_role_options.html" import role_options %}
+{% from "backoffice/_payment_fields.html" import payment_fields %}
 
 {% block title %}Users &amp; settings{% endblock %}
 {% block page_title %}{{ app.app_name }}{% endblock %}
 
 {% block head %}
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>[x-cloak]{display:none !important}</style>
 {% endblock %}
 
 {% block content %}
@@ -151,11 +153,17 @@
                  value="{{ app.telegram_bot_token or '' }}" {{ 'disabled' if is_disabled }}>
         </div>
 
+        {{ payment_fields(app, is_disabled) }}
+
+        {% if session.is_heimdall or session.is_pr0meth4us %}
         <div>
-          <label class="label" for="s-qr">Payment QR URL</label>
-          <input class="input" id="s-qr" name="qr_url" type="url"
-                 value="{{ app.app_qr_url }}" {{ 'disabled' if is_disabled }}>
+          <label class="label" for="s-locked">Platform-locked tables <span class="muted">(super-admin)</span></label>
+          <input class="input mono" id="s-locked" name="platform_locked_tables" type="text"
+                 placeholder="transactions, ledger, bank_accounts"
+                 value="{{ (app.platform_locked_tables or []) | join(', ') }}">
+          <p class="muted text-[12px] mt-1">Never editable through the CMS grid. Tenant admins cannot change this.</p>
         </div>
+        {% endif %}
 
         <fieldset class="border-t border-border pt-5"
                   x-data="{ dbMode: '{{ app.db_mode or ('custom' if app.db_connection else 'managed') }}' }">

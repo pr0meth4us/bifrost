@@ -80,6 +80,11 @@
          {% if ep in ('backoffice.global_users', 'backoffice.global_user_details') %}aria-current="page"{% endif %}>All users</a>
       <a class="nav-link" href="{{ url_for('backoffice.global_api_keys') }}"
          {% if ep == 'backoffice.global_api_keys' %}aria-current="page"{% endif %}>API vault</a>
+      <a class="nav-link" href="{{ url_for('backoffice.tenant_requests') }}"
+         {% if ep == 'backoffice.tenant_requests' %}aria-current="page"{% endif %}>
+        Tenant requests
+        {% if pending_requests %}<span class="badge ml-auto">{{ pending_requests }}</span>{% endif %}
+      </a>
       <a class="nav-link" href="{{ url_for('backoffice.create_app') }}"
          {% if ep == 'backoffice.create_app' %}aria-current="page"{% endif %}>New application</a>
     {% endif %}

@@ -1,0 +1,89 @@
+{# The payment setup block, shared by onboarding (New application) and the
+   per-app Settings tab, so the two can't drift into asking different questions.
+
+   `app` is None at creation and the app document when editing. Editing follows
+   the same convention as the DB connection field above it: a stored credential
+   is never rendered back, and a blank input means "leave it alone" rather than
+   "clear it". #}
+{% macro payment_fields(app=None, disabled=False) %}
+{% set methods = (app.payment_methods if app else []) or [] %}
+{% set has_merchant = app and (app.api_keys or {}).get('PAYWAY_MERCHANT_ID') %}
+{% set has_key = app and (app.api_keys or {}).get('PAYWAY_API_KEY') %}
+
+<fieldset class="border-t border-border pt-5"
+          x-data="{ pay: {{ 'true' if methods else 'false' }},
+                    payway: {{ 'true' if 'payway' in methods else 'false' }},
+                    manual: {{ 'true' if 'manual' in methods else 'false' }} }">
+  <legend class="label">Payments</legend>
+
+  <label class="flex items-center gap-3 cursor-pointer">
+    <input type="checkbox" name="payments_enabled" x-model="pay" {{ 'disabled' if disabled }}>
+    <span>This application collects payments</span>
+  </label>
+
+  <div x-show="pay" x-cloak class="mt-4 space-y-3">
+    <p class="hint">Pick either, or both — they can run side by side.</p>
+
+    <label class="card card-pad flex items-start gap-3 cursor-pointer"
+           :class="payway && 'border-accent'">
+      <input type="checkbox" name="pay_payway" x-model="payway" class="mt-1" {{ 'disabled' if disabled }}>
+      <span>
+        <span class="block font-medium">Direct bank API</span>
+        <span class="block muted text-[12px]">
+          Your own ABA PayWay merchant. Money settles into your account; Bifrost
+          only generates the KHQR and records the transaction.
+        </span>
+      </span>
+    </label>
+
+    <div x-show="payway" x-cloak class="grid grid-cols-1 sm:grid-cols-2 gap-4 pl-8">
+      <div>
+        <label class="label" for="pw_mid">
+          Merchant ID
+          {% if has_merchant %}<span class="badge badge-success ml-1">stored</span>{% endif %}
+        </label>
+        <input class="input mono" id="pw_mid" name="payway_merchant_id" type="text"
+               autocomplete="off" placeholder="{{ 'Unchanged' if has_merchant else 'ec462892' }}"
+               {{ 'disabled' if disabled }}>
+      </div>
+      <div>
+        <label class="label" for="pw_key">
+          PayWay API key
+          {% if has_key %}<span class="badge badge-success ml-1">stored</span>{% endif %}
+        </label>
+        <input class="input mono" id="pw_key" name="payway_api_key" type="password"
+               autocomplete="off" placeholder="{{ 'Unchanged' if has_key else '' }}"
+               {{ 'disabled' if disabled }}>
+        <p class="hint">
+          Encrypted into this app's vault, never shared with other tenants.
+          {% if has_key %}Leave blank to keep the current key.{% endif %}
+        </p>
+      </div>
+    </div>
+
+    <label class="card card-pad flex items-start gap-3 cursor-pointer"
+           :class="manual && 'border-accent'">
+      <input type="checkbox" name="pay_manual" x-model="manual" class="mt-1" {{ 'disabled' if disabled }}>
+      <span>
+        <span class="block font-medium">Bifrost payment queue</span>
+        <span class="block muted text-[12px]">
+          No bank API. Users pay a static KHQR and upload a receipt; your team
+          approves it in the console. Works today, no merchant contract needed.
+        </span>
+      </span>
+    </label>
+
+    <div x-show="manual" x-cloak class="pl-8">
+      <label class="label" for="qr_url">Payment QR image URL</label>
+      <input class="input" id="qr_url" name="qr_url" type="url"
+             value="{{ app.app_qr_url if app else '' }}"
+             placeholder="https://cdn.example.com/aba-khqr.png" {{ 'disabled' if disabled }}>
+      <p class="hint">
+        Shown on the paywall, served from
+        <span class="mono">/api/v1/public/branding/{{ app.client_id if app else '&lt;client_id&gt;' }}</span>.
+        Swapping the receiving account needs no deploy.
+      </p>
+    </div>
+  </div>
+</fieldset>
+{% endmacro %}
