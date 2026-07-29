@@ -1,211 +1,139 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In - {{ app.app_name }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; }
-        .glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); }
-    </style>
+{% extends 'backoffice/base_auth.html' %}
+{% set tenant_app = app %}
 
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-</head>
-<body class="flex items-center justify-center min-h-screen p-6">
-<div class="w-full max-w-md">
-    <div class="glass rounded-[2.5rem] shadow-2xl p-8 sm:p-12">
-        <div class="text-center mb-10">
-            {% if app.app_logo_url %}
-            <img src="{{ app.app_logo_url }}" class="h-16 mx-auto mb-6 drop-shadow-lg">
-            {% else %}
-            <div class="h-16 w-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-3xl font-bold mx-auto mb-6">{{ app.app_name[0] }}</div>
-            {% endif %}
-            <h1 class="text-3xl font-extrabold text-slate-900">Welcome Back</h1>
-            <p class="text-slate-500 mt-2">Sign in to <span class="text-indigo-600 font-bold">{{ app.app_name }}</span></p>
-        </div>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        {% for category, message in messages %}
-        <div class="mb-6 p-4 rounded-2xl text-sm font-bold {% if category == 'danger' %}bg-red-50 text-red-600{% else %}bg-green-50 text-green-600{% endif %}">
-            {{ message }}
-        </div>
-        {% endfor %}
-        {% endif %}
-        {% endwith %}
-
-        <!-- Segment Tab Control -->
-        {% if phone_otp_enabled %}
-        <div class="flex bg-slate-100 p-1.5 rounded-2xl mb-8">
-            <button type="button" onclick="switchLoginTab('credentials')" id="tabBtn-credentials" class="flex-grow flex items-center justify-center py-2.5 text-xs font-bold text-indigo-600 bg-white rounded-xl shadow-sm transition-all outline-none">
-                Password
-            </button>
-            <button type="button" onclick="switchLoginTab('phone')" id="tabBtn-phone" class="flex-grow flex items-center justify-center py-2.5 text-xs font-bold text-slate-500 rounded-xl transition-all outline-none">
-                Phone OTP
-            </button>
-        </div>
-        {% endif %}
-
-        <div id="credentialsForm" class="space-y-5">
-            <form action="{{ url_for('auth_ui.login', client_id=app.client_id) }}" method="POST" class="space-y-5">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Email or Username</label>
-                    <input type="text" name="email" required class="w-full px-6 py-4 bg-white/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 outline-none transition-all">
-                </div>
-                <div>
-                    <div class="flex justify-between mb-2">
-                        <label class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Password</label>
-                        {% if email_otp_enabled %}
-                        <a href="{{ url_for('auth_ui.forgot_password', client_id=app.client_id) }}" class="text-xs font-bold text-indigo-600">Forgot?</a>
-                        {% endif %}
-                    </div>
-                    <div class="relative">
-                        <input type="password" id="password" name="password" required 
-                               class="w-full pl-6 pr-12 py-4 bg-white/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 outline-none transition-all">
-                        <button type="button" onclick="togglePasswordVisibility('password')" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-indigo-600 transition-colors">
-                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-                <button type="submit" class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-2xl shadow-lg shadow-indigo-200 transition-all transform active:scale-95">
-                    Sign In
-                </button>
-            </form>
-        </div>
-
-        <div id="phoneForm" class="hidden space-y-5">
-            <form action="{{ url_for('auth_ui.request_phone_otp_ui') }}" method="POST" class="space-y-5">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                <input type="hidden" name="client_id" value="{{ app.client_id }}">
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Phone Number</label>
-                    <input type="tel" name="phone_number" placeholder="+855 12 345 678" required 
-                           class="w-full px-6 py-4 bg-white/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 outline-none transition-all">
-                    <p class="text-xs text-slate-400 mt-2 ml-1">Include country code (e.g., +85512345678)</p>
-                </div>
-                <button type="submit" class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-2xl shadow-lg shadow-indigo-200 transition-all transform active:scale-95">
-                    Send SMS Code
-                </button>
-            </form>
-        </div>
-
-        <div class="space-y-5">
-            <script>
-                function togglePasswordVisibility(id) {
-                    const input = document.getElementById(id);
-                    const btn = input.nextElementSibling;
-                    if (input.type === "password") {
-                        input.type = "text";
-                        btn.innerHTML = `<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.268m5.842-.889A6 6 0 0118 12a5.964 5.964 0 01-.765 2.901m0 0a3 3 0 11-4.243-4.243m4.242 4.242L9.88 9.88" />
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18" />
-                        </svg>`;
-                    } else {
-                        input.type = "password";
-                        btn.innerHTML = `<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>`;
-                    }
-                }
-
-                function switchLoginTab(tabName) {
-                    const credForm = document.getElementById('credentialsForm');
-                    const phoneForm = document.getElementById('phoneForm');
-                    const credTabBtn = document.getElementById('tabBtn-credentials');
-                    const phoneTabBtn = document.getElementById('tabBtn-phone');
-                    
-                    if (tabName === 'credentials') {
-                        credForm.classList.remove('hidden');
-                        phoneForm.classList.add('hidden');
-                        
-                        credTabBtn.classList.add('bg-white', 'text-indigo-600', 'shadow-sm');
-                        credTabBtn.classList.remove('text-slate-500');
-                        
-                        phoneTabBtn.classList.remove('bg-white', 'text-indigo-600', 'shadow-sm');
-                        phoneTabBtn.classList.add('text-slate-500');
-                    } else {
-                        credForm.classList.add('hidden');
-                        phoneForm.classList.remove('hidden');
-                        
-                        phoneTabBtn.classList.add('bg-white', 'text-indigo-600', 'shadow-sm');
-                        phoneTabBtn.classList.remove('text-slate-500');
-                        
-                        credTabBtn.classList.remove('bg-white', 'text-indigo-600', 'shadow-sm');
-                        credTabBtn.classList.add('text-slate-500');
-                    }
-                }
-            </script>
-            {% if sso_providers and sso_providers.values()|select|list|length > 0 %}
-            <div class="relative flex py-4 items-center">
-                <div class="flex-grow border-t border-slate-200"></div>
-                <span class="flex-shrink mx-4 text-slate-400 text-xs font-bold uppercase tracking-wider">Or continue with</span>
-                <div class="flex-grow border-t border-slate-200"></div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-                {% if sso_providers.google %}
-                <a href="{{ url_for('auth_ui.sso_login', provider='google', client_id=app.client_id) }}" 
-                   class="flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all font-bold text-slate-700 text-sm">
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12.24 10.285V13.4h6.887C18.2 15.614 15.645 18 12.24 18c-3.86 0-7-3.14-7-7s3.14-7 7-7c1.7 0 3.25.61 4.5 1.64l2.42-2.42C17.43 1.68 14.97 1 12.24 1c-5.52 0-10 4.48-10 10s4.48 10 10 10c5.73 0 10.2-4.03 10.2-9.715 0-.6-.05-1.2-.16-1.7H12.24z"/>
-                    </svg>
-                    Google
-                </a>
-                {% endif %}
-
-                {% if sso_providers.github %}
-                <a href="{{ url_for('auth_ui.sso_login', provider='github', client_id=app.client_id) }}" 
-                   class="flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all font-bold text-slate-700 text-sm">
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
-                    </svg>
-                    GitHub
-                </a>
-                {% endif %}
-
-                {% if sso_providers.microsoft %}
-                <a href="{{ url_for('auth_ui.sso_login', provider='microsoft', client_id=app.client_id) }}" 
-                   class="flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all font-bold text-slate-700 text-sm">
-                    <svg class="h-5 w-5" viewBox="0 0 23 23">
-                        <path fill="#f35325" d="M0 0h11v11H0z"/>
-                        <path fill="#81bc06" d="M12 0h11v11H12z"/>
-                        <path fill="#05a6f0" d="M0 12h11v11H0z"/>
-                        <path fill="#ffba08" d="M12 12h11v11H12z"/>
-                    </svg>
-                    Microsoft
-                </a>
-                {% endif %}
-
-                {% if sso_providers.apple %}
-                <a href="{{ url_for('auth_ui.sso_login', provider='apple', client_id=app.client_id) }}" 
-                   class="flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all font-bold text-slate-700 text-sm">
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-1 .04-2.22.67-2.94 1.51-.62.71-1.16 1.85-1.01 2.96 1.1.09 2.24-.57 2.96-1.41z"/>
-                    </svg>
-                    Apple
-                </a>
-                {% endif %}
-
-                {% if sso_providers.facebook %}
-                <a href="{{ url_for('auth_ui.sso_login', provider='facebook', client_id=app.client_id) }}" 
-                   class="flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all font-bold text-slate-700 text-sm">
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c4.56-.93 8-4.96 8-9.75z"/>
-                    </svg>
-                    Facebook
-                </a>
-                {% endif %}
-            </div>
-            {% endif %}
-        </div>
-    </div>
+{% block content %}
+{% if phone_otp_enabled %}
+<div class="tabs mb-6 flex bg-surface-alt p-1 rounded-lg">
+    <button type="button" onclick="switchLoginTab('credentials')" id="tabBtn-credentials" class="flex-1 py-1.5 text-sm font-semibold rounded bg-surface shadow-sm text-ink">
+        Password
+    </button>
+    <button type="button" onclick="switchLoginTab('phone')" id="tabBtn-phone" class="flex-1 py-1.5 text-sm font-semibold text-muted bg-transparent">
+        Phone OTP
+    </button>
 </div>
-</body>
-</html>
+{% endif %}
+
+<div id="credentialsForm">
+    <form action="{{ url_for('auth_ui.login', client_id=app.client_id) }}" method="POST" class="space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        
+        <div class="form-control">
+            <label class="label">Email or Username</label>
+            <input type="text" name="email" required class="input" autofocus>
+        </div>
+        
+        <div class="form-control">
+            <div class="flex justify-between items-center mb-1">
+                <label class="label mb-0">Password</label>
+                {% if email_otp_enabled %}
+                <a href="{{ url_for('auth_ui.forgot_password', client_id=app.client_id) }}" class="text-xs text-accent hover:underline">Forgot?</a>
+                {% endif %}
+            </div>
+            <div class="relative">
+                <input type="password" id="password" name="password" required class="input pr-10">
+                <button type="button" onclick="togglePasswordVisibility('password')" class="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary w-full mt-2">Sign In</button>
+    </form>
+</div>
+
+{% if phone_otp_enabled %}
+<div id="phoneForm" class="hidden">
+    <form action="{{ url_for('auth_ui.request_phone_otp_ui') }}" method="POST" class="space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input type="hidden" name="client_id" value="{{ app.client_id }}">
+        
+        <div class="form-control">
+            <label class="label">Phone Number</label>
+            <input type="tel" name="phone_number" placeholder="+855 12 345 678" required class="input">
+            <p class="text-xs muted mt-1">Include country code</p>
+        </div>
+        
+        <button type="submit" class="btn btn-primary w-full mt-2">Send SMS Code</button>
+    </form>
+</div>
+{% endif %}
+
+{% if sso_providers and sso_providers.values()|select|list|length > 0 %}
+<div class="relative flex py-5 items-center">
+    <div class="flex-grow border-t border-line"></div>
+    <span class="shrink-0 mx-4 text-xs font-semibold uppercase tracking-wider text-muted">Or continue with</span>
+    <div class="flex-grow border-t border-line"></div>
+</div>
+
+<div class="grid grid-cols-2 gap-3">
+    {% if sso_providers.google %}
+    <a href="{{ url_for('auth_ui.sso_login', provider='google', client_id=app.client_id) }}" class="btn btn-secondary w-full flex items-center justify-center gap-2">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12.24 10.285V13.4h6.887C18.2 15.614 15.645 18 12.24 18c-3.86 0-7-3.14-7-7s3.14-7 7-7c1.7 0 3.25.61 4.5 1.64l2.42-2.42C17.43 1.68 14.97 1 12.24 1c-5.52 0-10 4.48-10 10s4.48 10 10 10c5.73 0 10.2-4.03 10.2-9.715 0-.6-.05-1.2-.16-1.7H12.24z"/>
+        </svg>
+        Google
+    </a>
+    {% endif %}
+    {% if sso_providers.github %}
+    <a href="{{ url_for('auth_ui.sso_login', provider='github', client_id=app.client_id) }}" class="btn btn-secondary w-full flex items-center justify-center gap-2">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+        </svg>
+        GitHub
+    </a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block below_card %}
+<div class="mt-6 text-center text-sm">
+    <span class="muted">Don't have an account?</span> <a href="{{ url_for('auth_ui.register', client_id=app.client_id) }}" class="text-accent hover:underline font-semibold">Sign Up</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function togglePasswordVisibility(id) {
+    const input = document.getElementById(id);
+    const btn = input.nextElementSibling;
+    if (input.type === "password") {
+        input.type = "text";
+        btn.innerHTML = `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.268m5.842-.889A6 6 0 0118 12a5.964 5.964 0 01-.765 2.901m0 0a3 3 0 11-4.243-4.243m4.242 4.242L9.88 9.88" /><path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18" /></svg>`;
+    } else {
+        input.type = "password";
+        btn.innerHTML = `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>`;
+    }
+}
+
+function switchLoginTab(tabName) {
+    const credForm = document.getElementById('credentialsForm');
+    const phoneForm = document.getElementById('phoneForm');
+    const credTabBtn = document.getElementById('tabBtn-credentials');
+    const phoneTabBtn = document.getElementById('tabBtn-phone');
+    
+    if (tabName === 'credentials') {
+        credForm.classList.remove('hidden');
+        phoneForm.classList.add('hidden');
+        
+        credTabBtn.classList.add('bg-surface', 'text-ink', 'shadow-sm');
+        credTabBtn.classList.remove('text-muted', 'bg-transparent');
+        
+        phoneTabBtn.classList.remove('bg-surface', 'text-ink', 'shadow-sm');
+        phoneTabBtn.classList.add('text-muted', 'bg-transparent');
+    } else {
+        credForm.classList.add('hidden');
+        phoneForm.classList.remove('hidden');
+        
+        phoneTabBtn.classList.add('bg-surface', 'text-ink', 'shadow-sm');
+        phoneTabBtn.classList.remove('text-muted', 'bg-transparent');
+        
+        credTabBtn.classList.remove('bg-surface', 'text-ink', 'shadow-sm');
+        credTabBtn.classList.add('text-muted', 'bg-transparent');
+    }
+}
+</script>
+{% endblock %}

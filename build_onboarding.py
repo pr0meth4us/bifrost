@@ -1,0 +1,177 @@
+import os
+
+html_content = """<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Onboarding - Valhalla Console</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "secondary-fixed": "#d4e4fa", "primary": "#c0c1ff", "secondary": "#b9c8de", "surface-bright": "#37393f",
+                      "inverse-on-surface": "#2e3036", "background": "#111318", "inverse-surface": "#e2e2e9",
+                      "on-primary": "#1000a9", "on-tertiary-fixed-variant": "#703700", "surface-variant": "#33353a",
+                      "on-error": "#690005", "on-background": "#e2e2e9", "on-surface": "#e2e2e9",
+                      "on-primary-container": "#0d0096", "inverse-primary": "#494bd6", "surface-dim": "#111318",
+                      "on-secondary-container": "#a7b6cc", "on-tertiary-container": "#452000", "primary-fixed-dim": "#c0c1ff",
+                      "error": "#ffb4ab", "tertiary-fixed-dim": "#ffb783", "on-primary-fixed-variant": "#2f2ebe",
+                      "surface-container-highest": "#33353a", "secondary-container": "#39485a", "on-primary-fixed": "#07006c",
+                      "surface-tint": "#c0c1ff", "surface-container": "#1e1f25", "surface-container-lowest": "#0c0e13",
+                      "on-tertiary-fixed": "#301400", "on-secondary": "#233143", "outline": "#908fa0",
+                      "secondary-fixed-dim": "#b9c8de", "error-container": "#93000a", "tertiary-fixed": "#ffdcc5",
+                      "outline-variant": "#464554", "surface": "#111318", "surface-container-low": "#1a1b21",
+                      "surface-container-high": "#282a2f", "tertiary-container": "#d97721", "on-error-container": "#ffdad6",
+                      "tertiary": "#ffb783", "on-tertiary": "#4f2500", "primary-fixed": "#e1e0ff",
+                      "primary-container": "#8083ff", "on-secondary-fixed-variant": "#39485a", "on-surface-variant": "#c7c4d7",
+                      "on-secondary-fixed": "#0d1c2d"
+              },
+              "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+              "spacing": { "margin-desktop": "32px", "topbar-height": "64px", "margin-mobile": "16px", "unit": "4px", "gutter": "16px", "sidebar-width": "260px" },
+              "fontFamily": {
+                      "headline-sm": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "headline-md": ["Plus Jakarta Sans"],
+                      "display-lg": ["Plus Jakarta Sans"], "body-sm": ["Plus Jakarta Sans"], "tabular-nums": ["Plus Jakarta Sans"],
+                      "label-caps": ["Plus Jakarta Sans"]
+              },
+              "fontSize": {
+                      "headline-sm": ["18px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                      "body-md": ["14px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                      "headline-md": ["24px", { "lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                      "display-lg": ["36px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                      "body-sm": ["13px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                      "tabular-nums": ["14px", { "fontWeight": "500" }],
+                      "label-caps": ["11px", { "lineHeight": "1.0", "letterSpacing": "0.1em", "fontWeight": "600" }]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+        
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #111318; color: #e2e2e9; }
+        .glass-panel { background-color: rgba(30, 31, 37, 0.4); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.10); }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #464554; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #908fa0; }
+        
+        .alert-info { background: rgba(0,113,227,0.1); border: 1px solid rgba(0,113,227,0.2); color: #c0c1ff; padding: 16px 20px; border-radius: 12px; margin-bottom: 24px; font-weight: 500; font-size: 14px; display: flex; gap: 12px; align-items: flex-start; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden font-body-md text-body-md selection:bg-inverse-primary/30">
+<!-- Atmospheric Glow -->
+<div class="absolute inset-0 pointer-events-none z-0 overflow-hidden flex justify-center items-center">
+<div class="w-[800px] h-[800px] bg-inverse-primary/10 rounded-full blur-[120px] opacity-50 translate-y-[-20%]"></div>
+</div>
+<!-- Wizard Container -->
+<main class="w-full max-w-4xl z-10 flex flex-col gap-8">
+<!-- Header & Progress Tracker -->
+<header class="flex flex-col gap-6 items-center w-full">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-[28px]" data-weight="fill" style="font-variation-settings: 'FILL' 1;">hub</span>
+<h1 class="font-headline-md text-headline-md text-on-background tracking-tight">Valhalla Console</h1>
+</div>
+<!-- Progress Steps -->
+<div class="flex items-center w-full max-w-2xl mt-4">
+<!-- Step 1 (Completed) -->
+<div class="flex flex-col items-center gap-2 flex-1 relative">
+<div class="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center border border-primary/30 z-10">
+<span class="material-symbols-outlined text-sm">check</span>
+</div>
+<span class="font-label-caps text-label-caps text-primary text-center uppercase tracking-wider">Connect Database</span>
+<div class="absolute top-4 left-[50%] w-full h-[1px] bg-primary/30 z-0"></div>
+</div>
+<!-- Step 2 (Active) -->
+<div class="flex flex-col items-center gap-2 flex-1 relative">
+<div class="w-8 h-8 rounded-full bg-inverse-primary text-on-background flex items-center justify-center shadow-[0_0_15px_rgba(73,75,214,0.4)] z-10">
+<span class="font-tabular-nums text-tabular-nums">2</span>
+</div>
+<span class="font-label-caps text-label-caps text-on-background text-center uppercase tracking-wider">Smart Detection</span>
+<div class="absolute top-4 left-[50%] w-full h-[1px] bg-outline-variant/30 z-0"></div>
+</div>
+<!-- Step 3 (Pending) -->
+<div class="flex flex-col items-center gap-2 flex-1 relative">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest text-on-surface-variant flex items-center justify-center border border-outline-variant/30 z-10">
+<span class="font-tabular-nums text-tabular-nums">3</span>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant text-center uppercase tracking-wider">Invite Team</span>
+</div>
+</div>
+</header>
+<!-- Main Content Card -->
+<section class="glass-panel rounded-xl shadow-2xl flex flex-col w-full overflow-hidden">
+<form method="POST" action="{{ url_for('backoffice.cms_onboarding', app_id=app._id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+<input type="hidden" name="cms_config_json" value="{{ smart_config | tojson | forceescape }}">
+<!-- Card Header -->
+<div class="px-8 py-6 border-b border-outline-variant/10">
+<h2 class="font-headline-sm text-headline-sm text-on-surface mb-2">Review Smart Detection</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">We found {{ all_tables|length }} tables. We hid {{ smart_config.hidden_tables|length }} system tables and suggested friendlier names based on schema patterns. Review below.</p>
+</div>
+<!-- Table List -->
+<div class="flex flex-col bg-surface-container-lowest/50 max-h-[400px] overflow-y-auto p-4 gap-2">
+<div class="grid grid-cols-12 gap-4 px-4 py-2 border-b border-outline-variant/10 text-on-surface-variant font-label-caps text-label-caps uppercase tracking-wider">
+<div class="col-span-1 flex items-center">Include</div>
+<div class="col-span-4 flex items-center">Table Name</div>
+<div class="col-span-2 flex items-center justify-end">Columns</div>
+<div class="col-span-5 flex items-center pl-4">Suggested Label</div>
+</div>
+
+{% for t in all_tables %}
+<div class="grid grid-cols-12 gap-4 px-4 py-3 rounded-lg hover:bg-surface-variant/30 transition-colors border border-transparent hover:border-outline-variant/20 items-center group {% if t in smart_config.hidden_tables %}opacity-50{% endif %}">
+<div class="col-span-1 flex items-center">
+<input type="checkbox" {% if t not in smart_config.hidden_tables %}checked{% endif %} class="w-4 h-4 rounded-sm bg-surface-container border-outline-variant/50 text-inverse-primary focus:ring-inverse-primary focus:ring-offset-background cursor-pointer transition-all" onclick="return false;" />
+</div>
+<div class="col-span-4 flex items-center gap-3">
+<span class="material-symbols-outlined text-outline text-sm">table</span>
+<span class="font-tabular-nums text-tabular-nums text-on-surface">public.{{ t }}</span>
+</div>
+<div class="col-span-2 flex items-center justify-end text-on-surface-variant font-tabular-nums text-tabular-nums">
+{{ table_schemas[t]|length }}
+</div>
+<div class="col-span-5 flex flex-wrap items-center gap-2 pl-4">
+{% if t in smart_config.hidden_tables %}
+<span class="inline-flex items-center gap-1 px-2 py-1 bg-surface-variant border border-outline-variant/30 text-on-surface-variant rounded-DEFAULT font-label-caps text-label-caps whitespace-nowrap">
+<span class="material-symbols-outlined text-[12px]">settings</span>
+    Hidden
+</span>
+{% else %}
+<span class="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 border border-primary/20 text-primary rounded-DEFAULT font-label-caps text-label-caps whitespace-nowrap">
+<span class="material-symbols-outlined text-[12px]">auto_awesome</span>
+    {{ smart_config.tables[t].label if t in smart_config.tables else t }}
+</span>
+{% endif %}
+</div>
+</div>
+{% endfor %}
+
+</div>
+<!-- Actions Footer -->
+<div class="px-8 py-5 border-t border-outline-variant/10 bg-surface/30 flex justify-between items-center">
+<button type="submit" name="action" value="customize" class="flex items-center gap-2 px-4 py-2 rounded-DEFAULT border border-outline-variant/30 text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface transition-all font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-sm">edit</span>
+    Customize everything
+</button>
+<div class="flex items-center gap-4">
+<button type="submit" name="action" value="continue" class="flex items-center gap-2 px-6 py-2 rounded-DEFAULT bg-inverse-primary text-on-background hover:bg-inverse-primary/90 hover:shadow-[0_0_15px_rgba(73,75,214,0.4)] transition-all font-body-sm text-body-sm font-semibold">
+    Confirm &amp; Continue
+    <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+</div>
+</form>
+</section>
+</main>
+</body></html>
+"""
+
+with open("/Users/nicksng/code/bifrost/bifrost/templates/backoffice/cms_onboarding.html", "w") as f:
+    f.write(html_content)

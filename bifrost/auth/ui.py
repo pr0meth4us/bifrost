@@ -96,6 +96,67 @@ def login():
     return render_template('auth/login.html', app=app_config, sso_providers=sso_providers, phone_otp_enabled=phone_otp_enabled, email_otp_enabled=email_otp_enabled)
 
 
+@auth_ui_bp.route('/register', methods=['GET', 'POST'])
+def register():
+    client_id = request.args.get('client_id')
+    if not client_id:
+        return render_template('auth/error.html', error="Missing client_id")
+
+    db, app_config = get_app_config(client_id)
+    if not app_config:
+        return render_template('auth/error.html', error="Invalid client_id")
+
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        display_name = request.form.get('display_name')
+
+        if db.find_account_by_email(email):
+            flash("An account with that email already exists.", "danger")
+            return render_template('auth/register.html', app=app_config)
+
+        # Create user
+        user_id = db.create_account({
+            "client_id": client_id,
+            "email": email,
+            "password": password,
+            "display_name": display_name
+        })
+        user = db.find_account_by_email(email)
+        db.link_user_to_app(user['_id'], app_config['_id'])
+
+        # Check OIDC flow
+        if 'auth_code' in session:
+            user_data = {
+                "id": str(user['_id']),
+                "email": user.get('email'),
+                "name": user.get('display_name', ''),
+            }
+            code = session.pop('auth_code')
+            session[f"code_data_{code}"] = user_data
+
+            redirect_uri = session.pop('redirect_uri', None)
+            state = session.pop('state', None)
+            if not redirect_uri:
+                return render_template('auth/error.html', error="Missing redirect_uri in session")
+                
+            import urllib.parse
+            params = {"code": code}
+            if state:
+                params["state"] = state
+            
+            separator = '&' if '?' in redirect_uri else '?'
+            query_string = urllib.parse.urlencode(params)
+            return redirect(f"{redirect_uri}{separator}{query_string}")
+
+        # Standard flow
+        token = create_session_token(user, client_id, db, app_config)
+        callback_url = app_config.get('app_callback_url')
+        separator = '&' if '?' in callback_url else '?'
+        return redirect(f"{callback_url}{separator}token={token}")
+
+    return render_template('auth/register.html', app=app_config)
+
 @auth_ui_bp.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
     client_id = request.args.get('client_id')
