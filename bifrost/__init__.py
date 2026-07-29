@@ -114,6 +114,39 @@ def create_app(config_class):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    # --- OIDC RSA KEY GENERATION ---
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.backends import default_backend
+    import base64
+    
+    # Generate ephemeral RSA keypair for RS256 OIDC tokens on startup
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        backend=default_backend()
+    )
+    
+    # Get public numbers for JWKS
+    public_key = private_key.public_key()
+    public_numbers = public_key.public_numbers()
+    
+    def int_to_base64(num):
+        val = num.to_bytes((num.bit_length() + 7) // 8, byteorder='big')
+        return base64.urlsafe_b64encode(val).decode('utf-8').rstrip('=')
+        
+    jwk = {
+        "kty": "RSA",
+        "alg": "RS256",
+        "use": "sig",
+        "kid": "bifrost-key-1",
+        "n": int_to_base64(public_numbers.n),
+        "e": int_to_base64(public_numbers.e)
+    }
+    
+    app.config['OIDC_PRIVATE_KEY'] = private_key
+    app.config['OIDC_PUBLIC_JWK'] = jwk
+
     logging.basicConfig(
         level=logging.INFO,
         format='[%(asctime)s] %(levelname)s in %(module)s: %(message)s',
@@ -142,6 +175,7 @@ def create_app(config_class):
     # --- BLUEPRINTS ---
     from .auth.ui import auth_ui_bp
     from .auth.api import auth_api_bp
+    from .auth.oidc import oidc_bp
     from .internal import internal_bp
     from .internal.bot_webhook_routes import bot_webhook_bp
     from .backoffice import backoffice_bp
@@ -149,6 +183,7 @@ def create_app(config_class):
 
     app.register_blueprint(auth_ui_bp)
     app.register_blueprint(auth_api_bp)
+    app.register_blueprint(oidc_bp)
     app.register_blueprint(internal_bp)
     app.register_blueprint(bot_webhook_bp)
     app.register_blueprint(backoffice_bp)
@@ -158,6 +193,7 @@ def create_app(config_class):
     from flask_wtf.csrf import CSRFProtect
     csrf = CSRFProtect(app)
     csrf.exempt(auth_api_bp)
+    csrf.exempt(oidc_bp)
     csrf.exempt(internal_bp)
     csrf.exempt(bot_webhook_bp)
     csrf.exempt(config_api_bp)
