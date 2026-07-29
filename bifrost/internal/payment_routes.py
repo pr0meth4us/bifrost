@@ -3,7 +3,7 @@ from flask import request, jsonify, current_app
 import logging
 from .. import mongo
 from ..models import BifrostDB
-from ..services.payway import PayWayService
+from ..services.payway import PayWayService, PayWayNotConfigured
 from ..services.gumroad import GumroadService
 from .utils import require_service_auth
 from . import internal_bp
@@ -154,7 +154,11 @@ def create_payment_intent():
 
     # 2. ROUTER LOGIC
     if region == 'local':
-        payway = PayWayService()
+        try:
+            payway = PayWayService(app_doc)
+        except PayWayNotConfigured as e:
+            log.error(str(e))
+            return jsonify({"error": "PayWay is not configured for this application"}), 400
         items = [{"name": target_role, "quantity": "1", "price": amount}]
 
         result = payway.create_transaction(
@@ -179,7 +183,7 @@ def create_payment_intent():
             return jsonify({"error": "Failed to communicate with ABA"}), 502
 
     else:
-        gumroad = GumroadService()
+        gumroad = GumroadService(app_doc)
         checkout_url = gumroad.generate_checkout_url(
             transaction_id=tx_id,
             email=email,
@@ -295,6 +299,25 @@ def payway_callback():
     apv = data.get('apv')
 
     db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
+
+    # Which tenant's merchant this callback belongs to is only knowable from the
+    # transaction — the callback URL is shared. Resolving it is also what makes
+    # the signature checkable at all: the HMAC key is per-merchant.
+    tx = db.get_transaction(tran_id) if tran_id else None
+    if not tx:
+        log.warning(f"PayWay callback for unknown transaction {tran_id!r}")
+        return "OK", 200
+
+    app_doc = db.db.applications.find_one({"_id": tx['app_id']})
+    try:
+        payway = PayWayService(app_doc)
+    except PayWayNotConfigured as e:
+        log.error(f"PayWay callback for unconfigured app: {e}")
+        return "OK", 200
+
+    if not payway.verify_webhook(data):
+        log.warning(f"PayWay callback rejected: bad signature for {tran_id}")
+        return "OK", 200
 
     if status == '00':
         success, msg = db.complete_transaction(transaction_id=tran_id, provider_ref=apv)

@@ -33,3 +33,16 @@ def decrypt_value(encrypted_value: str, secret: str) -> str:
     except Exception:
         # Fallback if decryption fails
         return encrypted_value
+
+
+def app_secret(app_doc, key_name, default=None):
+    """Reads one decrypted key out of a tenant's own vault.
+
+    Every app document carries its own webhook_secret, so a key encrypted for one
+    tenant is unreadable with another's. Callers that used to reach into
+    current_app.config for a platform-wide credential go through here instead.
+    """
+    raw = ((app_doc or {}).get('api_keys') or {}).get(key_name)
+    if not raw:
+        return default
+    return decrypt_value(raw, (app_doc or {}).get('webhook_secret', '')) or default

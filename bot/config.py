@@ -47,15 +47,6 @@ class Config:
     BIFROST_ROOT_CLIENT_ID = os.environ.get('BIFROST_CLIENT_ID')
     BIFROST_ROOT_CLIENT_SECRET = os.environ.get('BIFROST_CLIENT_SECRET')
 
-    # --- ABA PAYWAY ---
-    PAYWAY_API_URL = os.environ.get('PAYWAY_API_URL', 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase')
-    PAYWAY_MERCHANT_ID = os.environ.get('PAYWAY_MERCHANT_ID', 'ec462892')
-    PAYWAY_API_KEY = os.environ.get('PAYWAY_API_KEY', '8f43f99f4b8bfb7b050f55f0c2b79858cc237dcb')
-
-    # --- GUMROAD ---
-    GUMROAD_PRODUCT_PERMALINK = os.environ.get('GUMROAD_PRODUCT_PERMALINK')
-    GUMROAD_BASE_URL = "https://gumroad.com/l"
-
     @staticmethod
     def check_critical():
         """Ensures vital keys are present."""

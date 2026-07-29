@@ -10,11 +10,29 @@ from datetime import datetime
 log = logging.getLogger(__name__)
 
 
+class PayWayNotConfigured(Exception):
+    """The tenant has no PayWay merchant of its own in the vault."""
+
+
 class PayWayService:
-    def __init__(self):
-        self.api_url = current_app.config['PAYWAY_API_URL']
-        self.merchant_id = current_app.config['PAYWAY_MERCHANT_ID']
-        self.api_key = current_app.config['PAYWAY_API_KEY']
+    def __init__(self, app_doc):
+        """Binds to one tenant's ABA merchant.
+
+        Credentials come from that app's vault only — there is deliberately no
+        platform-wide fallback. A missing key must fail loudly: falling back to a
+        shared merchant would silently route this tenant's money into someone
+        else's ABA account, which is worse than a 400.
+        """
+        from ..utils.encryption import app_secret
+        self.merchant_id = app_secret(app_doc, 'PAYWAY_MERCHANT_ID')
+        self.api_key = app_secret(app_doc, 'PAYWAY_API_KEY')
+        if not self.merchant_id or not self.api_key:
+            raise PayWayNotConfigured(
+                f"App '{(app_doc or {}).get('client_id')}' has no PAYWAY_MERCHANT_ID / "
+                f"PAYWAY_API_KEY in its Bifrost vault."
+            )
+        # Endpoint is not a credential: sandbox vs production, platform default is fine.
+        self.api_url = app_secret(app_doc, 'PAYWAY_API_URL', current_app.config['PAYWAY_API_URL'])
         self.public_url = current_app.config['BIFROST_PUBLIC_URL']
 
     def _generate_hash(self, data_string):
