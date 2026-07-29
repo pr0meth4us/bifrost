@@ -128,11 +128,21 @@ class AuthMixin:
 
     def find_account_by_email(self, email, client_id=None):
         if not email: return None
-        return self.db.accounts.find_one({"email": email.lower()})
+        query = {"email": email.lower()}
+        if client_id:
+            query["client_id"] = client_id
+        else:
+            query["client_id"] = {"$in": [None, ""]}
+        return self.db.accounts.find_one(query)
 
     def find_account_by_username(self, username, client_id=None):
         if not username: return None
-        return self.db.accounts.find_one({"username": username.lower()})
+        query = {"username": username.lower()}
+        if client_id:
+            query["client_id"] = client_id
+        else:
+            query["client_id"] = {"$in": [None, ""]}
+        return self.db.accounts.find_one(query)
 
     def find_account_by_id(self, account_id):
         try:
@@ -141,22 +151,37 @@ class AuthMixin:
             return None
 
     def find_account_by_telegram(self, telegram_id, client_id=None):
-        return self.db.accounts.find_one({"telegram_id": str(telegram_id)})
+        query = {"telegram_id": str(telegram_id)}
+        if client_id:
+            query["client_id"] = client_id
+        else:
+            query["client_id"] = {"$in": [None, ""]}
+        return self.db.accounts.find_one(query)
 
-    def find_account_by_phone(self, phone):
+    def find_account_by_phone(self, phone, client_id=None):
         if not phone: return None
-        return self.db.accounts.find_one({"phone_number": str(phone).strip()})
+        query = {"phone_number": str(phone).strip()}
+        if client_id:
+            query["client_id"] = client_id
+        else:
+            query["client_id"] = {"$in": [None, ""]}
+        return self.db.accounts.find_one(query)
 
-    def find_account_by_sso(self, provider, provider_id):
+    def find_account_by_sso(self, provider, provider_id, client_id=None):
         if not provider or not provider_id: return None
-        return self.db.accounts.find_one({
+        query = {
             "$or": [
                 {f"{provider}_id": str(provider_id)},
                 {f"identities.{provider}.id": str(provider_id)}
             ]
-        })
+        }
+        if client_id:
+            query["client_id"] = client_id
+        else:
+            query["client_id"] = {"$in": [None, ""]}
+        return self.db.accounts.find_one(query)
 
-    def update_password(self, email, new_password, client_id):
+    def update_password(self, email, new_password, client_id=None):
         user = self.find_account_by_email(email, client_id)
         if not user:
             return
@@ -167,9 +192,15 @@ class AuthMixin:
         )
         self._trigger_event_for_user(user['_id'], "security_password_change")
 
-    def link_email_credentials(self, account_id, email, password, client_id):
+    def link_email_credentials(self, account_id, email, password, client_id=None):
         email = email.lower()
-        existing = self.db.accounts.find_one({"email": email, "_id": {"$ne": ObjectId(account_id)}})
+        query = {"email": email, "_id": {"$ne": ObjectId(account_id)}}
+        if client_id:
+            query["client_id"] = client_id
+        else:
+            query["client_id"] = {"$in": [None, ""]}
+        
+        existing = self.db.accounts.find_one(query)
         if existing:
             return False, "Email is already associated with another account."
 

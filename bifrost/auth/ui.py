@@ -37,9 +37,9 @@ def login():
         identifier = request.form.get('email')
         password = request.form.get('password')
 
-        user = db.find_account_by_email(identifier)
+        user = db.find_account_by_email(identifier, client_id)
         if not user:
-            user = db.find_account_by_username(identifier)
+            user = db.find_account_by_username(identifier, client_id)
 
         if user and user.get('password_hash') and check_password_hash(user['password_hash'], password):
             db.link_user_to_app(user['_id'], app_config['_id'])
@@ -111,7 +111,7 @@ def register():
         password = request.form.get('password')
         display_name = request.form.get('display_name')
 
-        if db.find_account_by_email(email):
+        if db.find_account_by_email(email, client_id):
             flash("An account with that email already exists.", "danger")
             return render_template('auth/register.html', app=app_config)
 
@@ -122,7 +122,7 @@ def register():
             "password": password,
             "display_name": display_name
         })
-        user = db.find_account_by_email(email)
+        user = db.find_account_by_email(email, client_id)
         db.link_user_to_app(user['_id'], app_config['_id'])
 
         # Check OIDC flow
@@ -168,7 +168,7 @@ def forgot_password():
 
     if request.method == 'POST':
         email = request.form.get('email').strip().lower()
-        user = db.find_account_by_email(email)
+        user = db.find_account_by_email(email, client_id)
 
         if user:
             # Create OTP and get verification ID
@@ -267,7 +267,7 @@ def set_password():
 
         if record:
             email = record['identifier']
-            user = db.find_account_by_email(email)
+            user = db.find_account_by_email(email, client_id)
 
             if user:
                 # User exists - just set password
@@ -535,9 +535,9 @@ def sso_callback(provider):
         return render_template('auth/error.html', error="Could not retrieve email or identity ID from the SSO provider")
 
     # Find or provision account
-    user = db.find_account_by_sso(provider, provider_id)
+    user = db.find_account_by_sso(provider, provider_id, client_id)
     if not user:
-        user = db.find_account_by_email(email)
+        user = db.find_account_by_email(email, client_id)
         if user:
             db.link_sso(user['_id'], provider, provider_id)
         else:
@@ -609,7 +609,7 @@ def verify_phone_otp_ui():
 
         if record:
             phone_number = record['identifier']
-            user = db.find_account_by_phone(phone_number)
+            user = db.find_account_by_phone(phone_number, client_id)
             
             if not user:
                 account_data = {
