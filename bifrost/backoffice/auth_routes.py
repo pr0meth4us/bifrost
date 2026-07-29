@@ -1,6 +1,7 @@
 # bifrost/backoffice/auth_routes.py
 from datetime import datetime, timezone
-from flask import render_template, request, redirect, url_for, session, flash
+from flask import render_template, request, redirect, url_for, session, flash, current_app, make_response
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import check_password_hash, generate_password_hash
 from ..services.email_service import send_invite_email, send_reset_email, send_otp_email
 from . import backoffice_bp, get_db
@@ -8,6 +9,44 @@ from . import backoffice_bp, get_db
 # Admin login rate limit (SOW 4.7). Per source IP, short window.
 LOGIN_MAX_ATTEMPTS = 10
 LOGIN_WINDOW_SECONDS = 300
+
+# "Remember this device": the 30-minute idle timeout (SOW 4.6) means a normal
+# working day costs several sign-ins, and mailing an OTP for every one of them
+# trains people to click through codes without reading them. The device stays a
+# second factor — it is a signed cookie bound to one account, opted into per
+# device, and expires in 30 days — so MFA still holds for every new device.
+# It deliberately survives logout: re-prompting there would put the OTP back on
+# the exact path this removes.
+TRUSTED_DEVICE_COOKIE = "bo_trusted_device"
+TRUSTED_DEVICE_DAYS = 30
+
+
+def _device_serializer():
+    return URLSafeTimedSerializer(current_app.config['SECRET_KEY'], salt="backoffice-trusted-device")
+
+
+def _device_trusted_for(user_id):
+    token = request.cookies.get(TRUSTED_DEVICE_COOKIE)
+    if not token:
+        return False
+    try:
+        return _device_serializer().loads(token, max_age=TRUSTED_DEVICE_DAYS * 86400) == str(user_id)
+    except (BadSignature, SignatureExpired):
+        return False
+
+
+def _issue_session(user_id, is_heimdall, app_id):
+    now = datetime.now(timezone.utc).isoformat()
+    session.pop('mfa_pending', None)
+    session['backoffice_user'] = str(user_id)
+    session['is_heimdall'] = is_heimdall
+    session['role'] = 'Heimdall' if is_heimdall else 'Tenant'
+    session['session_started_at'] = now
+    session['last_seen_at'] = now
+    session.permanent = True
+    if app_id:
+        return redirect(url_for('backoffice.view_cms_grid', app_id=app_id))
+    return redirect(url_for('backoffice.dashboard'))
 
 
 def _login_rate_limited():
@@ -32,6 +71,10 @@ def _start_mfa(db, user_doc, is_heimdall, tenant_app):
     if not email:
         flash("This account has no email address and cannot complete MFA. Contact an owner.", "danger")
         return redirect(url_for('backoffice.login'))
+
+    if _device_trusted_for(user_doc['_id']):
+        return _issue_session(user_doc['_id'], is_heimdall,
+                              str(tenant_app['_id']) if tenant_app else None)
 
     otp, _ = db.create_otp(email, channel="backoffice_mfa", account_id=user_doc['_id'])
     send_otp_email(email, otp, app_name="Bifrost Console")
@@ -98,17 +141,17 @@ def mfa():
     if request.method == 'POST':
         db = get_db()
         if db.verify_otp(identifier=pending['email'], code=request.form.get('otp')):
-            now = datetime.now(timezone.utc).isoformat()
-            session.pop('mfa_pending', None)
-            session['backoffice_user'] = pending['user_id']
-            session['is_heimdall'] = pending['is_heimdall']
-            session['role'] = 'Heimdall' if pending['is_heimdall'] else 'Tenant'
-            session['session_started_at'] = now
-            session['last_seen_at'] = now
-            session.permanent = True
-            if pending.get('app_id'):
-                return redirect(url_for('backoffice.view_cms_grid', app_id=pending['app_id']))
-            return redirect(url_for('backoffice.dashboard'))
+            resp = make_response(_issue_session(pending['user_id'], pending['is_heimdall'],
+                                                pending.get('app_id')))
+            if request.form.get('remember_device'):
+                resp.set_cookie(
+                    TRUSTED_DEVICE_COOKIE,
+                    _device_serializer().dumps(pending['user_id']),
+                    max_age=TRUSTED_DEVICE_DAYS * 86400,
+                    httponly=True, samesite='Lax',
+                    secure=current_app.config.get('SESSION_COOKIE_SECURE', True),
+                )
+            return resp
         flash("Invalid or expired code.", "danger")
 
     return render_template('backoffice/mfa.html', email=pending['email'])
