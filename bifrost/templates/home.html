@@ -45,7 +45,7 @@
   <div class="max-w-6xl mx-auto px-6 h-14 flex items-center gap-3">
     <a href="{{ url_for('index') }}" class="flex items-center gap-2.5 shrink-0" aria-label="Bifrost home">
       <img src="{{ url_for('static', filename='logo-mark-64.png') }}" alt=""
-           width="28" height="28" class="w-7 h-7 rounded-lg shrink-0">
+           width="28" height="28" class="w-7 h-7 shrink-0">
       <span class="font-semibold tracking-tight">Bifrost</span>
     </a>
     <span class="text-[11px] muted font-mono">v{{ version }}</span>
@@ -221,7 +221,7 @@
     <div>
       <a href="{{ url_for('index') }}" class="flex items-center gap-2 mb-2" aria-label="Bifrost home">
         <img src="{{ url_for('static', filename='logo-mark-64.png') }}" alt=""
-             width="22" height="22" class="w-[22px] h-[22px] rounded-md">
+             width="22" height="22" class="w-[22px] h-[22px]">
         <span class="font-semibold">Bifrost</span>
       </a>
       <p class="muted text-[12px]">Version {{ version }} · {{ date }}</p>
