@@ -55,11 +55,29 @@ def attach(app):
             "mongodb://localhost:27017 or unset BIFROST_DEV_MODE."
         )
 
-    from flask import session
+    from flask import redirect, request, session, url_for
     from . import mongo
+
+    SIGNED_OUT = "dev_signed_out"
 
     @app.before_request
     def _dev_sign_in():
+        # Signing out has to actually stick, or the public pages and the sign-in
+        # screen are unreachable locally: this hook runs before every request and
+        # would re-stamp the session the instant logout cleared it.
+        if request.endpoint == "backoffice.logout":
+            session.clear()
+            session[SIGNED_OUT] = True
+            return redirect(url_for("index"))
+
+        # Landing on the sign-in screen is how you come back — dev mode still
+        # promises no password.
+        if request.endpoint == "backoffice.login":
+            session.pop(SIGNED_OUT, None)
+
+        if session.get(SIGNED_OUT):
+            return
+
         # Re-stamped every request so the 30-minute idle timeout in
         # backoffice/__init__.py never boots you out mid-session.
         now = datetime.now(timezone.utc).isoformat()

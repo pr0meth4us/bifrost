@@ -1,10 +1,12 @@
 # bifrost/backoffice/tenant_routes.py
 from flask import render_template, request, redirect, url_for, flash, session, current_app, abort
 from bson import ObjectId
-from . import backoffice_bp, get_db, login_required, requires, get_current_role_in_app, check_permission
+from . import (backoffice_bp, get_db, login_required, requires, get_current_role_in_app,
+               check_permission, cms_full_access)
 from ..models.payments import (
     REJECT_REASON_CODES, REFUND_REASON_CODES, SLA_HOURS,
 )
+from ..models import cms_mongo
 from ..models.queue_schema import QueueSchema
 
 def managed_schema_for(app):
@@ -75,12 +77,11 @@ def get_tenant_db_conn_str(app):
 def locked_tables_for(app):
     """Tables the console must never let a tenant edit.
 
-    Union, never override: the platform defaults stay enforced whatever the app
-    document says, so a tenant cannot unlock its own ledger by editing config.
+    Lives on the app document, so locking a new tenant's ledger is a console edit
+    rather than a deploy. The tenant still cannot unlock itself: the field is
+    writable only by a platform admin (see app_routes._save_platform_fields).
     """
-    from config import Config
-    platform = Config.PLATFORM_LOCKED_TABLES.get(app.get('client_id'), [])
-    return sorted(set(platform) | set(app.get('platform_locked_tables') or []))
+    return sorted(set(app.get('platform_locked_tables') or []))
 
 
 def _validate_payment_queue(db, db_conn_str, new_config):
@@ -97,6 +98,8 @@ def _validate_payment_queue(db, db_conn_str, new_config):
         return [str(e)]
     if not db_conn_str:
         return ["cannot validate against the tenant database — no connection configured."]
+    if cms_mongo.handles(db_conn_str):
+        return ["the payment queue is PostgreSQL-only; this tenant runs on MongoDB."]
     from ..utils.tenant_db import get_tenant_db
     with get_tenant_db(db_conn_str) as conn:
         with conn.cursor() as cur:
@@ -143,6 +146,10 @@ def view_manual_payments(app_id_or_slug=None):
     payments, tracks = [], []
     if not db_conn_str:
         flash("Tenant database connection not configured.", "warning")
+    elif cms_mongo.handles(db_conn_str):
+        # The queue is built on QueueSchema's SQL. A Mongo tenant gets the rest of
+        # the CMS and keeps its own payment handling.
+        flash("The payment queue is available for PostgreSQL tenants only.", "warning")
     else:
         try:
             status_filter = request.args.get('status', 'pending')
@@ -200,7 +207,7 @@ def approve_payment(app_id, payment_id):
     # from the tenant user's email — never the reviewing admin's, and never a raw
     # Postgres id where a Bifrost account id belongs.
     detail = db.get_manual_payment_by_id(db_conn_str, int(payment_id), queue=queue) or {}
-    payer = db.find_account_by_email(detail['email']) if detail.get('email') else None
+    payer = db.find_account_by_email(detail['email'], db.directory_scope(app)) if detail.get('email') else None
     if payer:
         db._trigger_event_for_user(
             account_id=payer['_id'],
@@ -272,7 +279,7 @@ def refund_payment(app_id, payment_id):
         return redirect(url_for('backoffice.view_manual_payments', app_id=app_id))
 
     detail = db.get_manual_payment_by_id(db_conn_str, int(payment_id), queue=queue) or {}
-    payer = db.find_account_by_email(detail['email']) if detail.get('email') else None
+    payer = db.find_account_by_email(detail['email'], db.directory_scope(app)) if detail.get('email') else None
     if payer:
         db._trigger_event_for_user(
             account_id=payer['_id'],
@@ -438,8 +445,7 @@ def view_cms_grid(app_id_or_slug=None):
     # Check if onboarded
     is_onboarded = cms_config.get('is_onboarded', False)
     if not is_onboarded:
-        current_role = get_current_role_in_app(app_id)
-        if current_role in ('owner', 'super_admin', 'admin', 'heimdall', 'pr0meth4us'):
+        if cms_full_access(app_id, roles=('owner', 'super_admin', 'admin')):
             return redirect(url_for('backoffice.cms_onboarding', app_id=app_id))
         else:
             flash("CMS has not been configured by an admin yet.", "warning")
@@ -468,7 +474,7 @@ def view_cms_grid(app_id_or_slug=None):
                 continue
             
             # Layer A Global Roles have full read access
-            if current_role in ('owner', 'super_admin', 'heimdall', 'pr0meth4us'):
+            if cms_full_access(app_id):
                 visible_tables.append(t)
             else:
                 # Layer B Tenant Roles check
@@ -503,12 +509,9 @@ def view_cms_grid(app_id_or_slug=None):
         table_col_config = cms_config.get('tables', {}).get(selected_table, {}).get('columns', {})
         readonly_table = cms_config.get('tables', {}).get(selected_table, {}).get('readonly', False)
 
-        # Apply Layer B Role-based column hiding
-        role_hidden_cols = []
-        if current_role not in ('owner', 'super_admin', 'heimdall', 'pr0meth4us'):
-            tbl_cfg = role_config.get('tables', {}).get(selected_table, {})
-            if isinstance(tbl_cfg, dict):
-                role_hidden_cols = tbl_cfg.get('hidden_columns', [])
+        # Apply Layer B Role-based column hiding. Same helper the save path uses,
+        # so what a role cannot see is exactly what it cannot write.
+        role_hidden_cols = hidden_columns_for(db, app_id, selected_table)
 
         # Filter hidden columns
         visible_columns = [
@@ -537,7 +540,7 @@ def view_cms_grid(app_id_or_slug=None):
     can_write = False
     role_readonly_cols = []
     if selected_table and not readonly_table:
-        if current_role in ('owner', 'super_admin', 'heimdall', 'pr0meth4us'):
+        if cms_full_access(app_id):
             can_write = True
         else:
             tbl_cfg = cms_config.get('roles', {}).get(current_role, {}).get('tables', {}).get(selected_table, [])
@@ -572,12 +575,38 @@ def view_cms_grid(app_id_or_slug=None):
         role_readonly_cols=role_readonly_cols
     )
 
+def hidden_columns_for(db, app_id, table_name):
+    """Columns the current role may not see — and therefore may not write.
+
+    One source of truth for the grid, the drawer and the save path. Filtering
+    only on render meant a hidden column was still writable by anyone who could
+    craft the POST.
+    """
+    if cms_full_access(app_id):
+        return set()
+    cms_config = db.get_cms_config(app_id)
+    tbl_cfg = (cms_config.get('roles', {})
+               .get(get_current_role_in_app(app_id), {})
+               .get('tables', {}).get(table_name, {}))
+    if not isinstance(tbl_cfg, dict):
+        return set()
+    return set(tbl_cfg.get('hidden_columns') or [])
+
+
 def check_cms_write_permission(db, app_id, table_name):
     """Verifies if the current user has write permission for a specific CMS table."""
+    app = db.db.applications.find_one({"_id": ObjectId(app_id)})
+
+    # Platform lock beats every role, owner included — that is the whole point of
+    # the setting. It used to filter the table list only, so a locked ledger was
+    # merely hidden and a hand-made POST still wrote to it.
+    if table_name in locked_tables_for(app or {}):
+        return False
+
     current_role = get_current_role_in_app(app_id)
-    if current_role in ('owner', 'super_admin', 'heimdall', 'pr0meth4us'):
+    if cms_full_access(app_id):
         return True
-        
+
     cms_config = db.get_cms_config(app_id)
     tbl_cfg = cms_config.get('roles', {}).get(current_role, {}).get('tables', {}).get(table_name, [])
     perms_list = tbl_cfg.get('permissions', []) if isinstance(tbl_cfg, dict) else tbl_cfg
@@ -600,6 +629,11 @@ def check_publish_permission(app_id, table_name, data, db, db_conn_str, row_id=N
     validated = (db.get_cms_config(app_id) or {}).get('publish_validation_table', 'questions')
     if table_name != validated or row_id is None:
         return None
+    # Structural validation is a SQL query. A Mongo-backed tenant keeps the role
+    # check above and skips it rather than crashing on int(ObjectId).
+    from ..models import cms_mongo
+    if cms_mongo.handles(db_conn_str):
+        return None
     errors = db.validate_question_publishable(db_conn_str, int(row_id))
     if errors:
         return "Cannot publish: " + " ".join(errors)
@@ -616,8 +650,10 @@ def save_cms_row(app_id, table_name, row_id):
     app = db.db.applications.find_one({"_id": ObjectId(app_id)})
     db_conn_str = get_tenant_db_conn_str(app)
 
-    # Exclude internal form variables
-    data = {k: v for k, v in request.form.items() if k not in ('csrf_token', '_method')}
+    # Exclude internal form variables, and any column this role is not allowed to
+    # see — a value it cannot read is a value it cannot write.
+    forbidden = hidden_columns_for(db, app_id, table_name) | {'csrf_token', '_method'}
+    data = {k: v for k, v in request.form.items() if k not in forbidden}
     acting_user = session.get('backoffice_user', 'unknown')
 
     blocked = check_publish_permission(app_id, table_name, data, db, db_conn_str, row_id)
@@ -626,7 +662,7 @@ def save_cms_row(app_id, table_name, row_id):
         return redirect(url_for('backoffice.view_cms_grid', app_id=app_id, table=table_name))
 
     try:
-        db.save_tenant_table_row(db_conn_str, table_name, int(row_id), data, app_id=app_id, acting_user=acting_user)
+        db.save_tenant_table_row(db_conn_str, table_name, row_id, data, app_id=app_id, acting_user=acting_user)
         flash("Row updated successfully.", "success")
     except Exception as e:
         flash(f"Update failed: {e}", "danger")
@@ -643,7 +679,8 @@ def create_cms_row(app_id, table_name):
     app = db.db.applications.find_one({"_id": ObjectId(app_id)})
     db_conn_str = get_tenant_db_conn_str(app)
 
-    data = {k: v for k, v in request.form.items() if k not in ('csrf_token', '_method')}
+    forbidden = hidden_columns_for(db, app_id, table_name) | {'csrf_token', '_method'}
+    data = {k: v for k, v in request.form.items() if k not in forbidden}
     acting_user = session.get('backoffice_user', 'unknown')
 
     blocked = check_publish_permission(app_id, table_name, data, db, db_conn_str)
@@ -672,7 +709,7 @@ def delete_cms_row(app_id, table_name, row_id):
     acting_user = session.get('backoffice_user', 'unknown')
     
     try:
-        db.delete_tenant_table_row(db_conn_str, table_name, int(row_id), app_id=app_id, acting_user=acting_user)
+        db.delete_tenant_table_row(db_conn_str, table_name, row_id, app_id=app_id, acting_user=acting_user)
         flash("Row deleted.", "warning")
     except Exception as e:
         flash(f"Deletion failed: {e}", "danger")

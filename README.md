@@ -11,6 +11,20 @@ Bifrost is a unified Identity, Authentication, and Payment Gateway system design
 - **Dynamic CORS Middleware:** Securely limits cross-origin requests by dynamically caching and verifying registered client application URLs.
 - **Backoffice & Admin Dashboards:** Dedicated UI for managing users, applications, secrets, and manual role overrides.
 
+## Documentation
+
+Full documentation index: **[docs/README.md](docs/README.md)**. The API reference
+and integration guide are served live at `/docs`; the landing page is `/`.
+
+| | |
+|---|---|
+| Architecture | [docs/reference/WHITE_PAPER.md](docs/reference/WHITE_PAPER.md) |
+| Integrating an app | [docs/guides/client_adoption.md](docs/guides/client_adoption.md) |
+| Running the console | [docs/guides/console-onboarding.md](docs/guides/console-onboarding.md) |
+| Working on Bifrost | [docs/guides/dev_guide.md](docs/guides/dev_guide.md) |
+| Terms, privacy, DPA | [docs/legal/](docs/legal/README.md) |
+| Release history | [CHANGELOG.md](CHANGELOG.md) |
+
 ## Project Structure
 
 - **`bifrost/`**: The core Flask application containing APIs for Authentication (`auth/`), Internal Services (`internal/`), Backoffice (`backoffice/`), and Models/Services.

@@ -78,14 +78,19 @@
 
   <nav class="toc" aria-label="Table of contents">
     <div class="flex items-center gap-2.5 px-4 h-[--topbar-h] border-b border-border">
-      <div class="w-7 h-7 rounded bg-accent text-accent-fg grid place-items-center font-bold shrink-0"
-           aria-hidden="true">V</div>
-      <div class="min-w-0">
-        <div class="font-semibold leading-tight">Bifrost docs</div>
-        <div class="text-[11px] muted leading-tight">
-          {% if version %}v{{ version }}{% if date %} · {{ date }}{% endif %}{% else %}Reference manual{% endif %}
+      {# Was a hardcoded "V" from the old Valhalla naming, and not a link — so the
+         docs were a dead end with no way back to the site. #}
+      <a href="{{ url_for('index') }}" class="flex items-center gap-2.5 min-w-0"
+         aria-label="Bifrost home">
+        <img src="{{ url_for('static', filename='logo-mark-64.png') }}" alt=""
+             width="28" height="28" class="w-7 h-7 rounded-lg shrink-0">
+        <div class="min-w-0">
+          <div class="font-semibold leading-tight">Bifrost docs</div>
+          <div class="text-[11px] muted leading-tight">
+            {% if version %}v{{ version }}{% if date %} · {{ date }}{% endif %}{% else %}Reference manual{% endif %}
+          </div>
         </div>
-      </div>
+      </a>
       <button type="button" class="btn btn-ghost btn-sm ml-auto" onclick="toggleTheme()"
               aria-label="Switch between light and dark theme">
         <span aria-hidden="true">◐</span>

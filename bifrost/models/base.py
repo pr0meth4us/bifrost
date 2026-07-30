@@ -53,6 +53,15 @@ class BaseMixin:
         self.db.verification_codes.create_index("created_at", expireAfterSeconds=600)
         self.db.verification_codes.create_index([("identifier", ASCENDING)])
 
+        # OIDC. Codes are kept past their one-minute expiry so a replay is
+        # detectable rather than merely absent; the TTL reaps them an hour later.
+        self.db.auth_codes.create_index([("code", ASCENDING)], unique=True)
+        self.db.auth_codes.create_index("created_at", expireAfterSeconds=3600)
+        self.db.oidc_refresh_tokens.create_index([("token_hash", ASCENDING)], unique=True)
+        self.db.oidc_refresh_tokens.create_index([("user_id", ASCENDING)])
+        self.db.oidc_refresh_tokens.create_index("created_at", expireAfterSeconds=30 * 86400)
+        self.db.applications.create_index([("tenant_id", ASCENDING)])
+
         # Transactions
         self.db.transactions.create_index([("transaction_id", ASCENDING)], unique=True)
         self.db.transactions.create_index([("account_id", ASCENDING)])

@@ -21,13 +21,16 @@
       {% if tenant_app and tenant_app.app_logo_url %}
         <img src="{{ tenant_app.app_logo_url }}" alt=""
              class="w-8 h-8 rounded object-contain shrink-0">
-      {% else %}
+      {% elif tenant_app %}
         <div class="w-8 h-8 rounded bg-accent text-accent-fg grid place-items-center font-bold shrink-0"
-             aria-hidden="true">{{ tenant_app.app_name[0]|upper if tenant_app else '·' }}</div>
+             aria-hidden="true">{{ tenant_app.app_name[0]|upper }}</div>
+      {% else %}
+        <img src="{{ url_for('static', filename='logo-mark-64.png') }}" alt=""
+             width="32" height="32" class="w-8 h-8 rounded-lg shrink-0">
       {% endif %}
       <div class="min-w-0">
         <div class="font-semibold leading-tight truncate">
-          {{ tenant_app.app_name if tenant_app else 'Console' }}
+          {{ tenant_app.app_name if tenant_app else 'Bifrost' }}
         </div>
         <div class="text-[11px] muted leading-tight">Sign in</div>
       </div>

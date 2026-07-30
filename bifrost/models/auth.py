@@ -9,6 +9,30 @@ import logging
 log = logging.getLogger(__name__)
 UTC = ZoneInfo("UTC")
 
+# Explicit opt-out of directory scoping, for platform paths that legitimately
+# search every tenant (console sign-in, Heimdall). Passing it is a decision;
+# omitting the scope entirely is a TypeError rather than a silent global search.
+ANY_TENANT = "*"
+
+
+def scoped(query, directory):
+    """Constrain an account lookup to one directory.
+
+    Accounts are partitioned per directory, so an unscoped lookup can return
+    another tenant's user. Callers must say which directory they mean, or say
+    ANY_TENANT out loud.
+    """
+    if directory == ANY_TENANT:
+        return query
+    if not directory:
+        raise ValueError(
+            "account lookup requires a directory scope "
+            "(db.directory_scope(app_config), or ANY_TENANT to search all tenants)"
+        )
+    query["client_id"] = directory
+    return query
+
+
 class AuthMixin:
     # ---------------------------------------------------------
     # OTP UTILITIES
@@ -126,48 +150,29 @@ class AuthMixin:
 
         return self.db.accounts.insert_one(account).inserted_id
 
-    def find_account_by_email(self, email, client_id=None):
+    def find_account_by_email(self, email, directory):
         if not email: return None
-        query = {"email": email.lower()}
-        if client_id:
-            query["client_id"] = client_id
-        else:
-            query["client_id"] = {"$in": [None, ""]}
-        return self.db.accounts.find_one(query)
+        return self.db.accounts.find_one(scoped({"email": email.lower()}, directory))
 
-    def find_account_by_username(self, username, client_id=None):
+    def find_account_by_username(self, username, directory):
         if not username: return None
-        query = {"username": username.lower()}
-        if client_id:
-            query["client_id"] = client_id
-        else:
-            query["client_id"] = {"$in": [None, ""]}
-        return self.db.accounts.find_one(query)
+        return self.db.accounts.find_one(scoped({"username": username.lower()}, directory))
 
     def find_account_by_id(self, account_id):
+        # _id is already unique across directories, so this needs no scope.
         try:
             return self.db.accounts.find_one({"_id": ObjectId(account_id)})
-        except:
+        except Exception:
             return None
 
-    def find_account_by_telegram(self, telegram_id, client_id=None):
-        query = {"telegram_id": str(telegram_id)}
-        if client_id:
-            query["client_id"] = client_id
-        else:
-            query["client_id"] = {"$in": [None, ""]}
-        return self.db.accounts.find_one(query)
+    def find_account_by_telegram(self, telegram_id, directory):
+        return self.db.accounts.find_one(scoped({"telegram_id": str(telegram_id)}, directory))
 
-    def find_account_by_phone(self, phone, client_id=None):
+    def find_account_by_phone(self, phone, directory):
         if not phone: return None
-        query = {"phone_number": str(phone).strip()}
-        if client_id:
-            query["client_id"] = client_id
-        else:
-            query["client_id"] = {"$in": [None, ""]}
-        return self.db.accounts.find_one(query)
+        return self.db.accounts.find_one(scoped({"phone_number": str(phone).strip()}, directory))
 
-    def find_account_by_sso(self, provider, provider_id, client_id=None):
+    def find_account_by_sso(self, provider, provider_id, directory):
         if not provider or not provider_id: return None
         query = {
             "$or": [
@@ -175,14 +180,10 @@ class AuthMixin:
                 {f"identities.{provider}.id": str(provider_id)}
             ]
         }
-        if client_id:
-            query["client_id"] = client_id
-        else:
-            query["client_id"] = {"$in": [None, ""]}
-        return self.db.accounts.find_one(query)
+        return self.db.accounts.find_one(scoped(query, directory))
 
-    def update_password(self, email, new_password, client_id=None):
-        user = self.find_account_by_email(email, client_id)
+    def update_password(self, email, new_password, directory):
+        user = self.find_account_by_email(email, directory)
         if not user:
             return
 
@@ -192,14 +193,22 @@ class AuthMixin:
         )
         self._trigger_event_for_user(user['_id'], "security_password_change")
 
+    def directory_of(self, account_id):
+        """The directory an existing account lives in.
+
+        Uniqueness checks below take their scope from the account itself rather
+        than from the caller: an identifier only has to be unique inside its own
+        directory, and reading it off the account is one fewer argument to get
+        wrong.
+        """
+        account = self.find_account_by_id(account_id)
+        return (account or {}).get('client_id')
+
     def link_email_credentials(self, account_id, email, password, client_id=None):
         email = email.lower()
-        query = {"email": email, "_id": {"$ne": ObjectId(account_id)}}
-        if client_id:
-            query["client_id"] = client_id
-        else:
-            query["client_id"] = {"$in": [None, ""]}
-        
+        query = scoped({"email": email, "_id": {"$ne": ObjectId(account_id)}},
+                       self.directory_of(account_id))
+
         existing = self.db.accounts.find_one(query)
         if existing:
             return False, "Email is already associated with another account."
@@ -225,7 +234,9 @@ class AuthMixin:
 
     def link_telegram(self, account_id, telegram_id, display_name, client_id):
         telegram_id = str(telegram_id)
-        existing = self.db.accounts.find_one({"telegram_id": telegram_id, "_id": {"$ne": ObjectId(account_id)}})
+        existing = self.db.accounts.find_one(scoped(
+            {"telegram_id": telegram_id, "_id": {"$ne": ObjectId(account_id)}},
+            self.directory_of(account_id)))
         if existing:
             return False, "Telegram account already linked to another user."
 
@@ -251,13 +262,13 @@ class AuthMixin:
 
     def link_sso(self, account_id, provider, provider_id):
         provider_id = str(provider_id)
-        existing = self.db.accounts.find_one({
+        existing = self.db.accounts.find_one(scoped({
             "$or": [
                 {f"{provider}_id": provider_id},
                 {f"identities.{provider}.id": provider_id}
             ],
             "_id": {"$ne": ObjectId(account_id)}
-        })
+        }, self.directory_of(account_id)))
         if existing:
             return False, f"{provider.capitalize()} account already linked to another user."
 
@@ -285,17 +296,20 @@ class AuthMixin:
         else:
             return False, "Account not found."
 
-    def update_account_profile(self, account_id, updates, client_id):
+    def update_account_profile(self, account_id, updates, client_id=None):
+        directory = self.directory_of(account_id)
+
         if 'email' in updates:
             updates['email'] = updates['email'].lower()
-            existing = self.db.accounts.find_one({"email": updates['email'], "_id": {"$ne": ObjectId(account_id)}})
+            existing = self.db.accounts.find_one(scoped(
+                {"email": updates['email'], "_id": {"$ne": ObjectId(account_id)}}, directory))
             if existing:
                 return False, "Email is already in use by another account."
 
         if 'username' in updates:
             updates['username'] = updates['username'].lower()
-            existing = self.db.accounts.find_one(
-                {"username": updates['username'], "_id": {"$ne": ObjectId(account_id)}})
+            existing = self.db.accounts.find_one(scoped(
+                {"username": updates['username'], "_id": {"$ne": ObjectId(account_id)}}, directory))
             if existing:
                 return False, "Username is already taken."
 
@@ -317,4 +331,7 @@ class AuthMixin:
         result = self.db.accounts.delete_one({"_id": ObjectId(account_id)})
         # Also clean up any associated sessions or linked apps in Bifrost
         self.db.apps_users.delete_many({"user_id": ObjectId(account_id)})
+        # A deleted account must not keep a live refresh token behind it.
+        self.db.oidc_refresh_tokens.delete_many({"user_id": ObjectId(account_id)})
+        self.db.auth_codes.delete_many({"user_id": ObjectId(account_id)})
         return result.deleted_count > 0

@@ -8,22 +8,28 @@
 {% set ep = request.endpoint %}
 <nav class="sidebar" aria-label="Console navigation">
 
-  <div class="flex items-center gap-2.5 px-4 h-[--topbar-h] border-b border-border shrink-0">
-    {# The tenant's own app is the brand here, not ours. Only fall back to a
-       generic mark when no app is in scope (the all-applications list). #}
+  <a href="{{ url_for('index') }}"
+     class="flex items-center gap-2.5 px-4 h-[--topbar-h] border-b border-border shrink-0 hover:bg-surface-2"
+     aria-label="Home">
+    {# The tenant's own app is the brand here, not ours — white-labelling is the
+       point, so Bifrost's mark only appears when no app is in scope (the
+       all-applications list). #}
     {% if app and app.app_logo_url %}
       <img src="{{ app.app_logo_url }}" alt="" class="w-7 h-7 rounded object-contain shrink-0">
-    {% else %}
+    {% elif app %}
       <div class="w-7 h-7 rounded bg-accent text-accent-fg grid place-items-center font-bold shrink-0"
-           aria-hidden="true">{{ app.app_name[0]|upper if app else '·' }}</div>
+           aria-hidden="true">{{ app.app_name[0]|upper }}</div>
+    {% else %}
+      <img src="{{ url_for('static', filename='logo-mark-64.png') }}" alt=""
+           width="28" height="28" class="w-7 h-7 rounded-lg shrink-0">
     {% endif %}
     <div class="min-w-0">
       <div class="font-semibold leading-tight truncate" title="{{ app.app_name if app }}">
-        {{ app.app_name if app else 'Console' }}
+        {{ app.app_name if app else 'Bifrost' }}
       </div>
       <div class="text-[11px] muted leading-tight">Console</div>
     </div>
-  </div>
+  </a>
 
   <div class="flex-1 overflow-y-auto py-2">
     <a class="nav-link" href="{{ url_for('backoffice.dashboard') }}"

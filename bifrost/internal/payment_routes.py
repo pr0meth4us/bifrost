@@ -240,7 +240,7 @@ def grant_role_by_admin():
     if account_id:
         user = db.db.accounts.find_one({"_id": ObjectId(account_id)})
     else:
-        user = db.find_account_by_telegram(telegram_id)
+        user = db.find_account_by_telegram(telegram_id, db.directory_scope(app_doc))
         
     if not user:
         return jsonify({"error": "User not found"}), 404
@@ -421,7 +421,7 @@ def submit_payment_proof():
     if account_id:
         user = db.find_account_by_id(account_id)
     elif email:
-        user = db.find_account_by_email(email)
+        user = db.find_account_by_email(email, db.directory_scope(app_doc))
 
     if not user:
         return jsonify({"error": "User not found"}), 404

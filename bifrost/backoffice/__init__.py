@@ -131,14 +131,51 @@ ROLE_PERMISSIONS = {
 CONSOLE_ROLES = ("owner", "super_admin", "admin", "content_manager", "operations",
                  "billing_agent", "developer")
 
+# Platform-staff roles. They run Bifrost; they are not automatically staff of
+# every tenant on it.
+PLATFORM_ROLES = ('heimdall', 'pr0meth4us')
+
+# What a platform admin may do inside an EXTERNAL tenant — someone else's
+# customers, someone else's data. Enough to keep the platform running and answer
+# "is their integration healthy", and nothing that reads or changes the tenant's
+# business: no secrets, no content, no end-user records, no payment approvals, no
+# SQL. Internal tenants are unrestricted.
+#
+# The escape hatch is deliberate and consented: a tenant owner can grant a
+# platform engineer a normal role in their app through user management, which is
+# visible to them and revocable by them. That is a better break-glass than an
+# implicit superuser nobody can see.
+PLATFORM_EXTERNAL_PERMISSIONS = {
+    "read:config",   # see how the app is wired, to support the integration
+    "view:metrics",  # aggregate health and usage
+    "audit:view",    # who did what, since the platform is accountable for it
+}
+
+
+def platform_admin_may(app_id, permission):
+    """Whether a platform admin may exercise `permission` inside this tenant."""
+    if not app_id:
+        # Platform-level page with no tenant in scope (dashboard, intake queue).
+        return True
+    db = get_db()
+    app = resolve_app_doc(db, app_id)
+    if db.is_internal_tenant(app):
+        return True
+    return permission in PLATFORM_EXTERNAL_PERMISSIONS
+
+
 def check_permission(app_id, permission_or_level):
     """
     Role-Based Access Control (RBAC) Checker.
     Supports both explicit permission strings (professional) and legacy levels (fallback).
     """
     role = get_current_role_in_app(app_id)
-    if role in ('heimdall', 'pr0meth4us'):
-        return True
+    if role in PLATFORM_ROLES:
+        # Numeric legacy levels are only ever used for tenant-config screens; treat
+        # them as the write-config permission rather than a blanket yes.
+        permission = ("write:config" if isinstance(permission_or_level, int)
+                      else permission_or_level)
+        return platform_admin_may(app_id, permission)
 
     if not role:
         return False
@@ -154,6 +191,20 @@ def check_permission(app_id, permission_or_level):
     # Explicit string permission check
     allowed_permissions = ROLE_PERMISSIONS.get(role, set())
     return permission_or_level in allowed_permissions
+
+
+def cms_full_access(app_id, roles=("owner", "super_admin")):
+    """Unrestricted read/write over the tenant's CMS tables.
+
+    Replaces five hand-copied role tuples that each listed heimdall alongside the
+    tenant's own owners. A platform admin keeps that blanket access on internal
+    tenants only — on an external one, the tenant's CMS is the tenant's data and
+    the platform sees it through the same per-role config as everyone else.
+    """
+    role = get_current_role_in_app(app_id)
+    if role in PLATFORM_ROLES:
+        return platform_admin_may(app_id, "content:write")
+    return role in roles
 
 
 def requires(permission):

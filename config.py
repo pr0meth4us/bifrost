@@ -20,7 +20,18 @@ class Config:
     SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'bifrostbyhelm@gmail.com')
 
     # --- PUBLIC URL ---
+    # Also the OIDC issuer. Relying parties pin this string, and it is read from
+    # config rather than X-Forwarded-Host so nobody can move the issuer with a
+    # request header.
     BIFROST_PUBLIC_URL = os.environ.get('BIFROST_PUBLIC_URL', 'http://localhost:5000')
+
+    # --- OIDC PROVIDER ---
+    # Optional: pin the RS256 signing key. Left unset, Bifrost generates one on
+    # first use and stores it in Mongo so every worker shares it.
+    OIDC_PRIVATE_KEY_PEM = os.environ.get('OIDC_PRIVATE_KEY_PEM')
+    # How long a Bifrost SSO session survives before the next app has to
+    # re-prompt for credentials.
+    OIDC_SSO_SESSION_SECONDS = int(os.environ.get('OIDC_SSO_SESSION_SECONDS', 12 * 3600))
 
     # --- ABA PAYWAY ---
     # Endpoint only. Merchant ID and API key are per-tenant and live in each app's
@@ -60,17 +71,6 @@ class Config:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
     SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'true').lower() != 'false'
-
-    # --- PLATFORM DATA LOCKS (CMS) ---
-    # LEGACY SEED ONLY — do not add tenants here. Locks now live on the app document
-    # as `platform_locked_tables`, editable by a platform super-admin in the console,
-    # so onboarding a tenant no longer needs a deploy. These two entries stay so the
-    # existing apps keep their locks whether or not anyone re-saves them; the two
-    # sources are unioned, never overridden, in locked_tables_for().
-    PLATFORM_LOCKED_TABLES = {
-        'finance-bot': ['transactions', 'user_balances', 'ledger', 'bank_accounts'],
-        'savvify': ['transactions', 'user_balances', 'ledger', 'bank_accounts']
-    }
 
     if not SECRET_KEY or not MONGO_URI or not JWT_SECRET_KEY or not EMAIL_PASSWORD:
         raise RuntimeError("CRITICAL: Missing .env keys (EMAIL_PASSWORD, SECRET_KEY, etc.)")

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from flask import render_template, request, redirect, url_for, session, flash, current_app, make_response
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import check_password_hash, generate_password_hash
+from ..models.auth import ANY_TENANT
 from ..services.email_service import send_invite_email, send_reset_email, send_otp_email
 from . import backoffice_bp, get_db
 
@@ -116,10 +117,12 @@ def login():
                 return _start_mfa(db, admin_doc, True, tenant_app)
             flash("Role deprecated. Update to 'heimdall'.", "warning")
 
-        # 2. App Tenant Check
-        user = db.find_account_by_email(identifier)
+        # 2. App Tenant Check. Console sign-in searches every directory on
+        #    purpose: one person can own apps in more than one of them, and the
+        #    managed-apps check below is what actually authorizes them.
+        user = db.find_account_by_email(identifier, ANY_TENANT)
         if not user:
-            user = db.find_account_by_username(identifier)
+            user = db.find_account_by_username(identifier, ANY_TENANT)
 
         if user and user.get('password_hash') and check_password_hash(user['password_hash'], password):
             if db.get_managed_apps(user['_id']):
@@ -173,7 +176,7 @@ def forgot_password():
         if user:
             is_heimdall = True
         else:
-            user = db.find_account_by_email(email)
+            user = db.find_account_by_email(email, ANY_TENANT)
 
         if user:
             otp, vid = db.create_otp(email, channel="email")

@@ -1,6 +1,125 @@
 # Changelog
 
-## [2026-07-28]
+All notable changes to Bifrost are recorded here.
+
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions
+follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Newest first.
+`[Unreleased]` always sits directly below this note.
+
+Section headings, in order: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`,
+`Security`.
+
+The version banner on `/docs` is parsed from the first `## [X.Y.Z] - YYYY-MM-DD`
+header in this file, so a release entered without that exact shape is a release
+the product will not admit to shipping.
+
+## [Unreleased]
+### Added
+- **Valhalla Console UI**: Completely redesigned the `content_grid.html` Backoffice template to use the modern, dark-mode premium "Stitch" design system (Valhalla Console). Added dynamic glassmorphic side drawer for entity creation/editing.
+- **Security**: Added `Flask-WTF` dependency to properly enforce CSRF protection across all Jinja backoffice forms.
+- **Option B Backoffice CMS Console (Phase 1)**: Built manual payment receipt validation queue, dynamic CNAME host header resolution routing, and user entitlement suspension and overrides (commit: payments proxy, user overrides, dynamic template split-screen queue with Alpine.js).
+- **Telegram Bot SQL Ingestion**: Integrated the payment bot with multi-tenant SQL databases. The bot now automatically maps Telegram IDs to Postgres users, downloads and stores payment receipts in the tenant database, and routes admin approvals and rejections directly to the custom SQL connection.
+- **Developer Guidelines & Verification Script**: Created project-scoped developer instructions (`.agents/AGENTS.md`) and automated initiation shell scripts (`scripts/init_dev.sh`) to support onboarding and pre-release testing.
+- **Technical Architecture White Paper**: Authored a detailed technical design blueprint (`docs/WHITE_PAPER.md`) outlining system topologies, database structures, envelope encryption models, and multi-tenant routing parameters.
+- **Norse Mythology Mock Client App (Valhalla Portal)**: Built a Norse-themed mock client application (`valhalla_portal/app.py` and templates) running on port `5050` to demonstrate and test secrets injection and centralized SSO authentication redirection callbacks over the Bifrost bridge.
+- **Unified Python Client SDK**: Created the canonical `bifrost_client.py` client SDK under `sdk/python/` to allow downstream Python applications to pull secrets, inject environment variables, and manage local config caching dynamically. Enhanced it to be fully object-oriented, documented, and parameterized (supporting custom Client IDs, cache paths, TTL parameters, and process-level injection flags).
+- **Auth UI**: Added interactive password show/hide toggle (eye icon) to all client-facing and backoffice login, password reset, and account activation templates.
+- **SSO Multi-Provider Integration**: Implemented generic OAuth2 and OpenID Connect (OIDC) SSO routers (`/auth/sso/<provider>/login` & `/callback`) for **Google**, **GitHub**, **Microsoft / Outlook**, **Apple**, and **Facebook**. Integrates nested linked identity schemas (`identities` map) in MongoDB, automatic app redirection, dynamic template rendering based on server configuration, and new user provisioning.
+- **Multi-Tenant Telegram Webhooks**: Extended the internal bot builder (`bot/main.py`) to accept dynamic bot tokens. Refactored the webhook receiver `/auth/api/telegram-webhook/<client_id>` to pull unique branded bot tokens dynamically from the respective client application's database vault, allowing a single deployment to host multiple custom branded payment bots. Configured Savvify with the master Telegram Payment Bot token for dynamic payment webhook execution.
+- **Phone OTP SMS Authentication**: Built a dedicated SMS dispatch service (`services/sms_service.py`) leveraging the Twilio HTTP API (with local stdout sandbox fallback). Implemented headless REST API endpoints (`/request-phone-otp` & `/verify-phone-otp`) and Flask UI routes (`/request-phone-otp` & `/verify-phone-otp`) with automatic user provisioning and a togglable Phone tab on the login screen.
+- **Heimdall Vision OCR Metrics**: The Heimdall AI Metrics dashboard now queries and displays usage and cost metrics for Google Cloud Vision API (`vision.googleapis.com`) under the model name `vision-ocr-pages`.
+- **Heimdall Billing Breakdown Table**: Enhanced the dashboard interface (`ai_metrics.html`) to display a detailed tabular breakdown of individual GCP service costs, applied credits, and net costs.
+- **Bifrost Console Branding**: Refined backoffice titles and templates to standardize management dashboard naming to "Bifrost Console" for tenant and admin screens.
+- **Bifrost Integration Sandbox**: Built an interactive mock client app (`sandbox/app.py`) using Flask to demonstrate integration flows. Showcases session authorization redirection, token callback parsing, local JWT claims decoding, multi-provider SSO/SMS OTP routing, and live SDK vault key loading diagnostics.
+- **Client Application RBAC Claims**: Introduced central JWT session token helpers (`utils/token.py`) that map and resolve client-specific user roles (`owner`, `super_admin`, `admin`, `premium_user`, `user`, `guest`) to fine-grained permission arrays (e.g. `premium:access`, `billing:manage`, `read:app`). Embeds resolved roles and permissions directly inside downstream client session tokens.
+- **Professional Role-Based Access Control (RBAC)**: Upgraded the numeric permission level checks into a professional explicit role-permissions matrix (`ROLE_PERMISSIONS`). Maps roles (`owner`, `super_admin`, `admin`, `member`, `user`, `viewer`) to granular permissions (such as `read:config`, `write:config`, `manage:users`, `view:secrets`, `manage:secrets`, `transfer:ownership`, `view:metrics`) with backwards-compatible legacy level fallbacks.
+- **Service Segmentation & Toggles**: Introduced a comprehensive service toggle configuration system (`enabled_services`) for registered applications. Supports toggling of OAuth SSO, Phone SMS OTP, Email OTP, Secrets Vault, Payment Verification Bot, and Heimdall AI Monitor individually. Dynamically updates UI elements and enforces service-level permission checks across all API and authentication endpoints.
+
+- Created `upload_sa_to_bifrost.py` script to seamlessly push Google Service Account credentials directly into the Bifrost MongoDB Vault.
+- Added `/heimdall/ai-metrics` routing in `backoffice.py` to query Google Cloud Monitoring.
+- Implemented `ai_metrics.html` visual dashboard for Heimdall users to track `aiplatform.googleapis.com` token metrics in real-time.
+- Updated `dashboard.html` to integrate AI Metrics button.
+- Added `google-cloud-monitoring` dependency to `requirements.txt`.
+
+## [0.17.0] - 2026-07-29
+
+Bifrost becomes a real OpenID Connect provider with working single sign-on, and
+platform staff stop being implicitly omnipotent over customer tenants.
+
+### Added
+- **OIDC provider, completed.** Client authentication at the token endpoint
+  (`client_secret_basic` / `client_secret_post`), exact-match `redirect_uri`
+  allowlisting at both authorize and token exchange, PKCE (`S256` and `plain`,
+  mandatory for clients flagged `oidc_public_client`), refresh tokens with
+  rotation and no scope widening, RFC 7009 revocation, RP-initiated logout with
+  an allowlisted `post_logout_redirect_uri`, and full discovery metadata.
+- **Single sign-on.** `bifrost/auth/sso.py` holds a real IdP session. Every
+  authentication path — password, email OTP, SMS, social, Telegram, invite
+  activation — funnels through one `complete_login()`, so a second application
+  redirecting to `/oidc/authorize` receives a code without re-prompting.
+  Supports `prompt=none`, `prompt=login`, `max_age`, and emits `amr` /
+  `auth_time`.
+- **Account directories.** `applications.tenant_id` groups applications that
+  share one user pool, defaulting to the application's own `client_id` so a
+  standalone tenant is unchanged. This is what lets SSO span more than one app.
+- **Internal vs external tenants.** `applications.tenant_type` decides how much
+  of a tenant platform staff can see. Internal is unrestricted; external limits
+  platform admins to `read:config`, `view:metrics` and `audit:view`.
+- **MongoDB backend for the tenant CMS** (`bifrost/models/cms_mongo.py`).
+  Selected by connection string, mirrors the seven Postgres CMS operations,
+  infers a schema by sampling documents, and coerces form values to the types a
+  collection already uses. The payment queue stays PostgreSQL-only.
+- Migration scripts `003`–`005` for account directories, tenant classification
+  and the legacy index drop.
+
+### Fixed
+- **The token endpoint had never worked.** It called `db.get_account()`, which
+  does not exist, so every authorization-code exchange raised `AttributeError`.
+- **Global unique indexes defeated multi-tenancy at the database layer.**
+  `accounts` carried both legacy platform-wide unique indexes (`email_1`,
+  `username_1`, `telegram_id_1`, `google_id_1`, `phone_number_1`) and the
+  per-tenant compound ones. The legacy indexes are strictly stronger, so two
+  tenants could never share a user's email — surfacing as a 500 on registration.
+  Dropped by `scripts/005_drop_legacy_global_indexes.py`.
+- **Directory scoping broke every caller outside `bifrost/auth/`.** The Telegram
+  bot, payment webhooks, internal API and backoffice user search all looked up
+  accounts without a scope and silently matched nothing. An unscoped lookup now
+  raises instead of quietly returning `None`; platform paths pass `ANY_TENANT`
+  explicitly.
+- **Console invites created accounts with no directory**, so an invited user
+  could never sign in to the tenant application.
+- **Platform-locked tables were cosmetic.** The lock list filtered the table
+  listing and was never consulted on save, so a hand-made POST wrote to a locked
+  ledger. Now enforced in `check_cms_write_permission`, ahead of every role.
+- **Role-hidden columns were cosmetic on write** for the same reason. Stripped
+  from the payload in `save_cms_row` and `create_cms_row`.
+- **The OIDC signing key was generated per worker process**, so one worker signed
+  id_tokens another worker's JWKS could not verify. Persisted in MongoDB and
+  shared, with `OIDC_PRIVATE_KEY_PEM` to pin it explicitly.
+- **The issuer was taken from `X-Forwarded-Host`**, which is attacker-controlled.
+  Read from `BIFROST_PUBLIC_URL`, with the header only as a fallback.
+- **Signing up mid-OIDC-flow dropped the relying party** — the branch checked a
+  session key nothing ever set.
+- `expires_in` advertised 3600 seconds while issuing a seven-day token.
+
+### Changed
+- Platform staff (`heimdall`, `pr0meth4us`) no longer short-circuit
+  `check_permission` to `True`. Access is resolved against the tenant's type.
+- Heimdall's cross-tenant views (`/heimdall/users`, `/heimdall/api-keys`, global
+  user delete) are scoped to internal directories. `global_user_details` returns
+  an identical 404 for absent and external accounts, so it cannot enumerate a
+  customer's users.
+- Deleting an account now revokes its refresh tokens and authorization codes.
+- Uniqueness checks in `link_sso`, `link_telegram`, `update_account_profile` and
+  `link_email_credentials` take their scope from the account itself rather than
+  applying globally.
+
+### Removed
+- `Config.PLATFORM_LOCKED_TABLES`. Locks live on the application document and
+  are editable in the console. The hardcoded keys (`finance-bot`, `savvify`)
+  matched no application in the database and had never taken effect.
+
+## [0.16.0] - 2026-07-28
 Admin Console ("Control Room") Phase 1 + 1.5, against the Ministry Exam Prep scope of
 work. Gap analysis and vendor reply in `docs/scope-response-admin-console.md`;
 operator runbook in `docs/console-onboarding.md`.
@@ -40,11 +159,11 @@ operator runbook in `docs/console-onboarding.md`.
 - `migrations/001_console_phase1.sql` — proposed schema additions (`payments.exam_track_id`, unique `txn_ref`, `receipt_checksum`, `created_at`, entitlement uniqueness, `users.status`, `questions.question_source`) plus the restricted `console_agent` role grants.
 - `tests/test_console_phase1.py` — 27 tests covering approve→entitlement, refund→revocation, duplicate `txn_ref`, the state machine, publish validation, identifier guards, and server-side role enforcement.
 
-## [2026-07-24]
+## [0.15.0] - 2026-07-24
 ### Added
 - `sdk/python/bifrost_ai.py` — Google AI client factories (`get_genai_client` for Vertex Gemini, `get_vision_client` for Cloud Vision) built on bifrost's own credential resolution. Bifrost now owns "talk to Google AI + handle credentials" for all consumers; downstream repos import these instead of hand-rolling `genai.Client(vertexai=True, …)`. google libs are imported lazily so `bifrost_client` (secrets-only) stays dependency-light.
 
-## [2026-07-09]
+## [0.14.0] - 2026-07-09
 ### Added
 - Multi-Tenant UI Configuration: App Owners can now input and update their `db_connection` (PostgreSQL/Supabase) string directly from the Configuration tab in the Bifrost Backoffice.
 - Inference Engine: Automatically detects and renders monetary columns, avatar columns, and status pills (active/pending) in the Content Editor grid.
@@ -56,37 +175,13 @@ operator runbook in `docs/console-onboarding.md`.
 All notable changes to the `bifrost` project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-### Added
-- **Valhalla Console UI**: Completely redesigned the `content_grid.html` Backoffice template to use the modern, dark-mode premium "Stitch" design system (Valhalla Console). Added dynamic glassmorphic side drawer for entity creation/editing.
-- **Security**: Added `Flask-WTF` dependency to properly enforce CSRF protection across all Jinja backoffice forms.
-- **Option B Backoffice CMS Console (Phase 1)**: Built manual payment receipt validation queue, dynamic CNAME host header resolution routing, and user entitlement suspension and overrides (commit: payments proxy, user overrides, dynamic template split-screen queue with Alpine.js).
-- **Telegram Bot SQL Ingestion**: Integrated the payment bot with multi-tenant SQL databases. The bot now automatically maps Telegram IDs to Postgres users, downloads and stores payment receipts in the tenant database, and routes admin approvals and rejections directly to the custom SQL connection.
-- **Developer Guidelines & Verification Script**: Created project-scoped developer instructions (`.agents/AGENTS.md`) and automated initiation shell scripts (`scripts/init_dev.sh`) to support onboarding and pre-release testing.
-- **Technical Architecture White Paper**: Authored a detailed technical design blueprint (`docs/WHITE_PAPER.md`) outlining system topologies, database structures, envelope encryption models, and multi-tenant routing parameters.
-- **Norse Mythology Mock Client App (Valhalla Portal)**: Built a Norse-themed mock client application (`valhalla_portal/app.py` and templates) running on port `5050` to demonstrate and test secrets injection and centralized SSO authentication redirection callbacks over the Bifrost bridge.
-- **Unified Python Client SDK**: Created the canonical `bifrost_client.py` client SDK under `sdk/python/` to allow downstream Python applications to pull secrets, inject environment variables, and manage local config caching dynamically. Enhanced it to be fully object-oriented, documented, and parameterized (supporting custom Client IDs, cache paths, TTL parameters, and process-level injection flags).
-- **Auth UI**: Added interactive password show/hide toggle (eye icon) to all client-facing and backoffice login, password reset, and account activation templates.
-- **SSO Multi-Provider Integration**: Implemented generic OAuth2 and OpenID Connect (OIDC) SSO routers (`/auth/sso/<provider>/login` & `/callback`) for **Google**, **GitHub**, **Microsoft / Outlook**, **Apple**, and **Facebook**. Integrates nested linked identity schemas (`identities` map) in MongoDB, automatic app redirection, dynamic template rendering based on server configuration, and new user provisioning.
-- **Multi-Tenant Telegram Webhooks**: Extended the internal bot builder (`bot/main.py`) to accept dynamic bot tokens. Refactored the webhook receiver `/auth/api/telegram-webhook/<client_id>` to pull unique branded bot tokens dynamically from the respective client application's database vault, allowing a single deployment to host multiple custom branded payment bots. Configured Savvify with the master Telegram Payment Bot token for dynamic payment webhook execution.
-- **Phone OTP SMS Authentication**: Built a dedicated SMS dispatch service (`services/sms_service.py`) leveraging the Twilio HTTP API (with local stdout sandbox fallback). Implemented headless REST API endpoints (`/request-phone-otp` & `/verify-phone-otp`) and Flask UI routes (`/request-phone-otp` & `/verify-phone-otp`) with automatic user provisioning and a togglable Phone tab on the login screen.
-- **Heimdall Vision OCR Metrics**: The Heimdall AI Metrics dashboard now queries and displays usage and cost metrics for Google Cloud Vision API (`vision.googleapis.com`) under the model name `vision-ocr-pages`.
-- **Heimdall Billing Breakdown Table**: Enhanced the dashboard interface (`ai_metrics.html`) to display a detailed tabular breakdown of individual GCP service costs, applied credits, and net costs.
-- **Bifrost Console Branding**: Refined backoffice titles and templates to standardize management dashboard naming to "Bifrost Console" for tenant and admin screens.
-- **Bifrost Integration Sandbox**: Built an interactive mock client app (`sandbox/app.py`) using Flask to demonstrate integration flows. Showcases session authorization redirection, token callback parsing, local JWT claims decoding, multi-provider SSO/SMS OTP routing, and live SDK vault key loading diagnostics.
-- **Client Application RBAC Claims**: Introduced central JWT session token helpers (`utils/token.py`) that map and resolve client-specific user roles (`owner`, `super_admin`, `admin`, `premium_user`, `user`, `guest`) to fine-grained permission arrays (e.g. `premium:access`, `billing:manage`, `read:app`). Embeds resolved roles and permissions directly inside downstream client session tokens.
-- **Professional Role-Based Access Control (RBAC)**: Upgraded the numeric permission level checks into a professional explicit role-permissions matrix (`ROLE_PERMISSIONS`). Maps roles (`owner`, `super_admin`, `admin`, `member`, `user`, `viewer`) to granular permissions (such as `read:config`, `write:config`, `manage:users`, `view:secrets`, `manage:secrets`, `transfer:ownership`, `view:metrics`) with backwards-compatible legacy level fallbacks.
-- **Service Segmentation & Toggles**: Introduced a comprehensive service toggle configuration system (`enabled_services`) for registered applications. Supports toggling of OAuth SSO, Phone SMS OTP, Email OTP, Secrets Vault, Payment Verification Bot, and Heimdall AI Monitor individually. Dynamically updates UI elements and enforces service-level permission checks across all API and authentication endpoints.
-
 ## [0.13.0] - 2026-06-15
-
 ### Added
 - **Config Webhooks (Secret Zero)**: Bifrost now emits a `config_updated` webhook event to an application's `app_api_url` whenever its API keys, details, or Client Secret are rotated. This allows client applications to seamlessly refresh their cached secrets without latency overhead or restarts.
 - **Client SecretManager**: Added a reusable `bifrost_secret_manager.py` Python snippet to easily integrate the webhook auto-refresh mechanism into downstream client applications.
 - **Vault UI Sync Status**: Updated the Global API Vault frontend to display the Webhook Sync status for applications, allowing Heimdall administrators to see at a glance if an application is hooked up to real-time configuration updates.
 
 ## [0.12.2] - 2026-06-15
-
 ### Added
 - **Global API Vault**: Added a centralized, read-only dashboard (`/heimdall/api-keys`) for Heimdall super-admins to monitor configured API keys across all registered applications.
 - **API Vault Navigation**: Integrated the "API VAULT" quick-link into the main Backoffice Dashboard and the Global Users List navigation bars.
@@ -96,12 +191,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Key Migration**: Automated the parsing of local `.env` keys (such as `EXCHANGERATE_API_KEY`, `TELEGRAM_TOKEN`, `MONGODB_URI`, `PAYWAY_API_KEY`) and securely encrypted them directly into the Bifrost database. Added placeholders for `GEMINI_API_KEY` for the TikTok streak features.
 
 ## [0.12.1] - 2026-06-15
-
 ### Fixed
 - **Config API Import**: Fixed an `ImportError: attempted relative import beyond top-level package` in `config_api.py` caused by an incorrect `get_db` relative import, which prevented Gunicorn workers from booting.
 
 ## [0.12.0] - 2026-06-15
-
 ### Added
 - **Remote Config Server**: Upgraded Bifrost to act as an HTTP-based centralized Remote Config Server utilizing End-to-End Encryption at Rest.
 - **Server-Side Decryption**: Added `GET /api/v1/config` endpoint. Bifrost decrypts stored API keys and Configs using the specific app's `webhook_secret` and returns them securely over HTTPS to authenticated clients.
@@ -116,20 +209,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Logging API Bug**: Resolved a `NameError` causing HTTP 500 responses in `/internal/logs` by importing the missing `datetime` module.
 
 ## [0.10.0] - 2026-06-14
-
 ### Changed
 - **Architectural Reversion**: Removed the Bifrost Control Room UI and the `pr0meth4us` role. 
 - **Decoupling**: Removed all dynamic TikTok configuration saving logic, as the configuration has been moved back into a static file inside the Finance service.
 
 ## [0.9.0] - 2026-06-14
-
 ### Added
 - **Centralized Control Room**: Added a new protected view in `backoffice.py` styled with Tailwind CSS, offering a terminal viewer for ecosystem logs and an interactive panel to manage the AI Keeper.
 - **pr0meth4us Role**: Added support for the `pr0meth4us` (Bot Master) role. `pr0meth4us` has Level 3 (Owner) privileges across all connected applications and exclusive access to the Control Room, but cannot register new apps or permanently delete users like `heimdall`.
 - **Dynamic Configuration Updates**: Implemented forms in the Control Room to push settings (`FORCE_DICE_ROLL`, `BEHAVIORAL_CONFIG`) directly to MongoDB, eliminating the need for hardcoded scripts.
 
 ## [0.8.9] - 2026-06-10
-
 ### Added
 - **Secret Management**: Added "Rotate Secret" action to the `ApplicationsView` in `admin_panel.py`. Administrators can now securely invalidate and regenerate Client Secrets directly from the Bifrost Admin Dashboard.
 
@@ -137,7 +227,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Production Safety**: Removed hardcoded `debug=True` in `run.py`, ensuring interactive debuggers are disabled in production.
 
 ## [0.8.8] - 2026-06-10
-
 ### Added
 - **Free Trial API**: Implemented a new internal endpoint (`POST /internal/payments/free-trial/activate`) to seamlessly upgrade users to the `premium_user` role for a 14-day duration without requiring a Stripe or ABA payment intent.
 - **Trial Fraud Prevention**: Added a `trial_used` boolean flag to the `app_links` collection in MongoDB. The free trial endpoint validates this flag before granting access, effectively preventing users from claiming multiple trials across different applications within the Bifrost ecosystem.
@@ -145,12 +234,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Role Assignment Controls**: Upgraded the internal data structures to support manual role overrides by system administrators via the Client Apps, bypassing automated billing flows when necessary.
 
 ## [0.8.7] - 2026-06-09
-
 ### Added
 - **Bank API Configuration (System-Level)**: Integrated the `ABA_RECURRING_API_TOKEN` environment variable in the Bifrost configuration (`config.py`) as a system-level placeholder/sandbox key to support future recurring payments, keeping it securely out of the user-facing backoffice settings.
 
 ## [0.8.6] - 2026-06-09
-
 ### Fixed
 - **App Link Role Preservation on Login**: Resolved premium user demotions by ensuring `link_user_to_app` preserves the existing `app_specific_role` and `role` when not explicitly specified (such as during login calls).
 - **Expiration Sync in Reaper**: Updated the scheduler's expiration logic to verify both `app_specific_role` and legacy `role` fields, ensuring a robust downgrade sync across both fields.
@@ -161,41 +248,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Warning Flag Clearance**: Clears the `warning_sent` subscription expiration warning flag on database role upgrades, renewals, and downgrades to prevent stale states.
 
 ## [0.8.5] - 2026-06-08
-
 ### Added
 - **Explicit Expiration Output**: Modified the `/internal/validate-token` endpoint in `bifrost/internal/routes.py` to output the `exp` timestamp parsed directly from the JWT payload. This empowers relying services (like the Finance Core) to accurately cap their cache TTL without violating domain isolation by decoding the token themselves.
 
 ## [0.8.4] - 2026-06-08
-
 ### Fixed
 - **Validation Debugging**: Improved `validate_token` endpoint to return specific JWT exceptions (e.g., ExpiredSignatureError, DecodeError) instead of a generic "Invalid Token" 401 error. This will assist client applications in diagnosing token rejections after webhook events.
 
 ## [0.8.3] - 2026-06-08
-
 ### Fixed
 - **Bifrost API**: Fixed a 404 error affecting `/internal/payments/secure-intent` and other payment endpoints by correcting the blueprint import in `bifrost/__init__.py`. The import was changed from `from .internal.routes import internal_bp` to `from .internal import internal_bp`, ensuring that both general routes and payment routes are properly registered with the Flask application.
 - **Webhook Processing**: Fixed an issue in `bot/main.py` where the bot would quietly drop messages during webhook execution. Added missing `await app.start()` and `await app.stop()` calls to ensure the `python-telegram-bot` application correctly initializes its internal task queues before processing updates.
 
 ## [0.8.2] - 2026-03-25
-
 ### Fixed
 - **Webhook Reliability**: Fixed a bug where the `subscription_success` webhook was not being dispatched to client applications when a pending transaction was completed via Bot admin approval, PayWay callback, or Gumroad callback. 
 - The `_trigger_event_for_user` call is now safely executed directly within `bifrost.models.payments.PaymentMixin.complete_transaction`, guaranteeing that role updates consistently flush local application caches.
 
 ## [0.8.1] - 2026-03-25
-
 ### Fixed
 - **Bifrost API**: Fixed `TypeError` in `/internal/payments/secure-intent` route caused by an incorrect keyword argument. Changed `ref_id` to `client_ref_id` when calling `db.create_transaction()` in `bifrost/internal/payment_routes.py` to match the `PaymentMixin` method signature.
 
 ## [0.8.0] - 2026-01-30
-
 ### Fixed
 - **Role Corruption Recovery**: Modified `get_user_role_for_app` in `bifrost/models/apps.py` to handle cases where the database record incorrectly stores the role in `app_specific_role` instead of `role`.
   - This fixes the "Premium users reported as Guest" bug caused by manual database edits or legacy scripts using the wrong field name.
   - Added warning logs when this corruption is detected.
 
 ## [0.7.9] - 2026-01-30
-
 ### Fixed
 - **Role Sync Debugging**: Added verbose logging to `get_user_role_for_app` in `models/apps.py` and internal API routes `get-role` and `validate-token`.
   - Now logs resolving of Telegram ID to User ID.
@@ -204,7 +284,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - This is to diagnose why Premium users are being reported as Guest/User.
 
 ## [0.7.8] - 2026-01-30
-
 ### Added
 - **App Super Admin Role**: Introduced an intermediate role (`super_admin`) between App Admin and Owner.
   - Can manage Users AND App Admins.
@@ -219,7 +298,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **UI Logic**: Updated `app_users.html` to conditionally hide the "Secrets" pane and disable Config forms based on the logged-in user's role rank.
 
 ## [0.7.7] - 2026-01-30
-
 ### Added
 - **Password Recovery**: Implemented a full Forgot Password flow for the Backoffice.
   - `/backoffice/forgot-password`: Email entry form.
@@ -228,7 +306,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Support**: Works for both **Heimdall** (Admins) and **App Owners** (Accounts) automatically.
 
 ## [0.7.6] - 2026-01-30
-
 ### Security
 - **Strict Role Enforcement**: Updated Backoffice login to strictly require `role: "heimdall"` for global access.
   - Users with the legacy `super_admin` role will now be blocked and prompted to update.
@@ -236,7 +313,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Users with no managed apps (zero ownership/admin links) will now be explicitly denied access with a clear error message.
 
 ## [0.7.5] - 2026-01-30
-
 ### Added
 - **Heimdall Vision**: Added a direct shortcut in the Backoffice Dashboard for God Admins to access the Global User Database.
 - **App Owner Display**: Added a read-only field in the App Configuration tab that displays the current App Owner's name and email, with a prompt to change it via the Users tab.
@@ -247,13 +323,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Permissions**: Updated `backoffice.py` decorators to check for `is_heimdall` session flags.
 
 ## [0.7.4] - 2026-01-30
-
 ### Fixed
 - **Bot Token UI**: Restored the ability to view and edit the `telegram_bot_token` in the App Configuration settings within the Backoffice.
 - **Data Model**: Updated `update_app_details` in `bifrost/models/apps.py` to allow `telegram_bot_token` updates.
 
 ## [0.7.3] - 2026-01-29
-
 ### Added
 - **Owner Role**: New top-level role for App Creators.
   - Apps can now have only **one** Owner.
@@ -268,27 +342,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Admin Panel**: Added `Owner` to the Flask-Admin role dropdowns.
 
 ## [0.7.2] - 2026-01-29
-
 ### Security
 - **Dynamic CORS Middleware**: Implemented a custom middleware that validates the `Origin` header against the database in real-time.
 - **Zero-Downtime Updates**: New client applications are automatically whitelisted within 60 seconds of registration without requiring a server restart.
 - **Smart Caching**: Implemented a TTL-based cache for allowed origins to maintain high performance while ensuring security.
 
 ## [0.7.1] - 2026-01-29
-
 ### Security
 - **CORS Hardening**: Replaced the insecure wildcard CORS configuration (`*`) with a strict dynamic whitelist.
 - **Dynamic Origin Loading**: The application now queries the database at startup to fetch `app_web_url` and `app_callback_url` for all registered clients, parsing them to allow only authorized origins.
 - **Dev Fallback**: `localhost` ports are automatically added to the whitelist when the app is running in debug mode.
 
 ## [0.7.0] 2026-01-29
-
 ### Added
 - "Get Started" section in bifrost_docs.html outlining the 4-step integration process.
 - Sidebar link for the "Get Started" section for improved navigation.
 
 ## [0.6.0] - 2026-01-29
-
 ### Added
 - **Payment Status Polling**: Added `GET /internal/payments/status/<transaction_id>`.
 - Client frontends can now poll this endpoint (via their backend) to confirm payment success in real-time without relying solely on webhooks.
@@ -296,7 +366,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Security Check**: Added explicit blocklist (`FORBIDDEN_ROLES`) to payment routes to prevent unauthorized promotion to Admin/Super Admin via the payment API.
 
 ## [0.5.0] - 2026-01-29
-
 ### Added
 - **Custom App QR Codes**: Added `app_qr_url` to the Application model.
 - Client Apps can now upload/set their own custom Payment QR code via the Backoffice configuration tab.
@@ -311,7 +380,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Payment Approval**: The `admin_approve` handler now dynamically checks the clicker's role against the target application of the transaction.
 
 ## [0.4.3] - 2026-01-29
-
 ### Documentation
 - **Integration Guide**: Major overhaul of `bifrost/templates/docs.html`.
 - Added comprehensive "Registration Flow" section covering OTP generation and verification.
@@ -322,7 +390,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Structure**: Organized docs with a sticky sidebar for easier navigation.
 
 ## [0.4.2] - 2026-01-29
-
 ### Added
 - **Guest Role**: Explicitly added `guest` as a selectable role in the Backoffice "Add User" and "Manage User" forms.
 - **Documentation**: Added `docs/` folder with `README.md` and `API_REFERENCE.md` detailing compliance rules.
@@ -336,7 +403,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Updated the UI button to label removal as "(Guest Only)".
 
 ## [0.4.1] - 2026-01-26
-
 ### Fixed
 - **OTP Race Condition**: Updated `create_otp` in `bifrost/models/auth.py` to delete any existing codes for the same identifier/channel before creating a new one.
 - This resolves issues where users try to use an "old" code after requesting a new one.
@@ -347,7 +413,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Auth UI**: Overhauled `forgot_password.html`, `verify_otp.html`, and `reset_password.html` to use the modern "Glassmorphism" design system (Tailwind CSS) consistent with the Login page.
 
 ## [0.4.0] - 2026-01-23
-
 ### Added
 - **Web Payment Proofs**: Added `POST /internal/payments/submit-proof` allowing client applications to upload payment screenshots directly via API.
 - **Admin Forwarding**: Implemented `send_payment_proof_to_admin` in `bifrost/utils/telegram.py` to bridge the gap between the Web API and the Telegram Admin Group.
@@ -357,13 +422,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Admin Handler**: Refactored `admin_approve` in the Bot to gracefully skip sending Telegram DMs if the user identifier is not a valid Telegram ID (Web upload flow).
 
 ## [0.3.3] - 2026-01-23
-
 ### Changed
 - **Webhooks**: The `subscription_success` webhook event now includes `duration` (e.g., '1m') and `expires_at` (ISO timestamp) in the `extra_data` payload.
 - **Internal Logic**: Updated `complete_transaction` in `PaymentMixin` to calculate the expiration date immediately for the webhook payload, ensuring client apps receive the exact validity period of the new subscription.
 
 ## [0.3.2] - 2026-01-23
-
 ### Added
 - **Global User Database**: Implemented a "God View" for Super Admins (`/backoffice/users`) to search and manage all accounts across the entire ecosystem.
 - **Global Deletion**: Added functionality to permanently delete a user account (`accounts` collection) and all their associated app links.
@@ -381,13 +444,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **User Feedback**: Clarified success messages to distinguish between "Inviting a new user" and "Linking an existing global user".
 
 ## [0.3.1] - 2026-01-23
-
 ### Added
 - **User Removal**: Added `remove_user_from_app` method to `BifrostDB` and corresponding UI in the Backoffice.
 - **Admin Control**: App Admins and Super Admins can now permanently unlink a user from an application via the Backoffice "Actions" column (Red "X" button).
 
 ## [0.3.0] - 2026-01-23
-
 ### Added
 - **API**: Added `update_app_details` method to `BifrostDB` and a corresponding `POST /backoffice/app/<id>/update` route.
 
@@ -398,13 +459,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Technical Details**: Exposed `client_id`, `webhook_secret`, and `rotate_secret` functionality to App Admins for their owned applications.
 
 ## [0.2.1] - 2026-01-23
-
 ### Fixed
 - **API Response**: The `validate_token` endpoint in `bifrost/internal/routes.py` now explicitly returns the `telegram_id` in its JSON response.
 - **Webhooks**: Enhanced `account_update` webhooks in `bifrost/models/auth.py` to include changed identity fields (`telegram_id`, `email`, `username`) in the `extra_data` payload.
 
 ## [0.2.0] - 2026-01-22
-
 ### Added
 - **Branding**: Implemented global support for `logo.png` and `favicon.ico` across the entire platform.
 - **Email Branding**: Updated `bifrost/services/email_service.py` to inject the specific App's logo (or the Bifrost system logo) into invitation and OTP emails.
@@ -417,7 +476,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Templates**: Updated `dashboard.html` and `index.html` to display the custom logo and favicon.
 
 ## [0.1.1] - 2026-01-22
-
 ### Added
 - **User Invite Flow**: Implemented a system to invite new users via email when adding them to an App or assigning them as an App Admin during creation.
 - **Email Service**: Added `send_invite_email` to `bifrost/services/email_service.py`.
@@ -435,7 +493,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - This ensures the client app receives the transaction ID and amount in the webhook payload.
 
 ## [0.1.0] - 2026-01-22
-
 ### Added
 - **Unified Portal**: The `/backoffice` now serves as the single portal for both Super Admins and App Admins.
 - **App Management**: Super Admins can now **Create Applications** via the UI.
@@ -493,17 +550,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Security
 - **Tamper-Proofing**: Users can no longer modify the payment amount or duration by editing the Telegram deep link, as the link now only contains a reference ID.
 
-## [Unreleased]
-
-### Added
-- Created `upload_sa_to_bifrost.py` script to seamlessly push Google Service Account credentials directly into the Bifrost MongoDB Vault.
-- Added `/heimdall/ai-metrics` routing in `backoffice.py` to query Google Cloud Monitoring.
-- Implemented `ai_metrics.html` visual dashboard for Heimdall users to track `aiplatform.googleapis.com` token metrics in real-time.
-- Updated `dashboard.html` to integrate AI Metrics button.
-- Added `google-cloud-monitoring` dependency to `requirements.txt`.
-
 ## [0.0.1] - 2026-01-19
-
 ### Added
 - **Centralized Auth**: Initial release as Global Identity Provider (IdP) for the ecosystem.
 - **User Model**: Implemented comprehensive `User` model supporting password hashing, account management, and application linking.

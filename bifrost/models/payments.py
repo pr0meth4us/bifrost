@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 from bson import ObjectId
 import logging
 
+from . import cms_mongo
 from .queue_schema import (  # noqa: F401 — safe_ident is re-exported for callers
     DEFAULT as DEFAULT_QUEUE, IDENT_RE, QueueSchema, _table_columns, safe_ident,
 )
@@ -203,14 +204,18 @@ class PaymentMixin:
             return False
 
     def claim_payment(self, trx_input, app_id, user_identity):
-        # 1. Resolve User
+        # 1. Resolve User, within the claiming app's own directory — a claim must
+        #    never land on a same-email account belonging to another tenant.
+        app_doc = self.db.applications.find_one({"_id": ObjectId(app_id)}) or {}
+        directory = self.directory_scope(app_doc) if app_doc else None
+
         user = None
         if 'account_id' in user_identity:
             user = self.find_account_by_id(user_identity['account_id'])
         elif 'telegram_id' in user_identity:
-            user = self.find_account_by_telegram(user_identity['telegram_id'])
+            user = self.find_account_by_telegram(user_identity['telegram_id'], directory)
         elif 'email' in user_identity:
-            user = self.find_account_by_email(user_identity['email'])
+            user = self.find_account_by_email(user_identity['email'], directory)
 
         if not user:
             return False, "User account not found."
@@ -748,6 +753,8 @@ class PaymentMixin:
 
     def get_tenant_tables(self, db_conn_str):
         """Fetches the tenant's tables from whichever schema its connection is pinned to."""
+        if cms_mongo.handles(db_conn_str):
+            return cms_mongo.get_tenant_tables(db_conn_str)
         from bifrost.utils.tenant_db import get_tenant_db
         sql = """
             SELECT table_name FROM information_schema.tables
@@ -761,6 +768,8 @@ class PaymentMixin:
 
     def get_tenant_table_schema(self, db_conn_str, table_name):
         """Returns column metadata: name, data_type, nullable, char_max_length, fk info."""
+        if cms_mongo.handles(db_conn_str):
+            return cms_mongo.get_tenant_table_schema(db_conn_str, table_name)
         from bifrost.utils.tenant_db import get_tenant_db
         sql = """
             SELECT
@@ -797,6 +806,9 @@ class PaymentMixin:
 
     def get_tenant_table_data(self, db_conn_str, table_name, limit=50, offset=0, sort_by='id', sort_dir='desc', search_query=None):
         """Fetches rows for a target table with pagination, sorting, and optional search."""
+        if cms_mongo.handles(db_conn_str):
+            return cms_mongo.get_tenant_table_data(db_conn_str, table_name, limit, offset,
+                                                   sort_by, sort_dir, search_query)
         from bifrost.utils.tenant_db import get_tenant_db
         from decimal import Decimal
         # Identifiers are validated against the introspected schema; never interpolated raw.
@@ -852,6 +864,8 @@ class PaymentMixin:
 
     def get_distinct_column_values(self, db_conn_str, table_name, column_name):
         """Returns distinct values for a column — used to build enum selects."""
+        if cms_mongo.handles(db_conn_str):
+            return cms_mongo.get_distinct_column_values(db_conn_str, table_name, column_name)
         from bifrost.utils.tenant_db import get_tenant_db
         safe_ident(table_name)
         safe_ident(column_name)
@@ -914,6 +928,13 @@ class PaymentMixin:
 
     def save_tenant_table_row(self, db_conn_str, table_name, row_id, data, app_id=None, acting_user=None):
         """Updates a row in the tenant database public schema."""
+        if cms_mongo.handles(db_conn_str):
+            before, after = cms_mongo.update_row(db_conn_str, table_name, row_id, data)
+            if app_id and acting_user:
+                self.log_cms_mutation(app_id, table_name, "UPDATE", str(row_id),
+                                      acting_user, before, after)
+            return True
+        row_id = int(row_id)
         from bifrost.utils.tenant_db import get_tenant_db
         safe_ident(table_name)
 
@@ -960,6 +981,12 @@ class PaymentMixin:
 
     def insert_tenant_table_row(self, db_conn_str, table_name, data, app_id=None, acting_user=None):
         """Inserts a new row in the tenant database public schema."""
+        if cms_mongo.handles(db_conn_str):
+            after = cms_mongo.insert_row(db_conn_str, table_name, data)
+            if app_id and acting_user:
+                self.log_cms_mutation(app_id, table_name, "CREATE", after.get('id'),
+                                      acting_user, None, after)
+            return True
         from bifrost.utils.tenant_db import get_tenant_db
         safe_ident(table_name)
 
@@ -999,6 +1026,13 @@ class PaymentMixin:
 
     def delete_tenant_table_row(self, db_conn_str, table_name, row_id, app_id=None, acting_user=None):
         """Deletes a row from the tenant database public schema."""
+        if cms_mongo.handles(db_conn_str):
+            before = cms_mongo.delete_row(db_conn_str, table_name, row_id)
+            if app_id and acting_user:
+                self.log_cms_mutation(app_id, table_name, "DELETE", str(row_id),
+                                      acting_user, before, None)
+            return True
+        row_id = int(row_id)
         from bifrost.utils.tenant_db import get_tenant_db
         safe_ident(table_name)
 
