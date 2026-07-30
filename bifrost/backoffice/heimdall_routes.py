@@ -6,18 +6,43 @@ from . import backoffice_bp, get_db, login_required, heimdall_required
 from ..services.metrics_service import fetch_ai_metrics, fetch_billing_data, PRICING
 from ..utils.encryption import decrypt_value
 
+
+def internal_directories(db):
+    """Account directories belonging to platform-owned tenants.
+
+    The global user views cross every tenant boundary at once, which is fine for
+    products the platform owns and wrong for a customer's end users. Restricting
+    the query is what keeps "platform admin" from meaning "reads every human in
+    the database".
+    """
+    return sorted({db.directory_scope(app)
+                   for app in db.db.applications.find(
+                       {"tenant_type": "internal"}, {"client_id": 1, "tenant_id": 1})})
+
+
+def visible_account(db, user_id):
+    """An account a platform admin may look at, or None."""
+    user = db.db.accounts.find_one({"_id": ObjectId(user_id)})
+    if not user or user.get('client_id') not in internal_directories(db):
+        return None
+    return user
+
+
 @backoffice_bp.route('/heimdall/users')
 @login_required
 @heimdall_required
 def global_users():
     db = get_db()
     query = request.args.get('q', '').strip()
+    scope = {"client_id": {"$in": internal_directories(db)}}
     if query:
-        users = list(db.db.accounts.find({"$or": [{"email": {"$regex": query, "$options": "i"}},
-                                                  {"username": {"$regex": query, "$options": "i"}}]}).limit(50))
+        scope["$or"] = [{"email": {"$regex": query, "$options": "i"}},
+                        {"username": {"$regex": query, "$options": "i"}}]
+        users = list(db.db.accounts.find(scope).limit(50))
     else:
-        users = list(db.db.accounts.find({}).sort('created_at', -1).limit(50))
-    return render_template('backoffice/global_users.html', users=users, query=query)
+        users = list(db.db.accounts.find(scope).sort('created_at', -1).limit(50))
+    return render_template('backoffice/global_users.html', users=users, query=query,
+                           external_hidden=True)
 
 
 @backoffice_bp.route('/heimdall/users/<user_id>/details')
@@ -25,8 +50,10 @@ def global_users():
 @heimdall_required
 def global_user_details(user_id):
     db = get_db()
-    user = db.db.accounts.find_one({"_id": ObjectId(user_id)})
+    user = visible_account(db, user_id)
     if not user:
+        # Same answer whether the account is absent or belongs to an external
+        # tenant, so this endpoint cannot be used to enumerate customers' users.
         return {"error": "Not found"}, 404
 
     links = list(db.db.app_links.find({"account_id": ObjectId(user_id)}))
@@ -53,8 +80,11 @@ def global_user_details(user_id):
 @heimdall_required
 def global_api_keys():
     db = get_db()
-    apps = list(db.db.applications.find({}))
-    return render_template('backoffice/global_api_keys.html', apps=apps)
+    # A customer's client_secret and webhook_secret are their credentials, not
+    # platform inventory. Their owners can still see them inside their own app.
+    apps = list(db.db.applications.find({"tenant_type": "internal"}))
+    return render_template('backoffice/global_api_keys.html', apps=apps,
+                           external_hidden=True)
 
 
 @backoffice_bp.route('/users/<user_id>/delete', methods=['POST'])
@@ -62,9 +92,11 @@ def global_api_keys():
 @heimdall_required
 def delete_global_user(user_id):
     db = get_db()
+    if not visible_account(db, user_id):
+        flash("That account belongs to an external tenant — its owner deletes it.", "danger")
+        return redirect(url_for('backoffice.global_users'))
     try:
-        db.db.app_links.delete_many({"account_id": ObjectId(user_id)})
-        db.db.accounts.delete_one({"_id": ObjectId(user_id)})
+        db.delete_account(user_id)
         flash("User deleted.", "warning")
     except Exception as e:
         flash(f"Error: {e}", "danger")

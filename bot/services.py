@@ -28,14 +28,14 @@ def check_admin_permission(telegram_id, client_id):
         db_instance = get_db()
         logic = BifrostDB(db_instance.client, Config.DB_NAME)
 
-        # 1. Resolve User
-        user = logic.find_account_by_telegram(telegram_id)
-        if not user:
-            return False
-
-        # 2. Resolve App
+        # 1. Resolve App first — the account lookup is scoped to its directory.
         app_doc = logic.get_app_by_client_id(client_id)
         if not app_doc:
+            return False
+
+        # 2. Resolve User
+        user = logic.find_account_by_telegram(telegram_id, logic.directory_scope(app_doc))
+        if not user:
             return False
 
         # 3. Check Role in App Links
@@ -86,8 +86,10 @@ def call_grant_premium(user_identifier, target_client_id, payment_id=None):
                         if isinstance(user_identifier, str) and len(str(user_identifier)) == 24:
                             user_obj = logic.find_account_by_id(user_identifier)
                         if not user_obj:
-                            user_obj = logic.find_account_by_telegram(user_identifier)
-                            
+                            user_obj = logic.find_account_by_telegram(
+                                user_identifier, logic.directory_scope(app_doc))
+
+
                         if user_obj and user_obj.get("email"):
                             from bifrost.utils.tenant_db import get_tenant_db
                             with get_tenant_db(db_conn_str) as conn:
@@ -126,7 +128,7 @@ def call_grant_premium(user_identifier, target_client_id, payment_id=None):
             if re.match(r'^[0-9a-fA-F]{24}$', user_identifier):
                 user = logic.find_account_by_id(user_identifier)
         if not user:
-            user = logic.find_account_by_telegram(user_identifier)
+            user = logic.find_account_by_telegram(user_identifier, logic.directory_scope(app_doc))
         if not user:
             log.error(f"User identifier '{user_identifier}' not found in DB.")
             return False

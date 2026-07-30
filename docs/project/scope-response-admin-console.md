@@ -10,7 +10,7 @@ Part A is internal — evidence, defects, honest status. Part B is the reply to 
 > fixed, the §4 scorecard has moved (see A4), and the six-test suite from §6.3 exists
 > and passes. Phase 2 — bulk import, versioning/rollback, analytics, app config, CSP —
 > is **not** built; it is listed as remaining in
-> [`docs/console-onboarding.md`](console-onboarding.md) §11 so nobody discovers it at UAT.
+> [`docs/guides/console-onboarding.md`](../guides/console-onboarding.md) §11 so nobody discovers it at UAT.
 > A1 below is kept as written, with outcomes appended, because the client asked for the
 > defect history and it is also the changelog for what shipped.
 

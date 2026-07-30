@@ -157,6 +157,23 @@
 
         {% if session.is_heimdall or session.is_pr0meth4us %}
         <div>
+          <label class="label" for="s-tenant-type">Tenant type <span class="muted">(super-admin)</span></label>
+          <select class="input" id="s-tenant-type" name="tenant_type">
+            <option value="external" {{ 'selected' if app.tenant_type != 'internal' }}>
+              External — a customer
+            </option>
+            <option value="internal" {{ 'selected' if app.tenant_type == 'internal' }}>
+              Internal — platform-owned product
+            </option>
+          </select>
+          <p class="muted text-[12px] mt-1">
+            External tenants own their data: platform admins see config, metrics and
+            the audit log, but not secrets, CMS content, end users or payments.
+            Their owner can still grant a platform engineer a role in the app.
+          </p>
+        </div>
+
+        <div>
           <label class="label" for="s-locked">Platform-locked tables <span class="muted">(super-admin)</span></label>
           <input class="input mono" id="s-locked" name="platform_locked_tables" type="text"
                  placeholder="transactions, ledger, bank_accounts"

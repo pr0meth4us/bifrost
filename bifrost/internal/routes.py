@@ -209,6 +209,10 @@ def set_credentials():
         return jsonify({"error": "Token does not match provided email"}), 403
 
     db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
+    app_doc = db.get_app_by_client_id(request.authenticated_client_id)
+    if not app_doc:
+        return jsonify({"error": "Calling App not found"}), 404
+    directory = db.directory_scope(app_doc)
     context_account_id = payload.get('account_id')
 
     if context_account_id:
@@ -218,9 +222,10 @@ def set_credentials():
         else:
             return jsonify({"error": message}), 409
     else:
-        user = db.find_account_by_email(email)
+        user = db.find_account_by_email(email, directory)
         if not user:
             db.create_account({
+                "client_id": directory,
                 "email": email,
                 "password": password,
                 "display_name": "New User",
@@ -228,7 +233,7 @@ def set_credentials():
             })
             return jsonify({"success": True, "message": "Account created", "mode": "created"})
         else:
-            db.update_password(email, password)
+            db.update_password(email, password, directory)
             return jsonify({"success": True, "message": "Credentials updated", "mode": "updated"})
 
 
@@ -302,17 +307,18 @@ def get_user_role_internal():
 
     db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
 
-    # 1. Find the User Account
-    user = db.find_account_by_telegram(telegram_id)
-    if not user:
-        log.warning(f"⚠️ User not found for TelegramID {telegram_id}. Returning 'guest'.")
-        return jsonify({"role": "guest"}), 200
-
-    # 2. Find the App ID for the calling service
+    # 1. Find the App ID for the calling service — needed first, because the
+    #    account lookup is scoped to that app's directory.
     app_doc = db.get_app_by_client_id(client_id)
     if not app_doc:
         log.error(f"❌ Calling App {client_id} not found in DB.")
         return jsonify({"error": "Calling App not found"}), 404
+
+    # 2. Find the User Account
+    user = db.find_account_by_telegram(telegram_id, db.directory_scope(app_doc))
+    if not user:
+        log.warning(f"⚠️ User not found for TelegramID {telegram_id}. Returning 'guest'.")
+        return jsonify({"role": "guest"}), 200
 
     # 3. Get the Role (Uses strict app_specific_role check)
     role = db.get_user_role_for_app(user['_id'], app_doc['_id'])

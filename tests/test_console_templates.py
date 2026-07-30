@@ -195,11 +195,14 @@ def test_devtools_is_gated_on_db_execute():
     assert "developer" in CONSOLE_ROLES, "developer cannot sign in to the console"
 
     app = create_app(Config)
+
+    # A platform admin gets raw SQL on a platform-owned tenant, and never on a
+    # customer's. An app that does not resolve at all is treated as external —
+    # the narrow answer is the safe one for an unknown tenant.
+    # See tests/test_platform_scope.py for the full matrix.
     with app.test_request_context("/backoffice/"):
-        # heimdall/pr0meth4us short-circuit to True by design; everyone else
-        # must be refused without an explicit developer grant.
         session["is_heimdall"] = True
-        assert check_permission(str(APP_ID), "db:execute") is True
+        assert check_permission(str(APP_ID), "db:execute") is False
 
     with app.test_request_context("/backoffice/"):
         session.clear()

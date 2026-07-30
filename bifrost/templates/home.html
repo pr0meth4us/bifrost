@@ -1,0 +1,255 @@
+{# Public landing page. Uses the console's head partial so the tokens, fonts and
+   theme switch are the same ones the product uses — a marketing page built on a
+   second design system is a second design system to maintain.
+
+   Only anonymous visitors on the platform's own domain reach this. A signed-in
+   operator goes to their dashboard and a custom-domain visitor goes to their
+   tenant, both decided in the `/` route rather than here. #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+{% include 'backoffice/_head.html' %}
+<title>Bifrost · Identity, authentication and payments for multi-tenant apps</title>
+<meta name="description" content="One backend for sign-in, single sign-on, roles and payments across every application you run. OpenID Connect provider, per-tenant user directories, and a console your operators can actually use.">
+<style>
+  /* The fade belongs to the grid alone. Masking the section masks its text too,
+     which is how the headline ended up half-invisible. */
+  .hero-grid { position: relative; isolation: isolate; }
+  .hero-grid::before {
+    content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background-image:
+      linear-gradient(rgb(var(--c-border) / .55) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--c-border) / .55) 1px, transparent 1px);
+    background-size: 56px 56px;
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 40%, transparent 100%);
+            mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 40%, transparent 100%);
+  }
+  .feature { padding: 22px; border: 1px solid rgb(var(--c-border)); border-radius: var(--radius-lg); background: rgb(var(--c-surface)); }
+  .feature h3 { font-size: 15px; font-weight: 620; margin-bottom: 6px; }
+  .feature p { font-size: 13.5px; line-height: 1.6; color: rgb(var(--c-fg-muted)); }
+  .step-num {
+    width: 26px; height: 26px; flex: none; border-radius: 999px;
+    display: grid; place-items: center;
+    font-size: 12px; font-weight: 700;
+    background: rgb(var(--c-accent) / .12); color: rgb(var(--c-accent));
+  }
+  .flow code { font-family: var(--font-mono); font-size: 12px; }
+  /* The code sample scrolls inside its own box; the page never scrolls sideways. */
+  .sample { overflow-x: auto; }
+</style>
+</head>
+
+<body class="bg-bg text-fg">
+
+<header class="border-b border-border sticky top-0 z-20 bg-bg/85 backdrop-blur">
+  <div class="max-w-6xl mx-auto px-6 h-14 flex items-center gap-3">
+    <a href="{{ url_for('index') }}" class="flex items-center gap-2.5 shrink-0" aria-label="Bifrost home">
+      <img src="{{ url_for('static', filename='logo-mark-64.png') }}" alt=""
+           width="28" height="28" class="w-7 h-7 rounded-lg shrink-0">
+      <span class="font-semibold tracking-tight">Bifrost</span>
+    </a>
+    <span class="text-[11px] muted font-mono">v{{ version }}</span>
+
+    <nav class="ml-auto flex items-center gap-1">
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('documentation') }}">Docs</a>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('changelog_page') }}">Changelog</a>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="toggleTheme()"
+              aria-label="Switch between light and dark theme"><span aria-hidden="true">◐</span></button>
+      <a class="btn btn-primary btn-sm" href="{{ url_for('backoffice.login') }}">Console</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="hero-grid border-b border-border">
+    <div class="max-w-6xl mx-auto px-6 pt-20 pb-16 text-center">
+      <p class="text-[11px] font-bold tracking-[.08em] uppercase text-accent mb-4">
+        Identity · Payments · Configuration
+      </p>
+      <h1 class="text-[40px] sm:text-[52px] leading-[1.06] font-semibold tracking-[-.03em] max-w-3xl mx-auto">
+        One backend for every app you run.
+      </h1>
+      <p class="mt-5 text-[16px] leading-relaxed muted max-w-xl mx-auto">
+        Sign-in, single sign-on, roles and payments — shared across your whole
+        portfolio, isolated per tenant. Stop rebuilding auth for the fourth time.
+      </p>
+      <div class="mt-8 flex flex-wrap items-center justify-center gap-2.5">
+        <a class="btn btn-primary" href="{{ url_for('backoffice.login') }}">Open the console</a>
+        <a class="btn" href="{{ url_for('documentation') }}">Read the docs</a>
+      </div>
+      <p class="mt-5 text-[12px] muted">
+        Standards-compliant OpenID Connect · Cambodian and international payment rails
+      </p>
+    </div>
+  </section>
+
+  <section class="max-w-6xl mx-auto px-6 py-16">
+    <h2 class="text-[13px] font-bold tracking-[.06em] uppercase muted mb-6">What it handles</h2>
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+
+      <div class="feature">
+        <h3>Authentication, every way</h3>
+        <p>Email and password, one-time codes by email or SMS, Telegram, and social
+           sign-in with Google, GitHub, Microsoft, Apple and Facebook. Enable only
+           what an app needs.</p>
+      </div>
+
+      <div class="feature">
+        <h3>A real OpenID Connect provider</h3>
+        <p>Authorization code flow with PKCE, refresh tokens, discovery and JWKS.
+           Anything that speaks OIDC — Supabase, Grafana, Metabase — integrates
+           with no custom code.</p>
+      </div>
+
+      <div class="feature">
+        <h3>Single sign-on that is actually single</h3>
+        <p>Group your applications into one directory and a user signs in once.
+           The second app gets a token without ever showing a login form.</p>
+      </div>
+
+      <div class="feature">
+        <h3>Tenant isolation by default</h3>
+        <p>Each tenant has its own user directory, branding, roles and database
+           schema. A lookup in one tenant cannot return another tenant's user —
+           enforced in the database, not just the code.</p>
+      </div>
+
+      <div class="feature">
+        <h3>Payments on local rails</h3>
+        <p>ABA PayWay for Cambodia, Gumroad internationally, and a manual receipt
+           queue with an approval SLA. Merchant credentials belong to each tenant,
+           so revenue lands in their account.</p>
+      </div>
+
+      <div class="feature">
+        <h3>Secrets and configuration</h3>
+        <p>Encrypted values your app reads at runtime through the SDK, with a
+           local cache so a Bifrost outage does not take your app down with it.</p>
+      </div>
+
+      <div class="feature">
+        <h3>A console operators can use</h3>
+        <p>User and role management, a content editor over the tenant's own
+           database, the payment queue, and an audit log with before-and-after
+           values on every change.</p>
+      </div>
+
+      <div class="feature">
+        <h3>Roles that mean something</h3>
+        <p>Per-application roles resolved into permission claims inside the token,
+           so your app authorises without a second lookup.</p>
+      </div>
+
+      <div class="feature">
+        <h3>Least privilege, including ours</h3>
+        <p>Platform staff see configuration, metrics and the audit log for external
+           tenants — not their secrets, content, users or payments. Deeper access
+           is granted by the tenant, and revoked by them.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="border-y border-border bg-surface">
+    <div class="max-w-6xl mx-auto px-6 py-16 grid gap-10 lg:grid-cols-2 items-start">
+      <div>
+        <h2 class="text-[13px] font-bold tracking-[.06em] uppercase muted mb-6">Integrating</h2>
+        <ol class="flow space-y-5">
+          <li class="flex gap-3">
+            <span class="step-num">1</span>
+            <div>
+              <div class="font-medium text-[14px]">Register your application</div>
+              <p class="text-[13.5px] muted mt-0.5">Get a <code>client_id</code> and
+                 <code>client_secret</code>, and set your callback URL.</p>
+            </div>
+          </li>
+          <li class="flex gap-3">
+            <span class="step-num">2</span>
+            <div>
+              <div class="font-medium text-[14px]">Send users to Bifrost</div>
+              <p class="text-[13.5px] muted mt-0.5">Redirect to the hosted sign-in page,
+                 or drive the OpenID Connect endpoints directly.</p>
+            </div>
+          </li>
+          <li class="flex gap-3">
+            <span class="step-num">3</span>
+            <div>
+              <div class="font-medium text-[14px]">Receive a signed token</div>
+              <p class="text-[13.5px] muted mt-0.5">Verify it against the published JWKS.
+                 It carries the user, their role and their permissions.</p>
+            </div>
+          </li>
+        </ol>
+      </div>
+
+      <div>
+        <div class="text-[11px] font-mono muted mb-2">GET /.well-known/openid-configuration</div>
+        <pre class="sample card card-pad text-[12.5px] leading-relaxed font-mono"><code>{
+  "issuer":                 "https://your-bifrost.example",
+  "authorization_endpoint": ".../oidc/authorize",
+  "token_endpoint":         ".../oidc/token",
+  "userinfo_endpoint":      ".../oidc/userinfo",
+  "jwks_uri":               ".../.well-known/jwks.json",
+  "end_session_endpoint":   ".../oidc/logout",
+
+  "grant_types_supported": [
+    "authorization_code", "refresh_token"
+  ],
+  "code_challenge_methods_supported": ["S256", "plain"]
+}</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="max-w-6xl mx-auto px-6 py-16 text-center">
+    <h2 class="text-[26px] font-semibold tracking-[-.02em]">Run it for your own products first.</h2>
+    <p class="mt-3 muted max-w-lg mx-auto text-[15px]">
+      Bifrost was built to stop rewriting the same login screen. It happens to
+      work just as well for someone else's.
+    </p>
+    <div class="mt-7 flex flex-wrap items-center justify-center gap-2.5">
+      <a class="btn btn-primary" href="{{ url_for('backoffice.login') }}">Open the console</a>
+      <a class="btn" href="{{ url_for('documentation') }}">Documentation</a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="border-t border-border">
+  <div class="max-w-6xl mx-auto px-6 py-10 flex flex-wrap gap-x-10 gap-y-6 justify-between text-[13px]">
+    <div>
+      <a href="{{ url_for('index') }}" class="flex items-center gap-2 mb-2" aria-label="Bifrost home">
+        <img src="{{ url_for('static', filename='logo-mark-64.png') }}" alt=""
+             width="22" height="22" class="w-[22px] h-[22px] rounded-md">
+        <span class="font-semibold">Bifrost</span>
+      </a>
+      <p class="muted text-[12px]">Version {{ version }} · {{ date }}</p>
+    </div>
+
+    <div>
+      <div class="text-[11px] font-bold tracking-[.06em] uppercase muted mb-2.5">Product</div>
+      <ul class="space-y-1.5">
+        <li><a class="hover:text-accent" href="{{ url_for('documentation') }}">Documentation</a></li>
+        <li><a class="hover:text-accent" href="{{ url_for('changelog_page') }}">Changelog</a></li>
+        <li><a class="hover:text-accent" href="{{ url_for('backoffice.login') }}">Console</a></li>
+      </ul>
+    </div>
+
+    <div>
+      <div class="text-[11px] font-bold tracking-[.06em] uppercase muted mb-2.5">Legal</div>
+      <ul class="space-y-1.5">
+        <li><a class="hover:text-accent" href="{{ url_for('legal_page', slug='terms-of-service') }}">Terms of Service</a></li>
+        <li><a class="hover:text-accent" href="{{ url_for('legal_page', slug='privacy-policy') }}">Privacy Policy</a></li>
+        <li><a class="hover:text-accent" href="{{ url_for('legal_page', slug='data-processing-agreement') }}">Data Processing</a></li>
+        <li><a class="hover:text-accent" href="{{ url_for('legal_page', slug='acceptable-use-policy') }}">Acceptable Use</a></li>
+        <li><a class="hover:text-accent" href="{{ url_for('legal_page', slug='subprocessors') }}">Subprocessors</a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+
+{% include 'backoffice/_chrome_js.html' %}
+
+</body>
+</html>

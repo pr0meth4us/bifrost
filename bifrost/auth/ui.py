@@ -10,6 +10,8 @@ from ..models import BifrostDB
 from ..services.email_service import send_otp_email
 from ..services.sms_service import send_otp_sms
 from ..utils.token import create_client_jwt
+from . import sso
+from .oidc import resume_pending
 
 auth_ui_bp = Blueprint('auth_ui', __name__, url_prefix='/auth/ui')
 UTC = ZoneInfo("UTC")
@@ -23,6 +25,30 @@ def create_session_token(user, client_id, db, app_config):
     """Helper to generate the JWT for the client app."""
     return create_client_jwt(user, client_id, db, app_config)
 
+def complete_login(db, app_config, user, amr):
+    """The single tail every authentication path shares.
+
+    Establishes the Bifrost SSO session — this is what lets the *next* app skip
+    the login form — then either resumes a waiting OIDC authorize request or
+    falls through to the classic token-on-the-callback redirect.
+
+    `amr` names the method that actually proved identity (pwd, otp, sms, the
+    social provider); it travels into the id_token so relying parties can reason
+    about how the session was established.
+    """
+    directory = db.directory_scope(app_config)
+    db.link_user_to_app(user['_id'], app_config['_id'])
+    sso.establish(user, directory, amr)
+
+    resumed = resume_pending(db, user, amr)
+    if resumed:
+        return resumed
+
+    token = create_session_token(user, app_config['client_id'], db, app_config)
+    callback_url = app_config.get('app_callback_url')
+    separator = '&' if '?' in callback_url else '?'
+    return redirect(f"{callback_url}{separator}token={token}")
+
 @auth_ui_bp.route('/login', methods=['GET', 'POST'])
 def login():
     client_id = request.args.get('client_id')
@@ -33,52 +59,18 @@ def login():
     if not app_config:
         return render_template('auth/error.html', error="Invalid client_id")
 
+    directory = db.directory_scope(app_config)
+
     if request.method == 'POST':
         identifier = request.form.get('email')
         password = request.form.get('password')
 
-        user = db.find_account_by_email(identifier, client_id)
+        user = db.find_account_by_email(identifier, directory)
         if not user:
-            user = db.find_account_by_username(identifier, client_id)
+            user = db.find_account_by_username(identifier, directory)
 
         if user and user.get('password_hash') and check_password_hash(user['password_hash'], password):
-            db.link_user_to_app(user['_id'], app_config['_id'])
-            
-            # Check if this is an OIDC login flow
-            oidc_context = session.get('oidc_auth')
-            if oidc_context and oidc_context.get('client_id') == client_id:
-                # Generate authorization code
-                import secrets
-                import time
-                code = secrets.token_urlsafe(32)
-                
-                db.db.auth_codes.insert_one({
-                    "code": code,
-                    "client_id": client_id,
-                    "user_id": user['_id'],
-                    "nonce": oidc_context.get('nonce'),
-                    "expires_at": time.time() + 600  # 10 minutes
-                })
-                
-                # Clear session
-                session.pop('oidc_auth', None)
-                
-                redirect_uri = oidc_context.get('redirect_uri')
-                state = oidc_context.get('state')
-                
-                params = {"code": code}
-                if state:
-                    params["state"] = state
-                
-                separator = '&' if '?' in redirect_uri else '?'
-                query_string = urllib.parse.urlencode(params)
-                return redirect(f"{redirect_uri}{separator}{query_string}")
-
-            # Standard Bifrost login flow
-            token = create_session_token(user, client_id, db, app_config)
-            callback_url = app_config.get('app_callback_url')
-            separator = '&' if '?' in callback_url else '?'
-            return redirect(f"{callback_url}{separator}token={token}")
+            return complete_login(db, app_config, user, ["pwd"])
         else:
             flash("Invalid email or password", "danger")
 
@@ -106,61 +98,43 @@ def register():
     if not app_config:
         return render_template('auth/error.html', error="Invalid client_id")
 
+    directory = db.directory_scope(app_config)
+
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
         display_name = request.form.get('display_name')
 
-        if db.find_account_by_email(email, client_id):
+        if db.find_account_by_email(email, directory):
             flash("An account with that email already exists.", "danger")
             return render_template('auth/register.html', app=app_config)
 
-        # Create user
-        user_id = db.create_account({
-            "client_id": client_id,
+        # Create user in this app's directory, so login can find them again.
+        db.create_account({
+            "client_id": directory,
             "email": email,
             "password": password,
             "display_name": display_name
         })
-        user = db.find_account_by_email(email, client_id)
-        db.link_user_to_app(user['_id'], app_config['_id'])
+        user = db.find_account_by_email(email, directory)
 
-        # Check OIDC flow
-        if 'auth_code' in session:
-            user_data = {
-                "id": str(user['_id']),
-                "email": user.get('email'),
-                "name": user.get('display_name', ''),
-            }
-            code = session.pop('auth_code')
-            session[f"code_data_{code}"] = user_data
-
-            redirect_uri = session.pop('redirect_uri', None)
-            state = session.pop('state', None)
-            if not redirect_uri:
-                return render_template('auth/error.html', error="Missing redirect_uri in session")
-                
-            import urllib.parse
-            params = {"code": code}
-            if state:
-                params["state"] = state
-            
-            separator = '&' if '?' in redirect_uri else '?'
-            query_string = urllib.parse.urlencode(params)
-            return redirect(f"{redirect_uri}{separator}{query_string}")
-
-        # Standard flow
-        token = create_session_token(user, client_id, db, app_config)
-        callback_url = app_config.get('app_callback_url')
-        separator = '&' if '?' in callback_url else '?'
-        return redirect(f"{callback_url}{separator}token={token}")
+        # Signing up mid-OIDC-flow lands in complete_login like every other path,
+        # so the relying party gets its code instead of being silently dropped.
+        return complete_login(db, app_config, user, ["pwd"])
 
     return render_template('auth/register.html', app=app_config)
 
 @auth_ui_bp.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
     client_id = request.args.get('client_id')
+    if not client_id:
+        return render_template('auth/error.html', error="Missing client_id")
+
     db, app_config = get_app_config(client_id)
+    # Every sibling route guards this; without it a bad or absent client_id is an
+    # AttributeError on None and the user gets a 500 instead of "invalid link".
+    if not app_config:
+        return render_template('auth/error.html', error="Invalid client_id")
 
     if not app_config.get("enabled_services", {}).get("email_otp", True):
         flash("Email password reset service is disabled for this application.", "danger")
@@ -168,7 +142,7 @@ def forgot_password():
 
     if request.method == 'POST':
         email = request.form.get('email').strip().lower()
-        user = db.find_account_by_email(email, client_id)
+        user = db.find_account_by_email(email, db.directory_scope(app_config))
 
         if user:
             # Create OTP and get verification ID
@@ -237,7 +211,10 @@ def reset_password():
 
     if request.method == 'POST':
         new_password = request.form.get('password')
-        db.update_password(email, new_password)
+        db.update_password(email, new_password, db.directory_scope(app_config))
+        # A password change invalidates the SSO session: whoever is holding this
+        # browser has to prove the new credential.
+        sso.end()
         flash("Password updated successfully. Please login.", "success")
         return redirect(url_for('auth_ui.login', client_id=client_id))
 
@@ -267,19 +244,17 @@ def set_password():
 
         if record:
             email = record['identifier']
-            user = db.find_account_by_email(email, client_id)
+            directory = db.directory_scope(app_config)
+            user = db.find_account_by_email(email, directory)
 
             if user:
                 # User exists - just set password
-                db.update_password(email, password)
-                db.link_user_to_app(user['_id'], app_config['_id'])
+                db.update_password(email, password, directory)
 
-                # Log them in automatically
-                token = create_session_token(user, client_id, db, app_config)
-                callback_url = app_config.get('app_callback_url')
-                separator = '&' if '?' in callback_url else '?'
+                # Log them in automatically. The OTP proved the mailbox and the
+                # form set the password, so both count toward amr.
                 flash("Account activated! Welcome.", "success")
-                return redirect(f"{callback_url}{separator}token={token}")
+                return complete_login(db, app_config, user, ["otp", "pwd"])
             else:
                 flash("Account setup error. Please contact support.", "danger")
         else:
@@ -535,14 +510,15 @@ def sso_callback(provider):
         return render_template('auth/error.html', error="Could not retrieve email or identity ID from the SSO provider")
 
     # Find or provision account
-    user = db.find_account_by_sso(provider, provider_id, client_id)
+    directory = db.directory_scope(app_config)
+    user = db.find_account_by_sso(provider, provider_id, directory)
     if not user:
-        user = db.find_account_by_email(email, client_id)
+        user = db.find_account_by_email(email, directory)
         if user:
             db.link_sso(user['_id'], provider, provider_id)
         else:
             account_data = {
-                "client_id": client_id,
+                "client_id": directory,
                 "email": email,
                 "display_name": display_name,
                 "auth_providers": [provider],
@@ -552,11 +528,7 @@ def sso_callback(provider):
             db.link_sso(new_id, provider, provider_id)
             user = db.find_account_by_id(new_id)
 
-    db.link_user_to_app(user['_id'], app_config['_id'])
-    token = create_session_token(user, client_id, db, app_config)
-    callback_url = app_config.get('app_callback_url')
-    separator = '&' if '?' in callback_url else '?'
-    return redirect(f"{callback_url}{separator}token={token}")
+    return complete_login(db, app_config, user, [provider])
 
 
 # ---------------------------------------------------------
@@ -609,11 +581,12 @@ def verify_phone_otp_ui():
 
         if record:
             phone_number = record['identifier']
-            user = db.find_account_by_phone(phone_number, client_id)
-            
+            directory = db.directory_scope(app_config)
+            user = db.find_account_by_phone(phone_number, directory)
+
             if not user:
                 account_data = {
-                    "client_id": client_id,
+                    "client_id": directory,
                     "phone_number": phone_number,
                     "display_name": f"User {phone_number[-4:]}",
                     "auth_providers": ["sms"]
@@ -621,11 +594,7 @@ def verify_phone_otp_ui():
                 new_id = db.create_account(account_data)
                 user = db.find_account_by_id(new_id)
 
-            db.link_user_to_app(user['_id'], app_config['_id'])
-            token = create_session_token(user, client_id, db, app_config)
-            callback_url = app_config.get('app_callback_url')
-            separator = '&' if '?' in callback_url else '?'
-            return redirect(f"{callback_url}{separator}token={token}")
+            return complete_login(db, app_config, user, ["sms"])
         else:
             flash("Invalid or expired SMS verification code.", "danger")
 

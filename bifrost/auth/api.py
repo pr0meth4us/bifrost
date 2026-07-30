@@ -38,11 +38,15 @@ def check_email():
         return jsonify({"error": "Missing client_id"}), 400
 
     db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
+    app_config = db.get_app_by_client_id(client_id)
+    if not app_config:
+        return jsonify({"error": "Invalid client_id"}), 401
+    directory = db.directory_scope(app_config)
 
     # Check both fields
-    user = db.find_account_by_email(identifier, client_id)
+    user = db.find_account_by_email(identifier, directory)
     if not user:
-        user = db.find_account_by_username(identifier, client_id)
+        user = db.find_account_by_username(identifier, directory)
 
     return jsonify({"exists": bool(user)})
 
@@ -253,15 +257,17 @@ def complete_registration():
     if not app_config:
         return jsonify({"error": "Invalid client_id"}), 401
 
+    directory = db.directory_scope(app_config)
+
     # 2. Check Username Uniqueness if provided
-    if username and db.find_account_by_username(username, client_id):
+    if username and db.find_account_by_username(username, directory):
         return jsonify({"error": "Username already taken"}), 409
 
     # 3. Create or Update Account
-    existing_user = db.find_account_by_email(email, client_id)
+    existing_user = db.find_account_by_email(email, directory)
 
     if existing_user:
-        db.update_password(email, password, client_id)
+        db.update_password(email, password, directory)
         # If updating, optionally set username if not set? 
         # For safety, we only set username on creation or explicit profile update,
         # but here we can allow it if the user doesn't have one.
@@ -271,7 +277,7 @@ def complete_registration():
         user_id = existing_user['_id']
     else:
         user_id = db.create_account({
-            "client_id": client_id,
+            "client_id": directory,
             "email": email,
             "username": username,
             "password": password,
@@ -319,13 +325,17 @@ def reset_password():
         return jsonify({"error": "Invalid or expired proof token"}), 403
 
     db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
+    app_config = db.get_app_by_client_id(client_id)
+    if not app_config:
+        return jsonify({"error": "Invalid client_id"}), 401
+    directory = db.directory_scope(app_config)
 
-    user = db.find_account_by_email(email, client_id)
+    user = db.find_account_by_email(email, directory)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
     # 2. Update Password
-    db.update_password(email, password, client_id)
+    db.update_password(email, password, directory)
 
     return jsonify({"success": True, "message": "Password updated successfully"})
 
@@ -355,9 +365,10 @@ def login():
         return jsonify({"error": "Invalid client_id"}), 401
 
     # Try finding by email first, then username
-    user = db.find_account_by_email(identifier, client_id)
+    directory = db.directory_scope(app_config)
+    user = db.find_account_by_email(identifier, directory)
     if not user:
-        user = db.find_account_by_username(identifier, client_id)
+        user = db.find_account_by_username(identifier, directory)
 
     # Validate Password
     if not user or not user.get('password_hash') or not check_password_hash(user['password_hash'], password):
@@ -408,11 +419,12 @@ def verify_otp_login():
         return jsonify({"error": "Invalid or expired code"}), 401
 
     # Find or Create Account
-    user = db.find_account_by_telegram(telegram_id, client_id)
+    directory = db.directory_scope(app_config)
+    user = db.find_account_by_telegram(telegram_id, directory)
 
     if not user:
         user_id = db.create_account({
-            "client_id": client_id,
+            "client_id": directory,
             "telegram_id": telegram_id,
             "display_name": "Telegram User",
             "auth_providers": ["telegram"]
@@ -468,11 +480,12 @@ def telegram_login():
         return jsonify({"error": "Authentication verification failed"}), 401
 
     telegram_id = str(tg_data['id'])
-    user = db.find_account_by_telegram(telegram_id, client_id)
+    directory = db.directory_scope(app_config)
+    user = db.find_account_by_telegram(telegram_id, directory)
 
     if not user:
         user_id = db.create_account({
-            "client_id": client_id,
+            "client_id": directory,
             "telegram_id": telegram_id,
             "display_name": tg_data.get('first_name', 'Unknown'),
             "auth_providers": ["telegram"]

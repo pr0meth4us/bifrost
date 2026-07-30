@@ -80,10 +80,12 @@ def _provision_application(db, form):
 
     admin_email = (form.get('admin_email') or '').strip().lower()
     if admin_email:
-        user = db.find_account_by_email(admin_email)
+        directory = db.directory_scope(app_doc)
+        user = db.find_account_by_email(admin_email, directory)
         if not user:
             user_id = db.create_account(
-                {"email": admin_email, "display_name": admin_email.split('@')[0], "auth_providers": ["email"]})
+                {"client_id": directory, "email": admin_email,
+                 "display_name": admin_email.split('@')[0], "auth_providers": ["email"]})
             otp, vid = db.create_otp(admin_email, channel="email")
             send_invite_email(admin_email, otp, app_name, vid, creds['client_id'])
         else:
@@ -248,12 +250,16 @@ def update_app_settings(app_id):
         data['db_connection'] = raw_db_conn
 
     # Platform-super-admin only. An owner must not be able to unlock their own
-    # ledger tables, so this field is ignored on a tenant's own POST rather than
-    # merely hidden from their form.
+    # ledger tables — or reclassify themselves as an internal tenant and thereby
+    # widen what the platform can see — so these fields are ignored on a tenant's
+    # own POST rather than merely hidden from their form.
     if session.get('is_heimdall') or session.get('is_pr0meth4us'):
         data['platform_locked_tables'] = [
             t.strip() for t in (request.form.get('platform_locked_tables') or '').split(',') if t.strip()
         ]
+        tenant_type = request.form.get('tenant_type')
+        if tenant_type in ('internal', 'external'):
+            data['tenant_type'] = tenant_type
 
 
     if db.update_app_details(app_id, data):

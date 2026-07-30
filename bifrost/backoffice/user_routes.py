@@ -42,10 +42,16 @@ def add_user_to_app(app_id):
     duration = request.form.get('duration')
 
     app = db.db.applications.find_one({"_id": ObjectId(app_id)})
-    user = db.find_account_by_email(email)
+    # Invites must land in the app's own directory. Created without one, the
+    # invited account is invisible to the tenant's login and the user can never
+    # redeem the invite.
+    directory = db.directory_scope(app)
+    user = db.find_account_by_email(email, directory)
 
     if not user:
-        new_id = db.create_account({"email": email, "display_name": email.split('@')[0], "auth_providers": ["email"]})
+        new_id = db.create_account({"client_id": directory, "email": email,
+                                    "display_name": email.split('@')[0],
+                                    "auth_providers": ["email"]})
         otp, vid = db.create_otp(email, channel="email")
         send_invite_email(email, otp, app['app_name'], vid, app['client_id'], app.get('app_logo_url'))
         user_id = new_id

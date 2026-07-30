@@ -114,38 +114,9 @@ def create_app(config_class):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
-    # --- OIDC RSA KEY GENERATION ---
-    from cryptography.hazmat.primitives.asymmetric import rsa
-    from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.backends import default_backend
-    import base64
-    
-    # Generate ephemeral RSA keypair for RS256 OIDC tokens on startup
-    private_key = rsa.generate_private_key(
-        public_exponent=65537,
-        key_size=2048,
-        backend=default_backend()
-    )
-    
-    # Get public numbers for JWKS
-    public_key = private_key.public_key()
-    public_numbers = public_key.public_numbers()
-    
-    def int_to_base64(num):
-        val = num.to_bytes((num.bit_length() + 7) // 8, byteorder='big')
-        return base64.urlsafe_b64encode(val).decode('utf-8').rstrip('=')
-        
-    jwk = {
-        "kty": "RSA",
-        "alg": "RS256",
-        "use": "sig",
-        "kid": "bifrost-key-1",
-        "n": int_to_base64(public_numbers.n),
-        "e": int_to_base64(public_numbers.e)
-    }
-    
-    app.config['OIDC_PRIVATE_KEY'] = private_key
-    app.config['OIDC_PUBLIC_JWK'] = jwk
+    # The OIDC signing key is loaded lazily and persisted (bifrost/auth/oidc.py:
+    # signing_key). Generating it here gave every gunicorn worker a different key,
+    # so worker A signed id_tokens that worker B's JWKS could not verify.
 
     logging.basicConfig(
         level=logging.INFO,
@@ -236,14 +207,17 @@ def create_app(config_class):
 
     @app.route('/')
     def index():
-        # No marketing home page: the root IS the console. Signed in → straight to
-        # your apps, otherwise sign in.
+        # A tenant on its own domain, and anyone already signed in, goes straight
+        # to work — the landing page is for people who have not seen Bifrost yet,
+        # and putting it in front of an operator every morning is a toll booth.
         from flask import g, redirect, url_for, session
         if hasattr(g, 'tenant_app_id'):
             return redirect(url_for('backoffice.view_app', app_id=g.tenant_app_id))
         if session.get('backoffice_user'):
             return redirect(url_for('backoffice.dashboard'))
-        return redirect(url_for('backoffice.login'))
+
+        version, date = get_latest_version_info()
+        return render_template('home.html', version=version, date=date)
 
     @app.route('/favicon.ico')
     def favicon():
@@ -254,6 +228,49 @@ def create_app(config_class):
     def documentation():
         version, date = get_latest_version_info()
         return render_template('docs.html', version=version, date=date)
+
+    # Legal pages are rendered from docs/legal/*.md so the published text and the
+    # reviewed text are the same file. The allowlist is the routing table: a slug
+    # that is not in it is a 404, which is also what stops the path being used to
+    # read arbitrary files.
+    LEGAL_DOCUMENTS = [
+        ('terms-of-service', 'Terms of Service'),
+        ('privacy-policy', 'Privacy Policy'),
+        ('data-processing-agreement', 'Data Processing Agreement'),
+        ('acceptable-use-policy', 'Acceptable Use Policy'),
+        ('subprocessors', 'Subprocessors'),
+    ]
+
+    @app.route('/legal')
+    def legal_index():
+        from flask import redirect, url_for
+        return redirect(url_for('legal_page', slug='terms-of-service'))
+
+    @app.route('/legal/<slug>')
+    def legal_page(slug):
+        from flask import abort
+        titles = dict(LEGAL_DOCUMENTS)
+        if slug not in titles:
+            abort(404)
+
+        path = os.path.join(app.root_path, '..', 'docs', 'legal', f'{slug}.md')
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                text = f.read()
+        except OSError as e:
+            logging.error(f"Could not read legal document {slug}: {e}")
+            abort(404)
+
+        version, date = get_latest_version_info()
+        body = markdown.markdown(text, extensions=['fenced_code', 'tables', 'toc'])
+        # Give wide tables their own scroll container rather than letting them
+        # push the page sideways on a phone.
+        body = body.replace('<table>', '<div class="table-wrap"><table>')
+        body = body.replace('</table>', '</table></div>')
+
+        return render_template('legal.html', body=body, title=titles[slug],
+                               current=slug, documents=LEGAL_DOCUMENTS,
+                               version=version, date=date)
 
     @app.route('/docs/changelog')
     def changelog_page():

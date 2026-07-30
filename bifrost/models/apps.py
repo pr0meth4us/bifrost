@@ -14,9 +14,40 @@ class AppMixin:
     # ---------------------------------------------------------
     # CLIENT APP MANAGEMENT
     # ---------------------------------------------------------
+    @staticmethod
+    def is_internal_tenant(app_config):
+        """Whether the platform team owns this tenant.
+
+        Internal tenants are Bifrost's own products, so a platform admin sees
+        everything. External tenants are somebody else's customers and somebody
+        else's data; a platform admin gets the operational view and nothing more.
+
+        Defaults to external when the field is missing — an unclassified tenant
+        gets the *narrower* answer, so forgetting to set this can never widen
+        access. The migration marks today's apps internal explicitly.
+        """
+        return (app_config or {}).get('tenant_type') == 'internal'
+
+    @staticmethod
+    def directory_scope(app_config):
+        """Which account directory this app draws its users from.
+
+        Defaults to the app's own client_id, so a tenant with one app behaves
+        exactly as before. Point several apps at the same `tenant_id` and they
+        share one user pool — which is the difference between SSO that spans
+        your customer's products and SSO that spans a single app.
+        """
+        return app_config.get('tenant_id') or app_config['client_id']
     def register_application(self, app_name, callback_url, web_url=None, logo_url=None, allowed_methods=None,
-                             api_url=None):
-        """Creates a new application document."""
+                             api_url=None, tenant_id=None, tenant_type="external"):
+        """Creates a new application document.
+
+        `tenant_id` groups apps that share a user directory; leave it None for a
+        standalone app and it defaults to the app's own client_id.
+
+        `tenant_type` is "internal" (a platform-owned product) or "external"
+        (a customer). It decides how much of this tenant a platform admin sees.
+        """
         safe_name = app_name.lower().replace(' ', '_')
         client_id = f"{safe_name}_{secrets.token_hex(4)}"
         client_secret = secrets.token_urlsafe(32)
@@ -32,6 +63,14 @@ class AppMixin:
             "app_web_url": web_url,
             "app_callback_url": callback_url,
             "app_api_url": api_url,
+            "tenant_id": tenant_id or client_id,
+            # New tenants are external until someone says otherwise.
+            "tenant_type": tenant_type,
+            # OIDC relying-party registration. The callback URL is always an
+            # implicit member of this set; add entries for extra environments.
+            "oidc_redirect_uris": [callback_url] if callback_url else [],
+            "oidc_post_logout_redirect_uris": [],
+            "oidc_public_client": False,
             "allowed_auth_methods": allowed_methods or ["email"],
             "telegram_bot_token": None,
             "enabled_services": {
@@ -55,7 +94,9 @@ class AppMixin:
     def update_app_details(self, app_id, data):
         """Updates non-sensitive app details."""
         allowed_fields = ['app_name', 'app_callback_url', 'app_web_url', 'app_api_url', 'app_logo_url', 'app_qr_url', 'telegram_bot_token', 'enabled_services', 'custom_domain', 'db_connection', 'db_mode', 'db_schema',
-                          'notification_configs', 'platform_locked_tables', 'payment_methods']
+                          'notification_configs', 'platform_locked_tables', 'payment_methods',
+                          'tenant_id', 'oidc_redirect_uris', 'oidc_post_logout_redirect_uris',
+                          'oidc_public_client', 'tenant_type']
         updates = {k: v for k, v in data.items() if k in allowed_fields}
 
         if updates:
