@@ -188,3 +188,90 @@ def test_locked_tables_come_from_the_app_document(ctx):
 def test_no_hardcoded_lock_table_remains():
     from config import Config
     assert not hasattr(Config, 'PLATFORM_LOCKED_TABLES')
+
+
+# ---------------------------------------------------------------------------
+# Configurable role matrix (Layer A)
+# ---------------------------------------------------------------------------
+
+def test_absent_override_keeps_the_platform_default(ctx):
+    from bifrost.backoffice import effective_role_permissions
+    _app, db, ids = ctx
+    import bson
+    doc = db.db.applications.find_one({"_id": bson.ObjectId(ids['external'])})
+    assert effective_role_permissions(doc, 'content_manager') == \
+        ROLE_PERMISSIONS['content_manager']
+
+
+def test_override_replaces_the_default_for_that_role_only(ctx):
+    """A tenant wanting content_manager to publish is a console edit, not a release."""
+    from bifrost.backoffice import effective_role_permissions
+    _app, db, ids = ctx
+    import bson
+
+    db.update_app_details(ids['external'], {"role_permissions": {
+        "content_manager": ["content:read", "content:write", "content:publish"]}})
+    doc = db.db.applications.find_one({"_id": bson.ObjectId(ids['external'])})
+
+    assert "content:publish" in effective_role_permissions(doc, 'content_manager')
+    # Untouched roles are unaffected.
+    assert effective_role_permissions(doc, 'operations') == ROLE_PERMISSIONS['operations']
+
+
+def test_managed_database_tenant_cannot_grant_raw_sql(ctx):
+    """db:execute against the platform's own Postgres stays platform-granted."""
+    from bifrost.backoffice import effective_role_permissions
+    _app, db, ids = ctx
+    import bson
+
+    # No db_connection and no db_mode -> managed, i.e. not the tenant's database.
+    db.update_app_details(ids['external'],
+                          {"role_permissions": {"developer": ["read:config", "db:execute"]}})
+    doc = db.db.applications.find_one({"_id": bson.ObjectId(ids['external'])})
+    assert db.owns_its_database(doc) is False
+    assert "db:execute" not in effective_role_permissions(doc, 'developer')
+    assert "read:config" in effective_role_permissions(doc, 'developer')
+
+
+def test_byodb_tenant_may_grant_raw_sql_over_its_own_database(ctx):
+    """It is their database and their credentials — they can reach it without
+    Bifrost, so gatekeeping it in the console would protect nothing."""
+    from bifrost.backoffice import effective_role_permissions
+    _app, db, ids = ctx
+    import bson
+
+    db.update_app_details(ids['external'], {
+        "db_mode": "custom",
+        "db_connection": "postgresql://user:pw@their-host:5432/theirs",
+        "role_permissions": {"developer": ["read:config", "db:execute"]},
+    })
+    doc = db.db.applications.find_one({"_id": bson.ObjectId(ids['external'])})
+    assert db.owns_its_database(doc) is True
+    assert "db:execute" in effective_role_permissions(doc, 'developer')
+
+
+def test_override_is_enforced_through_check_permission(ctx):
+    app, db, ids = ctx
+    user = db.create_account({"client_id": "x", "email": "cm@theirs.test"})
+    db.link_user_to_app(user, ids['internal'], role="content_manager")
+
+    with app.test_request_context():
+        session['backoffice_user'] = str(user)
+        assert check_permission(ids['internal'], "content:publish") is False
+
+    db.update_app_details(ids['internal'], {"role_permissions": {
+        "content_manager": ["content:read", "content:write", "content:publish"]}})
+
+    with app.test_request_context():
+        session['backoffice_user'] = str(user)
+        assert check_permission(ids['internal'], "content:publish") is True
+
+
+def test_an_emptied_role_loses_everything(ctx):
+    """An explicit empty list is a decision, not a fall-through to the default."""
+    from bifrost.backoffice import effective_role_permissions
+    _app, db, ids = ctx
+    import bson
+    db.update_app_details(ids['external'], {"role_permissions": {"operations": []}})
+    doc = db.db.applications.find_one({"_id": bson.ObjectId(ids['external'])})
+    assert effective_role_permissions(doc, 'operations') == set()

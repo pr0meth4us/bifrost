@@ -152,6 +152,34 @@ PLATFORM_EXTERNAL_PERMISSIONS = {
 }
 
 
+# Permissions a tenant owner may not hand out by editing their own role table.
+# Raw SQL is the only one, and only when the database is the platform's rather
+# than the tenant's — see AppMixin.owns_its_database. Everything else in the
+# matrix concerns the tenant's own content, users, payments and secrets, which
+# are theirs to delegate.
+PLATFORM_GRANTED_ONLY = {"db:execute"}
+
+
+def effective_role_permissions(app, role):
+    """The permission set for `role` in `app`.
+
+    `applications.role_permissions` overrides the platform defaults per role, so
+    a tenant that wants its content_manager to publish is a console edit rather
+    than a release. A role absent from the override falls back to the default,
+    which keeps the table meaningful when only one role has been customised.
+    """
+    overrides = (app or {}).get('role_permissions') or {}
+    if role not in overrides:
+        return ROLE_PERMISSIONS.get(role, set())
+
+    from ..models.apps import AppMixin
+
+    granted = set(overrides[role] or ())
+    if not AppMixin.owns_its_database(app):
+        granted -= PLATFORM_GRANTED_ONLY
+    return granted
+
+
 def platform_admin_may(app_id, permission):
     """Whether a platform admin may exercise `permission` inside this tenant."""
     if not app_id:
@@ -188,9 +216,10 @@ def check_permission(app_id, permission_or_level):
         if level <= 1 and role == 'admin': return True
         return False
 
-    # Explicit string permission check
-    allowed_permissions = ROLE_PERMISSIONS.get(role, set())
-    return permission_or_level in allowed_permissions
+    # Explicit string permission check, against this app's effective matrix —
+    # the platform defaults unless the tenant has overridden that role.
+    app = resolve_app_doc(get_db(), app_id) if app_id else None
+    return permission_or_level in effective_role_permissions(app, role)
 
 
 def cms_full_access(app_id, roles=("owner", "super_admin")):

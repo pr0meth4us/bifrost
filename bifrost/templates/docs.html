@@ -25,7 +25,10 @@
   @media (max-width: 1000px) { .toc { position: static; height: auto; border-right: 0;
                                       border-bottom: 1px solid rgb(var(--c-border)); } }
 
-  .doc-body { padding: 32px 28px 96px; max-width: 860px; }
+  /* Capped for line length, centred in whatever the column actually is. Without
+     the auto margin the prose pins itself to the left of a 1600px column and
+     leaves half the screen empty. */
+  .doc-body { padding: 32px 40px 96px; max-width: 860px; margin-inline: auto; }
   .doc-section { scroll-margin-top: 24px; padding-top: 40px; }
   .doc-section + .doc-section { border-top: 1px solid rgb(var(--c-border)); }
 
@@ -450,6 +453,13 @@ app.post('/bifrost-webhook', express.raw({ type: 'application/json' }), (req, re
         access control — a role without a permission gets a 403 from the server even
         if it crafts the request by hand.
       </p>
+      <p>
+        The table below is the <strong>platform default</strong>, not a fixed rule.
+        Each application can override any role under
+        <strong>Roles &amp; permissions</strong> in its console, so wanting a
+        <code>content_manager</code> who may publish is a setting rather than a
+        release. A role nobody customises keeps the default shown here.
+      </p>
       <div class="table-scroll">
         <table class="table">
           <thead>
@@ -484,6 +494,25 @@ app.post('/bifrost-webhook', express.raw({ type: 'application/json' }), (req, re
         It is deliberately narrow so raw database access can be granted to an engineer
         without also handing over the payment queue. See <a class="text-accent underline"
         href="#part6-developer">section 22</a>.
+      </p>
+
+      <h3>Two layers, and what each one controls</h3>
+      <p>
+        The matrix above is the coarse layer: whether a role reaches payments,
+        secrets, settings or raw SQL at all. Beneath it, the same
+        <strong>Roles &amp; permissions</strong> screen configures which individual
+        CMS tables and columns a role may read or write — so an
+        <code>operations</code> agent can work a table with the amount column masked.
+        Hidden columns are stripped from the response server-side, and are refused on
+        write, not merely omitted from the page.
+      </p>
+      <p>
+        One permission is not yours to assign: <code>db:execute</code> stays
+        platform-granted while an application uses Bifrost's <strong>managed</strong>
+        database, because that is a schema inside the platform's own PostgreSQL
+        instance. Connect your own database and it becomes yours to grant — at that
+        point you hold the credentials and can reach it without Bifrost anyway, so
+        gatekeeping it here would protect nothing.
       </p>
 
       <h3 id="part5-queue">16 · Payment queue and the SLA clock</h3>
