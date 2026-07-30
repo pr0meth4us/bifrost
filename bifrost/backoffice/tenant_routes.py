@@ -2,7 +2,8 @@
 from flask import render_template, request, redirect, url_for, flash, session, current_app, abort
 from bson import ObjectId
 from . import (backoffice_bp, get_db, login_required, requires, get_current_role_in_app,
-               check_permission, cms_full_access)
+               check_permission, cms_full_access, ROLE_PERMISSIONS,
+               PLATFORM_GRANTED_ONLY, effective_role_permissions)
 from ..models.payments import (
     REJECT_REASON_CODES, REFUND_REASON_CODES, SLA_HOURS,
 )
@@ -1073,6 +1074,34 @@ def cms_rbac(app_id):
             new_roles = json.loads(raw)
             cms_config['roles'] = new_roles
             db.save_cms_config(str(app['_id']), cms_config)
+
+            # Layer A — the coarse permission matrix. Optional; absent means this
+            # app keeps the platform defaults.
+            raw_perms = request.form.get('role_permissions_json')
+            if raw_perms is not None:
+                overrides = json.loads(raw_perms) if raw_perms.strip() else {}
+                if not isinstance(overrides, dict):
+                    raise ValueError("role_permissions must be an object")
+
+                known = set().union(*ROLE_PERMISSIONS.values()) | {"db:execute"}
+                cleaned, refused = {}, set()
+                for role, perms in overrides.items():
+                    perms = {p for p in (perms or []) if p in known}
+                    # The floor is enforced here, not in the browser: a tenant
+                    # cannot grant raw SQL against the platform's own database by
+                    # posting a hand-made form.
+                    if not db.owns_its_database(app) and not session.get('is_heimdall'):
+                        blocked = perms & PLATFORM_GRANTED_ONLY
+                        if blocked:
+                            refused |= blocked
+                            perms -= blocked
+                    cleaned[role] = sorted(perms)
+
+                db.update_app_details(app_id, {"role_permissions": cleaned})
+                if refused:
+                    flash(f"Not granted — platform admin only on a managed "
+                          f"database: {', '.join(sorted(refused))}", "warning")
+
             flash("RBAC configuration saved.", "success")
         except Exception as e:
             flash(f"Invalid config JSON: {e}", "danger")
@@ -1088,11 +1117,26 @@ def cms_rbac(app_id):
         all_tables, table_schemas = [], {}
 
     current_role = get_current_role_in_app(app_id)
+
+    # Layer A, for the coarse matrix editor. Send the defaults alongside the
+    # effective set so the UI can show which roles have been customised, and which
+    # permissions this tenant is not allowed to grant itself.
+    owns_db = db.owns_its_database(app)
+    matrix = {role: {"default": sorted(defaults),
+                     "effective": sorted(effective_role_permissions(app, role)),
+                     "customised": role in (app.get('role_permissions') or {})}
+              for role, defaults in ROLE_PERMISSIONS.items()}
+
     return render_template(
         'backoffice/cms_rbac.html',
         app=app,
         all_tables=all_tables,
         table_schemas=table_schemas,
         cms_config=cms_config,
-        current_role=current_role
+        current_role=current_role,
+        matrix=matrix,
+        all_permissions=sorted(set().union(*ROLE_PERMISSIONS.values()) | {"db:execute"}),
+        restricted_permissions=sorted(() if (owns_db or session.get('is_heimdall'))
+                                      else PLATFORM_GRANTED_ONLY),
+        owns_database=owns_db,
     )

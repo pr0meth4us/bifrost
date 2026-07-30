@@ -65,10 +65,75 @@
   </div>
 </div>
 
+{# ---------------------------------------------------------------------------
+   Layer A — the coarse permission matrix. Layer B above governs which CMS tables
+   and columns a role reaches; this governs whether it reaches payments, secrets
+   or raw SQL at all. Both save through the same button.
+   --------------------------------------------------------------------------- #}
+<div class="main-pad pt-0">
+  <div class="card">
+    <div class="card-head">
+      <span>Permissions</span>
+      <span class="block muted text-[12px] font-normal">
+        Platform defaults, overridable for this application. A role you don't touch
+        keeps its default.
+      </span>
+    </div>
+
+    <div class="table-scroll">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Role</th>
+            {% for perm in all_permissions %}
+              <th class="text-center text-[11px] mono whitespace-nowrap">{{ perm }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for role, info in matrix.items() %}
+          <tr>
+            <td class="mono whitespace-nowrap">
+              {{ role }}
+              {% if info.customised %}
+                <span class="badge ml-1" title="Overridden for this application">custom</span>
+              {% endif %}
+            </td>
+            {% for perm in all_permissions %}
+              {% set locked = perm in restricted_permissions %}
+              <td class="text-center">
+                <input type="checkbox"
+                       data-role="{{ role }}" data-perm="{{ perm }}"
+                       {{ 'checked' if perm in info.effective }}
+                       {{ 'disabled' if locked }}
+                       title="{{ 'Platform admin only while this app uses the managed database' if locked else perm }}">
+              </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="hint card-pad">
+      {% if restricted_permissions %}
+        <strong>{{ restricted_permissions | join(', ') }}</strong> can only be granted
+        by a platform admin, because this application runs on the platform's managed
+        database rather than its own. Connect your own database to control it here.
+      {% else %}
+        This application uses its own database, so every permission above is yours
+        to assign — including <span class="mono">db:execute</span>, which runs raw
+        SQL against it.
+      {% endif %}
+    </p>
+  </div>
+</div>
+
 <form id="saveForm" method="POST" hidden
       action="{{ url_for('backoffice.cms_rbac', app_id=app._id) }}">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
   <input type="hidden" name="cms_rbac_json" id="rbacJsonInput">
+  <input type="hidden" name="role_permissions_json" id="rolePermsInput">
 </form>
 {% endblock %}
 
@@ -235,9 +300,22 @@ function saveCurrentRoleState() {
   rolesConfig[currentRole] = config;
 }
 
+// Layer A: collect the checked boxes per role. Disabled boxes are skipped, but
+// the server re-applies the same floor — a checkbox is a hint, not the gate.
+function collectPermissions() {
+  var out = {};
+  document.querySelectorAll('input[type=checkbox][data-role]').forEach(function (box) {
+    var role = box.dataset.role;
+    if (!out[role]) out[role] = [];
+    if (box.checked) out[role].push(box.dataset.perm);
+  });
+  return out;
+}
+
 function saveRBAC() {
   saveCurrentRoleState();
   document.getElementById('rbacJsonInput').value = JSON.stringify(rolesConfig);
+  document.getElementById('rolePermsInput').value = JSON.stringify(collectPermissions());
   document.getElementById('saveForm').submit();
 }
 
