@@ -21,7 +21,7 @@
            aria-hidden="true">{{ app.app_name[0]|upper }}</div>
     {% else %}
       <img src="{{ url_for('static', filename='logo-mark-64.png') }}" alt=""
-           width="28" height="28" class="w-7 h-7 rounded-lg shrink-0">
+           width="28" height="28" class="w-7 h-7 shrink-0">
     {% endif %}
     <div class="min-w-0">
       <div class="font-semibold leading-tight truncate" title="{{ app.app_name if app }}">
