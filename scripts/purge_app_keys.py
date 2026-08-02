@@ -2,7 +2,7 @@ import os
 from pymongo import MongoClient
 
 def main():
-    mongo_uri = "mongodb+srv://bifrostbyhelm_db_user:***REMOVED***@bifrost.emyp9nm.mongodb.net/bifrost_db?retryWrites=true&w=majority"
+    mongo_uri = os.environ["MONGO_URI"]
     client = MongoClient(mongo_uri, tlsAllowInvalidCertificates=True)
     db = client['bifrost_db']
 
