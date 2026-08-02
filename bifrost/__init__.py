@@ -229,10 +229,10 @@ def create_app(config_class):
         version, date = get_latest_version_info()
         return render_template('docs.html', version=version, date=date)
 
-    # Legal pages are rendered from docs/legal/*.md so the published text and the
-    # reviewed text are the same file. The allowlist is the routing table: a slug
-    # that is not in it is a 404, which is also what stops the path being used to
-    # read arbitrary files.
+    # Legal pages and public guides are rendered from their markdown in docs/ so
+    # the published text and the reviewed text are the same file. Each allowlist
+    # is the routing table: a slug that is not in it is a 404, which is also what
+    # stops the path being used to read arbitrary files.
     LEGAL_DOCUMENTS = [
         ('terms-of-service', 'Terms of Service'),
         ('privacy-policy', 'Privacy Policy'),
@@ -241,24 +241,24 @@ def create_app(config_class):
         ('subprocessors', 'Subprocessors'),
     ]
 
-    @app.route('/legal')
-    def legal_index():
-        from flask import redirect, url_for
-        return redirect(url_for('legal_page', slug='terms-of-service'))
+    # Only guides written for tenants belong here. dev_guide and
+    # testing_pipeline are for people working on Bifrost, not using it.
+    GUIDE_DOCUMENTS = [
+        ('tenant-smtp', 'Sending email from your own domain'),
+    ]
 
-    @app.route('/legal/<slug>')
-    def legal_page(slug):
+    def render_markdown_page(folder, slug, documents, endpoint):
         from flask import abort
-        titles = dict(LEGAL_DOCUMENTS)
+        titles = dict(documents)
         if slug not in titles:
             abort(404)
 
-        path = os.path.join(app.root_path, '..', 'docs', 'legal', f'{slug}.md')
+        path = os.path.join(app.root_path, '..', 'docs', folder, f'{slug}.md')
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 text = f.read()
         except OSError as e:
-            logging.error(f"Could not read legal document {slug}: {e}")
+            logging.error(f"Could not read {folder} document {slug}: {e}")
             abort(404)
 
         version, date = get_latest_version_info()
@@ -269,8 +269,22 @@ def create_app(config_class):
         body = body.replace('</table>', '</table></div>')
 
         return render_template('legal.html', body=body, title=titles[slug],
-                               current=slug, documents=LEGAL_DOCUMENTS,
+                               current=slug, documents=documents,
+                               index_endpoint=endpoint,
                                version=version, date=date)
+
+    @app.route('/legal')
+    def legal_index():
+        from flask import redirect, url_for
+        return redirect(url_for('legal_page', slug='terms-of-service'))
+
+    @app.route('/legal/<slug>')
+    def legal_page(slug):
+        return render_markdown_page('legal', slug, LEGAL_DOCUMENTS, 'legal_page')
+
+    @app.route('/docs/guides/<slug>')
+    def guide_page(slug):
+        return render_markdown_page('guides', slug, GUIDE_DOCUMENTS, 'guide_page')
 
     @app.route('/docs/changelog')
     def changelog_page():

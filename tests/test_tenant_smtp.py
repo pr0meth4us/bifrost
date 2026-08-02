@@ -33,7 +33,7 @@ def tenant(**overrides):
         'smtp_host': 'smtp.acme.com',
         'smtp_port': 2525,
         'smtp_sender': 'noreply@acme.com',
-        'api_keys': {'SMTP_PASSWORD': encrypt_value('tenant-pw', WEBHOOK_SECRET)},
+        'smtp_password': encrypt_value('tenant-pw', WEBHOOK_SECRET),
     }
     doc.update(overrides)
     return doc
@@ -62,7 +62,7 @@ def test_resolve_smtp():
         assert resolve_smtp(tenant(smtp_port='465'))['port'] == 465
 
         # Any missing piece falls all the way back — never a mix.
-        for missing in ({'smtp_host': ''}, {'smtp_sender': ''}, {'api_keys': {}}):
+        for missing in ({'smtp_host': ''}, {'smtp_sender': ''}, {'smtp_password': ''}):
             got = resolve_smtp(tenant(**missing))
             assert got['host'] == PLATFORM['SMTP_SERVER'], missing
             assert got['sender'] == PLATFORM['SENDER_EMAIL'], missing

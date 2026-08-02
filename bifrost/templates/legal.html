@@ -61,7 +61,7 @@
   <div class="max-w-6xl mx-auto px-6 py-2.5 flex flex-wrap gap-1">
     {% for slug, label in documents %}
       <a class="btn btn-sm {{ 'btn-primary' if slug == current else 'btn-ghost' }}"
-         href="{{ url_for('legal_page', slug=slug) }}">{{ label }}</a>
+         href="{{ url_for(index_endpoint | default('legal_page'), slug=slug) }}">{{ label }}</a>
     {% endfor %}
   </div>
 </div>

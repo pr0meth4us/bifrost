@@ -228,6 +228,10 @@
             Leave the host blank and mail goes out through the Bifrost mailbox with your
             app name and logo. Fill all four and every email to your users is sent from
             your own server, under your own address.
+            <a class="underline hover:text-accent"
+               href="{{ url_for('guide_page', slug='tenant-smtp') }}" target="_blank"
+               rel="noopener">Setup guide</a> — provider settings, and the SPF/DKIM
+            records you need in DNS.
           </p>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -257,13 +261,13 @@
             </div>
             <div class="sm:col-span-2">
               <label class="label" for="s-smtp-pass">SMTP password</label>
-              {# Stored in the tenant vault as ciphertext; never echoed back. #}
+              {# Stored as ciphertext, like db_connection; never echoed back. #}
               <input class="input mono" id="s-smtp-pass" name="smtp_password" type="password"
                      value="" autocomplete="new-password" {{ 'disabled' if is_disabled }}
-                     placeholder="{% if app.api_keys and app.api_keys.SMTP_PASSWORD %}•••••••• stored — type a new one to replace{% else %}App password or SMTP token{% endif %}"
+                     placeholder="{% if app.smtp_password %}•••••••• stored — type a new one to replace{% else %}App password or SMTP token{% endif %}"
                      aria-describedby="s-smtp-pass-hint">
               <p class="hint" id="s-smtp-pass-hint">
-                {% if app.api_keys and app.api_keys.SMTP_PASSWORD %}A password is stored. Leave blank to keep it.{% endif %}
+                {% if app.smtp_password %}A password is stored. Leave blank to keep it.{% endif %}
                 Set SPF and DKIM for this domain or your mail will land in spam.
               </p>
             </div>

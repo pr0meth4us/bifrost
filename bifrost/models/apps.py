@@ -112,7 +112,8 @@ class AppMixin:
                           'notification_configs', 'platform_locked_tables', 'payment_methods',
                           'tenant_id', 'oidc_redirect_uris', 'oidc_post_logout_redirect_uris',
                           'oidc_public_client', 'tenant_type', 'role_permissions',
-                          'smtp_host', 'smtp_port', 'smtp_sender', 'smtp_sender_name']
+                          'smtp_host', 'smtp_port', 'smtp_sender', 'smtp_sender_name',
+                          'smtp_password']
         updates = {k: v for k, v in data.items() if k in allowed_fields}
 
         if updates:
