@@ -78,7 +78,7 @@ def request_email_otp():
     code, verification_id = db.create_otp(email, channel="email")
 
     # 3. Send Email with Dynamic Branding
-    if send_otp_email(to_email=email, otp=code, app_name=app_name):
+    if send_otp_email(to_email=email, otp=code, app_name=app_name, app_doc=app_config):
         return jsonify({
             "message": "OTP sent successfully",
             "verification_id": verification_id

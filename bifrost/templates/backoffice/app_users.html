@@ -223,6 +223,54 @@
         </fieldset>
 
         <fieldset class="border-t border-border pt-5">
+          <legend class="label">Outbound email</legend>
+          <p class="muted text-[12px] mb-3">
+            Leave the host blank and mail goes out through the Bifrost mailbox with your
+            app name and logo. Fill all four and every email to your users is sent from
+            your own server, under your own address.
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="label" for="s-smtp-host">SMTP host</label>
+              <input class="input mono" id="s-smtp-host" name="smtp_host" type="text"
+                     value="{{ app.smtp_host or '' }}" placeholder="smtp.yourdomain.com"
+                     {{ 'disabled' if is_disabled }}>
+            </div>
+            <div>
+              <label class="label" for="s-smtp-port">Port</label>
+              <input class="input mono" id="s-smtp-port" name="smtp_port" type="number"
+                     value="{{ app.smtp_port or 587 }}" {{ 'disabled' if is_disabled }}>
+              <p class="hint">STARTTLS — 587.</p>
+            </div>
+            <div>
+              <label class="label" for="s-smtp-sender">From address</label>
+              <input class="input mono" id="s-smtp-sender" name="smtp_sender" type="email"
+                     value="{{ app.smtp_sender or '' }}" placeholder="noreply@yourdomain.com"
+                     {{ 'disabled' if is_disabled }}>
+              <p class="hint">Also the SMTP username.</p>
+            </div>
+            <div>
+              <label class="label" for="s-smtp-name">From name</label>
+              <input class="input" id="s-smtp-name" name="smtp_sender_name" type="text"
+                     value="{{ app.smtp_sender_name or '' }}"
+                     placeholder="{{ app.app_name }}" {{ 'disabled' if is_disabled }}>
+            </div>
+            <div class="sm:col-span-2">
+              <label class="label" for="s-smtp-pass">SMTP password</label>
+              {# Stored in the tenant vault as ciphertext; never echoed back. #}
+              <input class="input mono" id="s-smtp-pass" name="smtp_password" type="password"
+                     value="" autocomplete="new-password" {{ 'disabled' if is_disabled }}
+                     placeholder="{% if app.api_keys and app.api_keys.SMTP_PASSWORD %}•••••••• stored — type a new one to replace{% else %}App password or SMTP token{% endif %}"
+                     aria-describedby="s-smtp-pass-hint">
+              <p class="hint" id="s-smtp-pass-hint">
+                {% if app.api_keys and app.api_keys.SMTP_PASSWORD %}A password is stored. Leave blank to keep it.{% endif %}
+                Set SPF and DKIM for this domain or your mail will land in spam.
+              </p>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="border-t border-border pt-5">
           <legend class="label">Enabled services</legend>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {# `enabled_services is not defined` keeps old app documents, written
