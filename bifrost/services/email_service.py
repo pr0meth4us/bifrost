@@ -23,14 +23,48 @@ def load_email_template(filename='verification_email.html'):
         return "<html><body><h1>{TITLE}</h1><p>{SUBTITLE}</p><p>Code: {OTP_CODE}</p></body></html>"
 
 
-def send_email(to_email, subject, html_content, text_content, app_name):
-    sender_email = current_app.config['SENDER_EMAIL']
-    app_password = current_app.config['EMAIL_PASSWORD']
-    smtp_server = current_app.config['SMTP_SERVER']
-    smtp_port = current_app.config['SMTP_PORT']
+def resolve_smtp(app_doc):
+    """The mailbox this app sends from: its own if it brought one, else ours.
+
+    A tenant with its own server sends under its own address — that is the whole
+    reason to bring one, and the platform mailbox cannot pass SPF/DMARC for
+    somebody else's domain anyway. Partial config falls back rather than mixing
+    the two: a tenant host with the platform password just fails auth, and the
+    platform host with a tenant From address fails alignment at the recipient.
+    """
+    from ..utils.encryption import app_secret
+
+    host = (app_doc or {}).get('smtp_host')
+    sender = (app_doc or {}).get('smtp_sender')
+    password = app_secret(app_doc, 'SMTP_PASSWORD')
+
+    if host and sender and password:
+        return {
+            "host": host,
+            "port": int((app_doc.get('smtp_port') or 587)),
+            "sender": sender,
+            "password": password,
+            "from_name": app_doc.get('smtp_sender_name') or app_doc.get('app_name'),
+        }
+
+    return {
+        "host": current_app.config['SMTP_SERVER'],
+        "port": current_app.config['SMTP_PORT'],
+        "sender": current_app.config['SENDER_EMAIL'],
+        "password": current_app.config['EMAIL_PASSWORD'],
+        "from_name": None,
+    }
+
+
+def send_email(to_email, subject, html_content, text_content, app_name, app_doc=None):
+    smtp = resolve_smtp(app_doc)
+    sender_email = smtp['sender']
+    app_password = smtp['password']
+    smtp_server = smtp['host']
+    smtp_port = smtp['port']
 
     message = MIMEMultipart("alternative")
-    message["From"] = f"{app_name} <{sender_email}>"
+    message["From"] = f"{smtp['from_name'] or app_name} <{sender_email}>"
     message["To"] = to_email
     message["Subject"] = subject
     message.attach(MIMEText(text_content, "plain"))
@@ -48,7 +82,7 @@ def send_email(to_email, subject, html_content, text_content, app_name):
         return False
 
 
-def send_otp_email(to_email, otp, app_name="Bifrost Identity", logo_url=None, app_url="#"):
+def send_otp_email(to_email, otp, app_name="Bifrost Identity", logo_url=None, app_url="#", app_doc=None):
     """Sends a standard OTP verification email."""
     html_template = load_email_template('verification_email.html')
     final_logo = logo_url if logo_url else get_default_logo_url()
@@ -61,10 +95,10 @@ def send_otp_email(to_email, otp, app_name="Bifrost Identity", logo_url=None, ap
         .replace("{SUBTITLE}", f"Use this code to verify your account for <b>{app_name}</b>.")
 
     text_content = f"Your {app_name} code is: {otp}"
-    return send_email(to_email, f"🔐 {app_name} Code", html_content, text_content, app_name)
+    return send_email(to_email, f"🔐 {app_name} Code", html_content, text_content, app_name, app_doc)
 
 
-def send_invite_email(to_email, otp, app_name, verification_id, client_id, logo_url=None):
+def send_invite_email(to_email, otp, app_name, verification_id, client_id, logo_url=None, app_doc=None):
     """
     Sends an invitation email with a direct link to the password setup page.
     The link includes the verification_id so the user can enter their OTP and set a password.
@@ -85,7 +119,7 @@ def send_invite_email(to_email, otp, app_name, verification_id, client_id, logo_
                  f"You have been granted access to <b>{app_name}</b>. Click below to activate your account.")
 
     text_content = f"You've been invited to {app_name}! Your activation code is: {otp}\nVisit: {setup_url}"
-    return send_email(to_email, f"👋 Welcome to {app_name}", html_content, text_content, app_name)
+    return send_email(to_email, f"👋 Welcome to {app_name}", html_content, text_content, app_name, app_doc)
 
 
 def send_reset_email(to_email, otp):

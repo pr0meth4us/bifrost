@@ -53,7 +53,7 @@ def add_user_to_app(app_id):
                                     "display_name": email.split('@')[0],
                                     "auth_providers": ["email"]})
         otp, vid = db.create_otp(email, channel="email")
-        send_invite_email(email, otp, app['app_name'], vid, app['client_id'], app.get('app_logo_url'))
+        send_invite_email(email, otp, app['app_name'], vid, app['client_id'], app.get('app_logo_url'), app_doc=app)
         user_id = new_id
         flash(f"Invite sent to {email}.", "success")
     else:

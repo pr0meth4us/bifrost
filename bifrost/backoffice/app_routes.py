@@ -207,6 +207,15 @@ def view_app(app_id_or_slug=None):
 
 
 
+def _smtp_port(raw):
+    """type=number is a hint to the browser, not a guarantee about the POST."""
+    try:
+        port = int(raw)
+    except (TypeError, ValueError):
+        return 587
+    return port if 1 <= port <= 65535 else 587
+
+
 @backoffice_bp.route('/app/<app_id>/update', methods=['POST'])
 @login_required
 def update_app_settings(app_id):
@@ -244,7 +253,12 @@ def update_app_settings(app_id):
         'app_logo_url': request.form.get('logo_url'),
         'telegram_bot_token': request.form.get('telegram_bot_token'),
         'db_mode': request.form.get('db_mode', 'custom'),
-        'enabled_services': enabled_services
+        'enabled_services': enabled_services,
+        # Blank host means "send through the platform mailbox" — see resolve_smtp.
+        'smtp_host': (request.form.get('smtp_host') or '').strip(),
+        'smtp_port': _smtp_port(request.form.get('smtp_port')),
+        'smtp_sender': (request.form.get('smtp_sender') or '').strip(),
+        'smtp_sender_name': (request.form.get('smtp_sender_name') or '').strip(),
     }
     if raw_db_conn:
         data['db_connection'] = raw_db_conn
@@ -261,6 +275,13 @@ def update_app_settings(app_id):
         if tenant_type in ('internal', 'external'):
             data['tenant_type'] = tenant_type
 
+
+    # Same rule as the connection string: the form never renders the stored
+    # secret, so blank means "keep it", not "clear it". It lives in the tenant's
+    # own vault, encrypted under their webhook_secret like every other key.
+    smtp_password = (request.form.get('smtp_password') or '').strip()
+    if smtp_password:
+        db.add_app_api_key(app_id, 'SMTP_PASSWORD', smtp_password)
 
     if db.update_app_details(app_id, data):
         flash("Settings updated.", "success")

@@ -36,14 +36,14 @@ def send_telegram_notification(bot_token, chat_id, message, photo_url=None):
         logger.error(f"Failed to send Telegram notification: {e}")
         return False
 
-def _send_email_notification(config, subject, message):
+def _send_email_notification(config, subject, message, app_doc=None):
     from .email_service import send_email
     to = config.get('email')
     if not to:
         logger.warning("Email notification skipped: no recipient configured.")
         return False
     text = message.replace('<b>', '').replace('</b>', '').replace('<code>', '').replace('</code>', '')
-    return bool(send_email(to, subject, f"<pre>{message}</pre>", text, "Bifrost Console"))
+    return bool(send_email(to, subject, f"<pre>{message}</pre>", text, "Bifrost Console", app_doc))
 
 
 def _send_webhook_notification(config, message, payload):
@@ -74,7 +74,7 @@ def dispatch_notification(app, message, photo_url=None, subject="Bifrost Console
             config.get('bot_token'), config.get('chat_id'), message, photo_url=photo_url
         )
     if channel == 'email':
-        return _send_email_notification(config, subject, message)
+        return _send_email_notification(config, subject, message, app_doc=app)
     if channel == 'webhook':
         return _send_webhook_notification(config, message, payload)
 
