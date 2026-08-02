@@ -32,11 +32,13 @@ def resolve_smtp(app_doc):
     the two: a tenant host with the platform password just fails auth, and the
     platform host with a tenant From address fails alignment at the recipient.
     """
-    from ..utils.encryption import app_secret
+    from ..utils.encryption import decrypt_value
 
-    host = (app_doc or {}).get('smtp_host')
-    sender = (app_doc or {}).get('smtp_sender')
-    password = app_secret(app_doc, 'SMTP_PASSWORD')
+    app_doc = app_doc or {}
+    host = app_doc.get('smtp_host')
+    sender = app_doc.get('smtp_sender')
+    # Encrypted under the app's own webhook_secret, exactly like db_connection.
+    password = decrypt_value(app_doc.get('smtp_password'), app_doc.get('webhook_secret', ''))
 
     if host and sender and password:
         return {

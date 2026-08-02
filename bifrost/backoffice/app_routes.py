@@ -234,16 +234,21 @@ def update_app_settings(app_id):
         'heimdall_monitor': bool(request.form.get('service_heimdall_monitor'))
     }
 
-    # The form no longer renders the stored value, so blank means "unchanged"
+    # The form no longer renders the stored values, so blank means "unchanged"
     # rather than "clear it". Only a value the operator actually typed is
     # plaintext, which is why the old startswith('gAAAAA') ciphertext sniff —
     # and its one-character-typo failure mode of double-encrypting — is gone.
-    raw_db_conn = (request.form.get('db_connection') or '').strip()
-    if raw_db_conn:
+    app_doc = db.db.applications.find_one({"_id": ObjectId(app_id)})
+
+    def typed_secret(field):
         from ..utils.encryption import encrypt_value
-        app_doc = db.db.applications.find_one({"_id": ObjectId(app_id)})
-        if app_doc and app_doc.get('webhook_secret'):
-            raw_db_conn = encrypt_value(raw_db_conn, app_doc['webhook_secret'])
+        raw = (request.form.get(field) or '').strip()
+        if raw and app_doc and app_doc.get('webhook_secret'):
+            return encrypt_value(raw, app_doc['webhook_secret'])
+        return raw
+
+    raw_db_conn = typed_secret('db_connection')
+    raw_smtp_password = typed_secret('smtp_password')
 
     data = {
         'app_name': request.form.get('app_name'),
@@ -262,6 +267,8 @@ def update_app_settings(app_id):
     }
     if raw_db_conn:
         data['db_connection'] = raw_db_conn
+    if raw_smtp_password:
+        data['smtp_password'] = raw_smtp_password
 
     # Platform-super-admin only. An owner must not be able to unlock their own
     # ledger tables — or reclassify themselves as an internal tenant and thereby
@@ -275,13 +282,6 @@ def update_app_settings(app_id):
         if tenant_type in ('internal', 'external'):
             data['tenant_type'] = tenant_type
 
-
-    # Same rule as the connection string: the form never renders the stored
-    # secret, so blank means "keep it", not "clear it". It lives in the tenant's
-    # own vault, encrypted under their webhook_secret like every other key.
-    smtp_password = (request.form.get('smtp_password') or '').strip()
-    if smtp_password:
-        db.add_app_api_key(app_id, 'SMTP_PASSWORD', smtp_password)
 
     if db.update_app_details(app_id, data):
         flash("Settings updated.", "success")
