@@ -111,7 +111,8 @@ class AppMixin:
         allowed_fields = ['app_name', 'app_callback_url', 'app_web_url', 'app_api_url', 'app_logo_url', 'app_qr_url', 'telegram_bot_token', 'enabled_services', 'custom_domain', 'db_connection', 'db_mode', 'db_schema',
                           'notification_configs', 'platform_locked_tables', 'payment_methods',
                           'tenant_id', 'oidc_redirect_uris', 'oidc_post_logout_redirect_uris',
-                          'oidc_public_client', 'tenant_type', 'role_permissions']
+                          'oidc_public_client', 'tenant_type', 'role_permissions',
+                          'smtp_host', 'smtp_port', 'smtp_sender', 'smtp_sender_name']
         updates = {k: v for k, v in data.items() if k in allowed_fields}
 
         if updates:

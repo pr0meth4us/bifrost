@@ -160,7 +160,8 @@ def forgot_password():
                 otp=otp,
                 app_name=app_config.get('app_name', 'Bifrost'),
                 logo_url=app_config.get('app_logo_url'),
-                app_url=verify_url
+                app_url=verify_url,
+                app_doc=app_config
             )
 
             # Redirect to OTP entry page
