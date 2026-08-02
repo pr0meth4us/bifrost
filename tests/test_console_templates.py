@@ -123,6 +123,14 @@ PAGES = {
     "cms_rbac.html": dict(
         app=APP, all_tables=["questions"], table_schemas={"questions": SCHEMA},
         cms_config={"roles": {"editor": {"tables": {}}}}, current_role="owner",
+        matrix={"editor": {"default": ["read:content"],
+                           "effective": ["read:content", "write:content"],
+                           "customised": True},
+                "viewer": {"default": ["read:content"],
+                           "effective": ["read:content"], "customised": False}},
+        all_permissions=["read:content", "write:content", "db:execute"],
+        restricted_permissions=["db:execute"],
+        owns_database=False,
     ),
     "cms_onboarding.html": dict(
         app=APP, all_tables=["questions"], table_schemas={"questions": SCHEMA},
