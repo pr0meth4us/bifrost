@@ -16,6 +16,7 @@ directory holds everything that is better read as a file than as a web page.
 | Understand how the system is built | [reference/WHITE_PAPER.md](reference/WHITE_PAPER.md) |
 | Integrate an application with Bifrost | [guides/client_adoption.md](guides/client_adoption.md) |
 | Run the admin console day to day | [guides/console-onboarding.md](guides/console-onboarding.md) |
+| Send your users' email from your own domain | [guides/tenant-smtp.md](guides/tenant-smtp.md) |
 | Work on Bifrost itself | [guides/dev_guide.md](guides/dev_guide.md) |
 | Know what shipped and when | [../CHANGELOG.md](../CHANGELOG.md) |
 
@@ -40,6 +41,7 @@ documentation.
 |---|---|
 | [client_adoption.md](guides/client_adoption.md) | Integrating an app: registration, tokens, callbacks |
 | [console-onboarding.md](guides/console-onboarding.md) | Operators: the console, payment queue, CMS |
+| [tenant-smtp.md](guides/tenant-smtp.md) | Tenants: pointing Bifrost at your own mail server |
 | [dev_guide.md](guides/dev_guide.md) | Contributors: local setup, conventions |
 | [testing_pipeline.md](guides/testing_pipeline.md) | How the test suite is structured and run |
 
