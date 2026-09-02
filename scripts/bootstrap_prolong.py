@@ -16,7 +16,16 @@ def bootstrap_prolong():
         from bifrost import mongo
         from bifrost.models import BifrostDB
         db = BifrostDB(mongo.cx, app.config['DB_NAME'])
-        
+
+        # Prolong pins whatever we write here, so a wrong origin is a config file
+        # that looks valid and points at nothing. No fallback on purpose.
+        base_url = (app.config.get('BIFROST_PUBLIC_URL') or '').rstrip('/')
+        if not base_url:
+            raise RuntimeError(
+                "BIFROST_PUBLIC_URL is unset. It is the OIDC issuer Prolong pins; "
+                "set it to the deployed origin before bootstrapping."
+            )
+
         client_id = "ministry_exam_prep"
         app_name = "Ministry Exam Prep"
         
@@ -97,9 +106,9 @@ def bootstrap_prolong():
             "client_id": client_id,
             "app_name": app_name,
             "webhook_secret": webhook_secret,
-            "bifrost_url": "https://melted-felipa-aupp-33e78e3e.koyeb.app",
-            "backoffice_url": f"https://melted-felipa-aupp-33e78e3e.koyeb.app/backoffice/app/{app_id}",
-            "cms_onboarding_url": f"https://melted-felipa-aupp-33e78e3e.koyeb.app/backoffice/app/{app_id}/cms/onboarding"
+            "bifrost_url": base_url,
+            "backoffice_url": f"{base_url}/backoffice/app/{app_id}",
+            "cms_onboarding_url": f"{base_url}/backoffice/app/{app_id}/cms/onboarding"
         }
         
         with open(prolong_config_path, "w", encoding="utf-8") as f:
@@ -110,7 +119,7 @@ def bootstrap_prolong():
         print(f"App ID:         {app_id}")
         print(f"Client ID:      {client_id}")
         print(f"Webhook Secret: {webhook_secret}")
-        print(f"CMS Setup URL:  https://melted-felipa-aupp-33e78e3e.koyeb.app/backoffice/app/{app_id}/cms/onboarding")
+        print(f"CMS Setup URL:  {base_url}/backoffice/app/{app_id}/cms/onboarding")
 
 if __name__ == "__main__":
     bootstrap_prolong()

@@ -54,7 +54,7 @@ services:
     environment:
       - BIFROST_BOT_TOKEN=${BIFROST_BOT_TOKEN}
       - ADMIN_CHAT_ID=${ADMIN_CHAT_ID}
-      - BIFROST_API_URL=https://objective-denna-auppecampus-9a7d86fc.koyeb.app/
+      - BIFROST_API_URL=${BIFROST_API_URL:-http://bifrost:8000}
       - BIFROST_CLIENT_ID=${BIFROST_ROOT_CLIENT_ID}
       - BIFROST_CLIENT_SECRET=${BIFROST_ROOT_CLIENT_SECRET}
     depends_on:
