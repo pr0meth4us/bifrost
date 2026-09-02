@@ -183,9 +183,18 @@ def create_app(config_class):
     from .backoffice.tenant_routes import api_notify_new_payment
     csrf.exempt(api_notify_new_payment)
 
-    from .scheduler import start_scheduler
-    if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-        start_scheduler(app)
+    # 'external' means Cloud Scheduler drives internal/cron/* instead. Running
+    # both would double every downgrade and every notification.
+    if app.config.get('BIFROST_SCHEDULER', 'thread') == 'thread':
+        from .scheduler import start_scheduler
+        if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+            start_scheduler(app)
+    elif not app.config.get('CRON_SERVICE_ACCOUNT'):
+        logging.warning(
+            "BIFROST_SCHEDULER=external but CRON_SERVICE_ACCOUNT is unset: the "
+            "cron routes will refuse every call, so expired subscriptions will "
+            "never be downgraded."
+        )
 
     # Local-only login bypass. Raises at boot unless MONGO_URI is loopback,
     # so this can never come up attached to a real database.

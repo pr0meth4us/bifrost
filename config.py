@@ -28,6 +28,19 @@ class Config:
     # every relying party at the user's own machine, with a 200 on it.
     BIFROST_PUBLIC_URL = os.environ.get('BIFROST_PUBLIC_URL')
 
+    # --- SCHEDULED JOBS ---
+    # 'thread' runs the reaper in-process (scheduler.py), which needs a process
+    # that stays alive. On Cloud Run CPU is throttled between requests and the
+    # thread stalls, so there set this to 'external' and drive internal/cron/*
+    # from Cloud Scheduler instead.
+    BIFROST_SCHEDULER = os.environ.get('BIFROST_SCHEDULER', 'thread')
+    # The service account Cloud Scheduler signs its OIDC tokens with. Unset
+    # means the cron routes refuse every request.
+    CRON_SERVICE_ACCOUNT = os.environ.get('CRON_SERVICE_ACCOUNT')
+    # Only needed if the scheduler jobs were created with an explicit
+    # --oidc-token-audience; otherwise the request URL is the audience.
+    CRON_AUDIENCE = os.environ.get('CRON_AUDIENCE')
+
     # --- OIDC PROVIDER ---
     # Optional: pin the RS256 signing key. Left unset, Bifrost generates one on
     # first use and stores it in Mongo so every worker shares it.

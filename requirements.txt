@@ -15,6 +15,10 @@ schedule
 markdown
 redis
 cryptography
+# Verifies the OIDC tokens Cloud Scheduler signs (internal/cron_routes.py).
+# Pinned explicitly: it arrives transitively today, and a security boundary
+# should not depend on another package's dependency graph.
+google-auth
 google-cloud-monitoring
 google-cloud-bigquery
 psycopg2-binary~=2.9.9
