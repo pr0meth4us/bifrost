@@ -23,7 +23,10 @@ class Config:
     # Also the OIDC issuer. Relying parties pin this string, and it is read from
     # config rather than X-Forwarded-Host so nobody can move the issuer with a
     # request header.
-    BIFROST_PUBLIC_URL = os.environ.get('BIFROST_PUBLIC_URL', 'http://localhost:5000')
+    # No default: a localhost literal here silently won over the forwarded-header
+    # fallback in utils/urls.py and shipped a discovery document that pointed
+    # every relying party at the user's own machine, with a 200 on it.
+    BIFROST_PUBLIC_URL = os.environ.get('BIFROST_PUBLIC_URL')
 
     # --- OIDC PROVIDER ---
     # Optional: pin the RS256 signing key. Left unset, Bifrost generates one on

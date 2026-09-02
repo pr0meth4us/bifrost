@@ -7,6 +7,8 @@ import requests
 from flask import current_app
 from datetime import datetime
 
+from ..utils.urls import public_url
+
 log = logging.getLogger(__name__)
 
 
@@ -33,7 +35,7 @@ class PayWayService:
             )
         # Endpoint is not a credential: sandbox vs production, platform default is fine.
         self.api_url = app_secret(app_doc, 'PAYWAY_API_URL', current_app.config['PAYWAY_API_URL'])
-        self.public_url = current_app.config['BIFROST_PUBLIC_URL']
+        self.public_url = public_url()
 
     def _generate_hash(self, data_string):
         """Generates the HMAC-SHA512 hash (Base64 of Binary)."""

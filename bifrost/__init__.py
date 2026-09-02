@@ -124,6 +124,16 @@ def create_app(config_class):
         force=True
     )
 
+    if not app.config.get('BIFROST_PUBLIC_URL'):
+        # BIFROST_API_URL is the bot's variable. Setting it and expecting Bifrost
+        # to pick it up is the mistake that put localhost in a live deployment's
+        # discovery document, so name it rather than warning in the abstract.
+        near_miss = " (BIFROST_API_URL is set — did you mean BIFROST_PUBLIC_URL?)" if os.environ.get('BIFROST_API_URL') else ""
+        logging.warning(
+            "BIFROST_PUBLIC_URL is unset; falling back to forwarded request "
+            "headers for the OIDC issuer and email links.%s", near_miss
+        )
+
     app.json_provider_class = CustomJSONProvider
     app.json = app.json_provider_class(app)
 

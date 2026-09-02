@@ -62,7 +62,9 @@ class AuthMixin:
             doc["account_id"] = str(account_id)
 
         result = self.db.verification_codes.insert_one(doc)
-        log.info(f"✅ OTP Created: Code={code}, Channel={channel}, ID={identifier}")
+        # Never the code: anyone with log access could spend a live OTP before it
+        # expires. The insert id is what correlates a send with its verification.
+        log.info(f"✅ OTP Created: Channel={channel}, ID={identifier}, VID={result.inserted_id}")
         return code, str(result.inserted_id)
 
     def create_login_code(self, telegram_id):

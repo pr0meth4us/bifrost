@@ -28,6 +28,7 @@ from . import sso
 from .. import mongo
 from ..models import BifrostDB
 from ..utils.token import create_client_jwt
+from ..utils.urls import public_url
 
 log = logging.getLogger(__name__)
 
@@ -49,22 +50,11 @@ def get_db():
 
 
 def issuer():
-    """The public origin, from config.
-
-    Derived from proxy headers only as a fallback: `X-Forwarded-Host` is
-    attacker-controlled, and an issuer an attacker can steer is an issuer
-    relying parties cannot pin.
+    """The public origin. Config first, forwarded headers only as a fallback:
+    `X-Forwarded-Host` is attacker-controlled, and an issuer an attacker can
+    steer is an issuer relying parties cannot pin. See utils/urls.py.
     """
-    configured = current_app.config.get('BIFROST_PUBLIC_URL')
-    if configured:
-        return configured.rstrip('/')
-
-    host = request.headers.get('X-Forwarded-Host', request.host)
-    proto = request.headers.get(
-        'X-Forwarded-Proto',
-        'http' if host.startswith('localhost') or host.startswith('127.0.0.1') else 'https',
-    )
-    return f"{proto}://{host}"
+    return public_url()
 
 
 def b64url(raw):

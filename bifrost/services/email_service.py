@@ -6,11 +6,13 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import current_app
 
+from ..utils.urls import public_url
+
 log = logging.getLogger(__name__)
 
 
 def get_default_logo_url():
-    base_url = current_app.config.get('BIFROST_PUBLIC_URL', '').rstrip('/')
+    base_url = public_url()
     return f"{base_url}/static/logo.png" if base_url else ""
 
 
@@ -109,7 +111,7 @@ def send_invite_email(to_email, otp, app_name, verification_id, client_id, logo_
     final_logo = logo_url if logo_url else get_default_logo_url()
 
     # Build the complete URL to the set-password page
-    base_url = current_app.config.get('BIFROST_PUBLIC_URL', 'http://localhost:5000')
+    base_url = public_url()
     setup_url = f"{base_url}/auth/ui/set-password?verification_id={verification_id}&client_id={client_id}"
 
     html_content = html_template.replace("{OTP_CODE}", str(otp)) \
@@ -133,7 +135,7 @@ def send_reset_email(to_email, otp):
     final_logo = get_default_logo_url()
 
     # We point them to the backoffice login for context, though they need to use the OTP on the reset screen.
-    base_url = current_app.config.get('BIFROST_PUBLIC_URL', '')
+    base_url = public_url()
     login_url = f"{base_url}/backoffice/login"
 
     html_content = html_template.replace("{OTP_CODE}", str(otp)) \
