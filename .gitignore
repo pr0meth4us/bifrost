@@ -9,3 +9,8 @@ __pycache__/
 prolong/
 scratch/
 .claude/settings.local.json
+
+# Vault backups from scripts/rotate_app_secrets.py --apply.
+# Each holds an old webhook_secret, which is the key that decrypts the
+# encrypted api_keys stored alongside it in the same file.
+vault-backup-*.json
