@@ -15,6 +15,10 @@ the product will not admit to shipping.
 
 ## [Unreleased]
 ### Added
+- **Externally driven scheduled jobs**: Added `POST /internal/cron/reap` and `POST /internal/cron/payment-sla` (`internal/cron_routes.py`) so Cloud Scheduler can drive the reaper where an in-process thread cannot survive. Both hourly jobs share the `reap` endpoint, so the deployment costs two Cloud Scheduler jobs rather than three — the free tier is three per billing account. The routes verify the OIDC token Cloud Scheduler signs, require it to name the configured `CRON_SERVICE_ACCOUNT`, and fail closed with `503` when that is unset, so an unconfigured deployment refuses to run the jobs instead of exposing them.
+- **`BIFROST_SCHEDULER` mode switch**: Selects `thread` (default, unchanged behaviour) or `external`. `external` skips `start_scheduler` so the in-process reaper cannot double-run against Cloud Scheduler, and warns at startup if the cron routes were left unconfigured.
+- **Cloud Run deploy scripts**: `scripts/seed_secrets.sh` pushes the sensitive half of `.env` into Secret Manager without printing values (re-running rotates rather than errors), and `scripts/deploy_cloudrun.sh` deploys in two passes — the service URL is not knowable until the first deploy, and `BIFROST_PUBLIC_URL` must then be pinned to exactly that string — before registering both scheduler jobs.
+- **Tests**: `tests/test_public_url.py` covers issuer resolution and the OTP logging regression; `tests/test_cron_auth.py` covers the cron authorization matrix, including the audience-scheme regression below.
 - **Valhalla Console UI**: Completely redesigned the `content_grid.html` Backoffice template to use the modern, dark-mode premium "Stitch" design system (Valhalla Console). Added dynamic glassmorphic side drawer for entity creation/editing.
 - **Security**: Added `Flask-WTF` dependency to properly enforce CSRF protection across all Jinja backoffice forms.
 - **Option B Backoffice CMS Console (Phase 1)**: Built manual payment receipt validation queue, dynamic CNAME host header resolution routing, and user entitlement suspension and overrides (commit: payments proxy, user overrides, dynamic template split-screen queue with Alpine.js).
@@ -40,6 +44,19 @@ the product will not admit to shipping.
 - Implemented `ai_metrics.html` visual dashboard for Heimdall users to track `aiplatform.googleapis.com` token metrics in real-time.
 - Updated `dashboard.html` to integrate AI Metrics button.
 - Added `google-cloud-monitoring` dependency to `requirements.txt`.
+
+### Changed
+- **Public origin resolution centralized**: `utils/urls.py::public_url()` is now the single answer to "what origin are we reachable at". `auth/oidc.py::issuer()`, `services/email_service.py` (logo, invite and reset links) and `services/payway.py` all route through it instead of reading `BIFROST_PUBLIC_URL` — or a proxy header — for themselves.
+- **`BIFROST_PUBLIC_URL` is no longer defaulted**: see Security. Startup now warns when it is unset, and names `BIFROST_API_URL` when *that* is set instead, because confusing the bot's variable for Bifrost's is the specific mistake that shipped the localhost issuer.
+- **`google-auth` pinned explicitly** in `requirements.txt`. It already arrived transitively via `google-cloud-*`, but it now backs a security boundary and should not rest on another package's dependency graph.
+- **Dead Koyeb hosts removed**: `scripts/bootstrap_prolong.py` wrote three `koyeb.app` literals into the config file Prolong pins; it now reads `BIFROST_PUBLIC_URL` and refuses to run when unset rather than writing a plausible wrong answer. The bot's `BIFROST_API_URL` in `docker-compose.yml` pointed at a remote Koyeb app while `depends_on` already wired up the local service; local dev now talks to the local one, still overridable.
+
+### Fixed
+- **Scheduled jobs rejected for a wrong audience**: the cron routes derived the expected OIDC audience from `request.base_url`, which reports `http://` because Cloud Run terminates TLS at the proxy and forwards plain HTTP — while the token Cloud Scheduler signs carries an `https://` audience. Every scheduled call `401`d, which is the failure these endpoints exist to prevent (the reaper silently not running) arriving by another route. The audience is now built from `public_url()`.
+
+### Security
+- **OTP codes are no longer written to the log**: `create_otp` logged the code itself, so anyone with log access could spend a live OTP before it expired. It now logs the verification id, which is what actually correlates a send with its verification.
+- **The OIDC issuer can no longer be moved by a request header**: `BIFROST_PUBLIC_URL` defaulted to `http://localhost:5000`, and that literal beat the forwarded-header fallback — so a deployment that never set the variable served a discovery document pointing every relying party at the operator's own machine, with a `200` on it. The default is gone: config wins, forwarded headers are the fallback, and outside a request context callers get `''` and omit the link rather than emit a broken one.
 
 ## [0.17.0] - 2026-07-29
 
