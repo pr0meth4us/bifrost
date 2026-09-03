@@ -38,6 +38,10 @@ def main():
     ap.add_argument("client_id")
     ap.add_argument("--no-verify", action="store_true",
                     help="skip the connection test before writing")
+    ap.add_argument("--unset", action="store_true",
+                    help="remove db_connection entirely. scheduler.py only sweeps "
+                         "apps that have one, so this takes the app out of the "
+                         "payment SLA sweep rather than pointing it somewhere new.")
     args = ap.parse_args()
 
     app = create_app(Config)
@@ -54,6 +58,14 @@ def main():
         print(f"App: {doc.get('app_name')} ({args.client_id})")
         print(f"Currently set: {bool(doc.get('db_connection'))}")
         print()
+
+        if args.unset:
+            if not doc.get('db_connection'):
+                print("Already unset, nothing to do.")
+                return
+            db.applications.update_one({"_id": doc["_id"]}, {"$unset": {"db_connection": ""}})
+            print("db_connection removed. This app is no longer in the SLA sweep.")
+            return
 
         conn = getpass.getpass("Postgres connection string (hidden): ").strip()
         if not conn:
