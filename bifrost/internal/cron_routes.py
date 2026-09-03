@@ -19,6 +19,7 @@ from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
 
 from . import internal_bp
+from ..utils.urls import public_url
 from ..scheduler import (
     run_expiration_check,
     run_expiration_warning_check,
@@ -42,14 +43,22 @@ def _authorize():
     if not header.startswith('Bearer '):
         return jsonify({"error": "unauthorized"}), 401
 
+    # When --oidc-token-audience is omitted, Cloud Scheduler uses the job's own
+    # URI as the audience. Rebuild that from public_url(), NOT request.base_url:
+    # Cloud Run terminates TLS at the proxy and forwards plain HTTP, so
+    # base_url says "http://" while the token says "https://" and every call is
+    # rejected for a wrong audience.
+    expected_audience = (
+        current_app.config.get('CRON_AUDIENCE')
+        or f"{public_url()}{request.path}"
+    )
+
     try:
-        # Verifies Google's signature, exp, and the audience. The audience is
-        # whatever --oidc-token-audience was set to at job creation; default it
-        # to the request URL, which is what gcloud uses when it is omitted.
+        # Verifies Google's signature, expiry, and the audience.
         claims = id_token.verify_oauth2_token(
             header[len('Bearer '):],
             google_requests.Request(),
-            audience=current_app.config.get('CRON_AUDIENCE') or request.base_url,
+            audience=expected_audience,
         )
     except Exception as exc:
         # Never echo the reason: it tells a prober which half they got wrong.

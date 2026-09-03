@@ -18,10 +18,14 @@ SA = 'bifrost-cron@example.iam.gserviceaccount.com'
 ROUTES = ('/internal/cron/reap', '/internal/cron/payment-sla')
 
 
-def _client(service_account=SA):
+PUBLIC = 'https://bifrost-abc.a.run.app'
+
+
+def _client(service_account=SA, public_url=PUBLIC):
     app = Flask(__name__)
     app.config['CRON_SERVICE_ACCOUNT'] = service_account
     app.config['CRON_AUDIENCE'] = None
+    app.config['BIFROST_PUBLIC_URL'] = public_url
     app.register_blueprint(internal_bp)
     return app.test_client()
 
@@ -78,6 +82,51 @@ def test_unverified_email_is_rejected():
         for route in ROUTES:
             r = c.post(route, headers={'Authorization': 'Bearer x'})
             assert r.status_code == 403, route
+
+
+def test_audience_uses_the_public_https_origin_not_the_proxied_scheme():
+    """Cloud Run terminates TLS and forwards plain HTTP.
+
+    request.base_url therefore says http:// while Cloud Scheduler's token
+    audience says https://, and every real call 401s for a wrong audience.
+    The expected audience must come from BIFROST_PUBLIC_URL.
+    """
+    c = _client()
+    seen = {}
+
+    def capture(token, request, audience=None):
+        seen['audience'] = audience
+        return {'email': SA, 'email_verified': True}
+
+    with mock.patch('bifrost.internal.cron_routes.id_token.verify_oauth2_token', capture), \
+            mock.patch('bifrost.internal.cron_routes.run_expiration_check'), \
+            mock.patch('bifrost.internal.cron_routes.run_expiration_warning_check'):
+        c.post('/internal/cron/reap', headers={'Authorization': 'Bearer good'})
+
+    assert seen['audience'] == f'{PUBLIC}/internal/cron/reap', seen['audience']
+    assert seen['audience'].startswith('https://'), seen['audience']
+
+
+def test_explicit_cron_audience_overrides():
+    c = _client()
+    seen = {}
+
+    def capture(token, request, audience=None):
+        seen['audience'] = audience
+        return {'email': SA, 'email_verified': True}
+
+    # Re-create with an explicit override.
+    app = Flask(__name__)
+    app.config.update(CRON_SERVICE_ACCOUNT=SA, CRON_AUDIENCE='https://pinned/aud',
+                      BIFROST_PUBLIC_URL=PUBLIC)
+    app.register_blueprint(internal_bp)
+
+    with mock.patch('bifrost.internal.cron_routes.id_token.verify_oauth2_token', capture), \
+            mock.patch('bifrost.internal.cron_routes.run_payment_sla_check'):
+        app.test_client().post('/internal/cron/payment-sla',
+                               headers={'Authorization': 'Bearer good'})
+
+    assert seen['audience'] == 'https://pinned/aud'
 
 
 def test_authorized_token_runs_the_jobs():
