@@ -6,7 +6,9 @@
 #   tenant bots -> /api/v1/webhooks/telegram/<client>  (token per app in Mongo)
 #
 # Usage:  ./scripts/relink_telegram.sh [base-url]
-# Defaults to BIFROST_PUBLIC_URL from .env.
+# Defaults to the deployed Cloud Run URL — NOT .env. .env is the local config,
+# so its BIFROST_PUBLIC_URL is a localhost literal, and defaulting to it would
+# point every production bot at somebody's laptop.
 #
 # Prints what each bot reports back, because setWebhook returns 200 for a URL
 # Telegram can never reach — the only real confirmation is getWebhookInfo, and
@@ -15,15 +17,35 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+PROJECT="${PROJECT:-bifrost-prod-2026}"
+REGION="${REGION:-asia-southeast1}"
+SERVICE="${SERVICE:-bifrost}"
+
 BASE="${1:-}"
 if [ -z "$BASE" ]; then
-  BASE="$(.venv/bin/python -c "
-from dotenv import dotenv_values
-print(dotenv_values('.env').get('BIFROST_PUBLIC_URL') or '', end='')
-")"
+  BASE="$(gcloud run services describe "$SERVICE" \
+    --project "$PROJECT" --region "$REGION" \
+    --format='value(status.url)' 2>/dev/null || true)"
 fi
-[ -n "$BASE" ] || { echo "No base URL. Pass one, or set BIFROST_PUBLIC_URL in .env." >&2; exit 1; }
+[ -n "$BASE" ] || {
+  echo "Could not read the deployed URL for $SERVICE. Pass one explicitly:" >&2
+  echo "  $0 https://your-service.a.run.app" >&2
+  exit 1
+}
 BASE="${BASE%/}"
+
+# The webhook must match the issuer relying parties pinned, or Telegram delivers
+# to an origin the rest of the system does not consider to be Bifrost.
+DEPLOYED_ISSUER="$(gcloud run services describe "$SERVICE" \
+  --project "$PROJECT" --region "$REGION" \
+  --format='value(spec.template.spec.containers[0].env)' 2>/dev/null \
+  | tr ';' '\n' | grep -a "BIFROST_PUBLIC_URL" | head -1 || true)"
+if [ -n "$DEPLOYED_ISSUER" ] && ! echo "$DEPLOYED_ISSUER" | grep -qa "$BASE"; then
+  echo "WARNING: target $BASE does not match the deployed BIFROST_PUBLIC_URL:" >&2
+  echo "  $DEPLOYED_ISSUER" >&2
+  echo "Continuing anyway — pass the URL explicitly if this is deliberate." >&2
+  echo >&2
+fi
 
 echo "Relinking every Telegram bot to $BASE"
 echo
