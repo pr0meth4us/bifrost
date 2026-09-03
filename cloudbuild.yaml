@@ -1,0 +1,53 @@
+# Auto-deploy on push. Wire this up with a Cloud Build trigger; see
+# scripts/setup_autodeploy.sh.
+#
+# Deliberately does NOT set --set-env-vars or --set-secrets. gcloud run deploy
+# preserves configuration it is not told to change, so the env vars and secret
+# bindings established by scripts/deploy_cloudrun.sh carry forward untouched.
+# That matters because those values come from .env, which is gitignored and
+# therefore absent in CI — a build that tried to rebuild that list would set
+# BIFROST_CLIENT_ID to an empty string and deploy it looking successful.
+#
+# Consequence worth knowing: changing configuration is still a local
+# deploy_cloudrun.sh run. This trigger ships code, not config.
+
+substitutions:
+  _SERVICE: bifrost
+  _REGION: asia-southeast1
+  _REPO: cloud-run-source-deploy
+
+steps:
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$COMMIT_SHA
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+      - .
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args: [push, --all-tags, '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}']
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$COMMIT_SHA
+      - --region=${_REGION}
+      - --project=$PROJECT_ID
+      # Tag the revision with the commit so a bad deploy is traceable to a diff.
+      - --revision-suffix=sha-${SHORT_SHA}
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+timeout: 1200s
