@@ -155,7 +155,7 @@ def forgot_password():
                                  _external=True)
 
             # Send email with OTP
-            send_otp_email(
+            sent = send_otp_email(
                 to_email=email,
                 otp=otp,
                 app_name=app_config.get('app_name', 'Bifrost'),
@@ -164,7 +164,10 @@ def forgot_password():
                 app_doc=app_config
             )
 
-            # Redirect to OTP entry page
+            # Redirect to OTP entry page — but only if there is a code to enter.
+            if not sent:
+                flash("We could not send the reset code. Please try again.", "danger")
+                return render_template('auth/forgot_password.html', app=app_config)
             return redirect(verify_url)
 
         flash("If an account exists, a reset code has been sent.", "info")

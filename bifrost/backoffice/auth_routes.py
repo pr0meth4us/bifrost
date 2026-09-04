@@ -78,7 +78,13 @@ def _start_mfa(db, user_doc, is_heimdall, tenant_app):
                               str(tenant_app['_id']) if tenant_app else None)
 
     otp, _ = db.create_otp(email, channel="backoffice_mfa", account_id=user_doc['_id'])
-    send_otp_email(email, otp, app_name="Bifrost Console")
+    if not send_otp_email(email, otp, app_name="Bifrost Console"):
+        # No session, no mfa_pending: sending them to a verify page for a code
+        # that never left the building is how a broken mailbox looks like a
+        # broken password. The real cause is in the log as "Email failed:".
+        flash("We could not send your sign-in code. Try again, or contact an "
+              "owner if it keeps failing.", "danger")
+        return redirect(url_for('backoffice.login'))
     session['mfa_pending'] = {
         "user_id": str(user_doc['_id']),
         "email": email,
