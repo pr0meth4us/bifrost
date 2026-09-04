@@ -107,6 +107,31 @@ def _validate_payment_queue(db, db_conn_str, new_config):
             return queue.validate(cur)
 
 
+def _validate_review_queue(db, db_conn_str, new_config):
+    """Same gate as _validate_payment_queue, for the review_queue block.
+
+    A queue whose columns do not exist is a 500 on the reviewer's screen, and the
+    reviewer is the one person who cannot afford to be told 'try again later'.
+    """
+    if not (new_config or {}).get('review_queue'):
+        return []
+    from ..models.review_queue import ReviewSchema
+    try:
+        schema = ReviewSchema.from_config(new_config)
+    except (ValueError, TypeError) as e:
+        return [str(e)]
+    if not schema:
+        return []
+    if not db_conn_str:
+        return ["cannot validate against the tenant database — no connection configured."]
+    if cms_mongo.handles(db_conn_str):
+        return ["the review queue is PostgreSQL-only; this tenant runs on MongoDB."]
+    from ..utils.tenant_db import get_tenant_db
+    with get_tenant_db(db_conn_str) as conn:
+        with conn.cursor() as cur:
+            return schema.validate(cur)
+
+
 def _app_and_conn(db, app_id):
     """Loads the tenant app doc, its decrypted connection string and its queue schema.
 
@@ -779,7 +804,8 @@ def cms_settings(app_id):
         raw = request.form.get('cms_config_json', '{}')
         try:
             new_config = json.loads(raw)
-            errors = _validate_payment_queue(db, db_conn_str, new_config)
+            errors = (_validate_payment_queue(db, db_conn_str, new_config)
+                      + _validate_review_queue(db, db_conn_str, new_config))
             if errors:
                 flash("Payment queue config rejected: " + " ".join(errors), "danger")
             else:

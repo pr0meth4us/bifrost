@@ -328,4 +328,4 @@ def _inject_rbac():
 
 
 from . import (auth_routes, app_routes, heimdall_routes, user_routes, tenant_routes,
-               devtools_routes)
+               devtools_routes, review_routes)

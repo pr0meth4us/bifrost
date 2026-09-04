@@ -28,16 +28,22 @@ class FakeConn:
 
 
 class DB(PaymentMixin):
-    def __init__(self, columns):
+    def __init__(self, columns, cms_config=None):
         self.columns, self.calls = columns, []
+        self.cms_config = cms_config or {}
         self.db = types.SimpleNamespace(cms_audit_log=types.SimpleNamespace(insert_one=lambda d: None))
 
     def get_tenant_table_schema(self, conn_str, table):
         return [{'column_name': c} for c in self.columns]
 
+    def get_cms_config(self, app_id):
+        # No review_queue block: the grid owns the stamp, as it does for any
+        # tenant that has not configured a queue.
+        return self.cms_config
 
-def save(columns, data, acting_user='reviewer@example.com'):
-    db = DB(columns)
+
+def save(columns, data, acting_user='reviewer@example.com', cms_config=None):
+    db = DB(columns, cms_config)
 
     @contextmanager
     def fake_get_tenant_db(conn_str):
@@ -70,6 +76,21 @@ class TestReviewStamp(unittest.TestCase):
     def test_untouched_when_table_has_no_review_columns(self):
         sql, params = save(('id', 'status'), {'status': 'published'})
         self.assertNotIn('reviewed_by', sql)
+
+    def test_queue_owned_table_is_not_stamped_by_the_grid(self):
+        # With a review_queue on this table the stamp belongs to the review
+        # decision; re-stamping on an unrelated grid edit would overwrite the
+        # identity of whoever actually signed it.
+        sql, _ = save(self.COLS, {'status': 'published'},
+                      cms_config={'review_queue': {'table': 'questions',
+                                                   'controls': ['ok']}})
+        self.assertNotIn('reviewed_by', sql)
+
+    def test_other_tables_still_stamped_when_a_queue_exists(self):
+        sql, _ = save(self.COLS, {'status': 'published'},
+                      cms_config={'review_queue': {'table': 'something_else',
+                                                   'controls': ['ok']}})
+        self.assertIn('"reviewed_by" = %s', sql)
 
     def test_no_update_when_nothing_to_set(self):
         sql, _ = save(self.COLS, {'id': 1}, acting_user=None)

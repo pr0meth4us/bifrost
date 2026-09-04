@@ -929,6 +929,13 @@ class PaymentMixin:
             query["acting_user"] = actor
         return list(self.db.cms_audit_log.find(query).sort("timestamp", -1).limit(int(limit)))
 
+    def _review_queue_owns(self, app_id, table_name):
+        """True when this table's review columns are the review queue's to write."""
+        if not app_id:
+            return False
+        block = (self.get_cms_config(app_id) or {}).get('review_queue') or {}
+        return block.get('table') == table_name
+
     def save_tenant_table_row(self, db_conn_str, table_name, row_id, data, app_id=None, acting_user=None):
         """Updates a row in the tenant database public schema."""
         if cms_mongo.handles(db_conn_str):
@@ -954,10 +961,10 @@ class PaymentMixin:
 
         # Attestation columns are stamped server-side from the session, never
         # from the client: a reviewer must not be able to sign as someone else.
-        # ponytail: stamps on every edit of a table that has these columns, not
-        # just review actions — Bifrost is generic and does not know what
-        # "published" means. Per-app gating belongs in cms_config if needed.
-        if acting_user:
+        # A table worked through the review queue is exempt: there the stamp
+        # belongs to the review decision, and stamping again on an unrelated
+        # grid edit would overwrite who actually signed it.
+        if acting_user and not self._review_queue_owns(app_id, table_name):
             for col, val in (('reviewed_by', acting_user),
                              ('reviewed_at', datetime.now(UTC))):
                 if col in valid_columns:
