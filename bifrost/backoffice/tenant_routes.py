@@ -10,6 +10,9 @@ from ..models.payments import (
 )
 from ..models import cms_mongo
 from ..models.queue_schema import QueueSchema
+import logging
+
+log = logging.getLogger(__name__)
 
 def managed_schema_for(app):
     """Postgres schema holding one tenant's tables inside the managed database.
@@ -178,6 +181,7 @@ def _app_and_conn(db, app_id):
     try:
         queue = QueueSchema.from_config(db.get_cms_config(str(app['_id'])))
     except (ValueError, TypeError) as e:
+        log.exception("_app_and_conn failed")
         flash(f"Invalid payment_queue config — fix it in CMS settings: {e}", "danger")
         return app, None, None
     return app, get_tenant_db_conn_str(app), queue
@@ -215,6 +219,7 @@ def view_manual_payments(app_id_or_slug=None):
             payments = db.get_manual_payments(db_conn_str, status_filter=status_filter, queue=queue)
             tracks = db.get_active_tracks(db_conn_str, queue=queue)
         except Exception as e:
+            log.exception("view_manual_payments failed")
             flash(f"Error querying tenant database: {e}", "danger")
 
     return render_template(
@@ -252,6 +257,7 @@ def approve_payment(app_id, payment_id):
             app_id=app_id, queue=queue
         )
     except Exception as e:
+        log.exception("approve_payment failed")
         flash(f"Approval error: {e}", "danger")
         return redirect(url_for('backoffice.view_manual_payments', app_id=app_id))
 
@@ -309,6 +315,7 @@ def reject_payment(app_id, payment_id):
               else result.get('message', 'Failed to reject payment.'),
               "warning" if success else "danger")
     except Exception as e:
+        log.exception("reject_payment failed")
         flash(f"Rejection error: {e}", "danger")
 
     return redirect(url_for('backoffice.view_manual_payments', app_id=app_id))
@@ -330,6 +337,7 @@ def refund_payment(app_id, payment_id):
             queue=queue
         )
     except Exception as e:
+        log.exception("refund_payment failed")
         flash(f"Refund error: {e}", "danger")
         return redirect(url_for('backoffice.view_manual_payments', app_id=app_id))
 
@@ -376,6 +384,7 @@ def suspend_user(app_id, user_id):
                                queue=queue)
         flash("User suspended. Entitlements are preserved and restore on reinstatement.", "warning")
     except Exception as e:
+        log.exception("suspend_user failed")
         flash(f"Suspension error: {e}", "danger")
 
     return redirect(url_for('backoffice.view_app', app_id=app_id))
@@ -396,6 +405,7 @@ def reinstate_user(app_id, user_id):
                                  queue=queue)
         flash("User status reinstated to active.", "success")
     except Exception as e:
+        log.exception("reinstate_user failed")
         flash(f"Reinstatement error: {e}", "danger")
 
     return redirect(url_for('backoffice.view_app', app_id=app_id))
@@ -419,8 +429,10 @@ def override_entitlement(app_id):
         )
         flash("Entitlement overridden and audit-logged.", "success")
     except (KeyError, ValueError) as e:
+        log.exception("override_entitlement failed")
         flash(f"Invalid override request: {e}", "danger")
     except Exception as e:
+        log.exception("override_entitlement failed")
         flash(f"Override error: {e}", "danger")
 
     return redirect(url_for('backoffice.view_app', app_id=app_id))
@@ -602,9 +614,11 @@ def view_cms_grid(app_id_or_slug=None):
                 children_by_parent, reason_column = _load_children(
                     db, db_conn_str, review, rows, schema_meta)
             except Exception as e:
+                log.exception("view_cms_grid failed")
                 flash(f"Could not load related rows for the drawer: {e}", "warning")
 
     except Exception as e:
+        log.exception("view_cms_grid failed")
         flash(f"Error loading tenant schema: {e}", "danger")
         tables, selected_table, columns, rows = [], None, [], []
         schema_meta, schema_by_col, table_col_config = [], {}, {}
@@ -755,6 +769,7 @@ def save_cms_row(app_id, table_name, row_id):
         db.save_tenant_table_row(db_conn_str, table_name, row_id, data, app_id=app_id, acting_user=acting_user)
         flash("Row updated successfully.", "success")
     except Exception as e:
+        log.exception("save_cms_row failed")
         flash(f"Update failed: {e}", "danger")
 
     return redirect(url_for('backoffice.view_cms_grid', app_id=app_id, table=table_name))
@@ -788,6 +803,7 @@ def create_cms_row(app_id, table_name):
         db.insert_tenant_table_row(db_conn_str, table_name, data, app_id=app_id, acting_user=acting_user)
         flash("Row inserted successfully.", "success")
     except Exception as e:
+        log.exception("create_cms_row failed")
         flash(f"Insertion failed: {e}", "danger")
         
     return redirect(url_for('backoffice.view_cms_grid', app_id=app_id, table=table_name))
@@ -808,6 +824,7 @@ def delete_cms_row(app_id, table_name, row_id):
         db.delete_tenant_table_row(db_conn_str, table_name, row_id, app_id=app_id, acting_user=acting_user)
         flash("Row deleted.", "warning")
     except Exception as e:
+        log.exception("delete_cms_row failed")
         flash(f"Deletion failed: {e}", "danger")
         
     return redirect(url_for('backoffice.view_cms_grid', app_id=app_id, table=table_name))
@@ -850,6 +867,7 @@ def lookup_cms_table(app_id, table_name):
             results.append({"id": r.get('id'), "label": label})
         return jsonify(results)
     except Exception as e:
+        log.exception("lookup_cms_table failed")
         return jsonify({"error": str(e)}), 500
 
 
@@ -882,6 +900,7 @@ def cms_settings(app_id):
                 db.save_cms_config(str(app['_id']), new_config)
                 flash("CMS configuration saved.", "success")
         except Exception as e:
+            log.exception("cms_settings failed")
             flash(f"Invalid config JSON: {e}", "danger")
         return redirect(url_for('backoffice.cms_settings', app_id=app_id))
 
@@ -891,6 +910,7 @@ def cms_settings(app_id):
         for t in all_tables:
             table_schemas[t] = db.get_tenant_table_schema(db_conn_str, t)
     except Exception as e:
+        log.exception("cms_settings failed")
         flash(f"DB error: {e}", "danger")
         all_tables, table_schemas = [], {}
 
@@ -974,6 +994,7 @@ def cms_onboarding(app_id_or_slug=None):
                 new_config['is_onboarded'] = True
                 db.save_cms_config(str(app['_id']), new_config)
             except Exception as e:
+                log.exception("cms_onboarding failed")
                 flash(f"Error parsing config: {e}", "danger")
                 
         if action == 'customize':
@@ -988,6 +1009,7 @@ def cms_onboarding(app_id_or_slug=None):
         for t in all_tables:
             table_schemas[t] = db.get_tenant_table_schema(db_conn_str, t)
     except Exception as e:
+        log.exception("cms_onboarding failed")
         flash(f"DB error: {e}", "danger")
         all_tables, table_schemas = [], {}
 
@@ -1141,6 +1163,7 @@ def bootstrap_schema(app_id):
             conn.commit()
         flash("✨ Database tables created successfully!", "success")
     except Exception as e:
+        log.exception("bootstrap_schema failed")
         flash(f"Error creating database schema: {e}", "danger")
 
     return redirect(url_for('backoffice.cms_onboarding', app_id=app_id))
@@ -1200,6 +1223,7 @@ def cms_rbac(app_id):
 
             flash("RBAC configuration saved.", "success")
         except Exception as e:
+            log.exception("cms_rbac failed")
             flash(f"Invalid config JSON: {e}", "danger")
         return redirect(url_for('backoffice.cms_rbac', app_id=app_id))
         
@@ -1209,6 +1233,7 @@ def cms_rbac(app_id):
         for t in all_tables:
             table_schemas[t] = db.get_tenant_table_schema(db_conn_str, t)
     except Exception as e:
+        log.exception("cms_rbac failed")
         flash(f"DB error: {e}", "danger")
         all_tables, table_schemas = [], {}
 

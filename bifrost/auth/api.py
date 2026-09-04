@@ -189,6 +189,7 @@ def verify_phone_otp():
     try:
         oid = db.db.verification_codes.find_one({"_id": ObjectId(verification_id)})
     except Exception:
+        log.exception("verify_phone_otp failed")
         return jsonify({"error": "Invalid verification ID format"}), 400
 
     if not oid:
@@ -250,6 +251,7 @@ def complete_registration():
             raise jwt.InvalidTokenError("Invalid scope")
         email = payload.get('email')
     except jwt.InvalidTokenError:
+        log.exception("complete_registration failed")
         return jsonify({"error": "Invalid or expired proof token"}), 403
 
     db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])
@@ -322,6 +324,7 @@ def reset_password():
             raise jwt.InvalidTokenError("Invalid scope")
         email = payload.get('email')
     except jwt.InvalidTokenError:
+        log.exception("reset_password failed")
         return jsonify({"error": "Invalid or expired proof token"}), 403
 
     db = BifrostDB(mongo.cx, current_app.config['DB_NAME'])

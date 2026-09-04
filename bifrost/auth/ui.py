@@ -12,6 +12,9 @@ from ..services.sms_service import send_otp_sms
 from ..utils.token import create_client_jwt
 from . import sso
 from .oidc import resume_pending
+import logging
+
+log = logging.getLogger(__name__)
 
 auth_ui_bp = Blueprint('auth_ui', __name__, url_prefix='/auth/ui')
 UTC = ZoneInfo("UTC")
@@ -210,6 +213,7 @@ def reset_password():
         payload = jwt.decode(proof_token, current_app.config['JWT_SECRET_KEY'], algorithms=["HS256"])
         email = payload['email']
     except:
+        log.exception("reset_password failed")
         flash("Session expired. Please start over.", "danger")
         return redirect(url_for('auth_ui.forgot_password', client_id=client_id))
 
@@ -508,6 +512,7 @@ def sso_callback(provider):
             provider_id = str(profile.get("id"))
 
     except Exception as e:
+        log.exception("sso_callback failed")
         return render_template('auth/error.html', error=f"SSO Handshake failed: {str(e)}")
 
     if not provider_id or not email:

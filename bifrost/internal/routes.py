@@ -155,10 +155,13 @@ def validate_token():
         })
 
     except jwt.ExpiredSignatureError:
+        log.exception("validate_token failed")
         return jsonify({"is_valid": False, "error": "Token has expired"}), 401
     except jwt.InvalidAudienceError:
+        log.exception("validate_token failed")
         return jsonify({"is_valid": False, "error": "Invalid audience"}), 401
     except jwt.DecodeError:
+        log.exception("validate_token failed")
         return jsonify({"is_valid": False, "error": "Malformed token"}), 401
     except Exception as e:
         log.error(f"Token validation failed: {e}")
@@ -200,6 +203,7 @@ def set_credentials():
             algorithms=["HS256"]
         )
     except jwt.InvalidTokenError:
+        log.exception("set_credentials failed")
         return jsonify({"error": "Invalid proof_token"}), 403
 
     if payload.get('scope') != 'credential_reset':

@@ -10,6 +10,8 @@ from bson import ObjectId
 import markdown
 from urllib.parse import urlparse
 
+log = logging.getLogger(__name__)
+
 try:
     from bifrost.utils.changelog import get_latest_version_info
 except ImportError:
@@ -325,6 +327,7 @@ def create_app(config_class):
             mongo.cx.admin.command('ping')
             return jsonify(status="ok", message="Bifrost IdP operational.")
         except Exception as e:
+            log.exception("create_app failed")
             return jsonify(status="error", message=f"Database error: {e}"), 500
 
     return app

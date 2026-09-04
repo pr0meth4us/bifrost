@@ -19,6 +19,9 @@ from . import (backoffice_bp, get_db, login_required, check_permission,
 from .tenant_routes import get_tenant_db_conn_str
 from ..models import cms_mongo
 from ..models.review_queue import ReviewSchema, submit
+import logging
+
+log = logging.getLogger(__name__)
 
 
 def _queue_for(db, app_id):
@@ -29,6 +32,7 @@ def _queue_for(db, app_id):
     try:
         schema = ReviewSchema.from_config(db.get_cms_config(app_id))
     except (ValueError, TypeError) as e:
+        log.exception("_queue_for failed")
         flash(f"Invalid review_queue config — fix it in CMS settings: {e}", "danger")
         return app, None, None
     return app, get_tenant_db_conn_str(app), schema
@@ -67,6 +71,7 @@ def submit_review(app_id, row_id):
                                 reason=request.form.get('reason'),
                                 reason_column=reason_column)
     except Exception as e:
+        log.exception("submit_review failed")
         flash(f"Review failed: {e}", "danger")
         return redirect(url_for('backoffice.view_cms_grid', app_id=app_id, table=schema.table))
 

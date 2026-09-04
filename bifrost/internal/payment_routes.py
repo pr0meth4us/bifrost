@@ -70,6 +70,7 @@ def create_secure_payment_intent():
             client_ref_id=ref_id
         )
     except ValueError as e:
+        log.exception("create_secure_payment_intent failed")
         return jsonify({"error": str(e)}), 400
 
     return jsonify({

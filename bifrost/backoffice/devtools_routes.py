@@ -21,6 +21,9 @@ from bson import ObjectId
 
 from . import backoffice_bp, get_db, requires, get_current_role_in_app, acting_identity
 from .tenant_routes import get_tenant_db_conn_str
+import logging
+
+log = logging.getLogger(__name__)
 
 # A query slower than this is a mistake, not a report. Keeps one bad scan from
 # holding a connection out of the MAX_CONNECTIONS=8 tenant pool (see tenant_db.py).
@@ -135,6 +138,7 @@ def devtools_execute(app_id):
         # psycopg2 errors carry the position/hint the developer actually needs,
         # and this endpoint is already behind db:execute — so return the real text
         # rather than a sanitised "query failed".
+        log.exception("devtools_execute failed")
         return jsonify({
             "error": str(e).strip(),
             "elapsed_ms": round((time.monotonic() - started) * 1000, 1),

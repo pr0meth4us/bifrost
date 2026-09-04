@@ -5,6 +5,9 @@ from datetime import datetime, timedelta
 from . import backoffice_bp, get_db, login_required, heimdall_required
 from ..services.metrics_service import fetch_ai_metrics, fetch_billing_data, PRICING
 from ..utils.encryption import decrypt_value
+import logging
+
+log = logging.getLogger(__name__)
 
 
 def internal_directories(db):
@@ -99,6 +102,7 @@ def delete_global_user(user_id):
         db.delete_account(user_id)
         flash("User deleted.", "warning")
     except Exception as e:
+        log.exception("delete_global_user failed")
         flash(f"Error: {e}", "danger")
     return redirect(url_for('backoffice.global_users'))
 

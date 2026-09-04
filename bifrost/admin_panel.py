@@ -9,6 +9,9 @@ from wtforms import form, fields, validators
 import secrets
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import logging
+
+log = logging.getLogger(__name__)
 
 UTC = ZoneInfo("UTC")
 
@@ -122,6 +125,7 @@ class ApplicationsView(SecureModelView):
                 app_name = app.get('app_name', 'Unknown App')
                 flash(f"⚠️ SECRET ROTATED FOR '{app_name}'! COPY NEW SECRET NOW: {new_secret}", "warning")
         except Exception as ex:
+            log.exception("action_rotate_secret failed")
             if not self.handle_view_exception(ex):
                 raise
             flash(f'Failed to rotate secrets. {str(ex)}', 'error')
