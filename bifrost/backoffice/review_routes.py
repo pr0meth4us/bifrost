@@ -1,21 +1,24 @@
 # bifrost/backoffice/review_routes.py
-"""One screen per record under review, parent row and children together.
+"""The review decision endpoint.
 
-Why this exists rather than a column in the grid: the grid renders one table at a
-time, so a reviewer attesting that the marked-correct child is correct is ticking
-a box about rows they cannot see. That is worse than no box — it turns an
-unreviewed record into one carrying a signed attestation.
+The review UI itself lives in the CMS grid's drawer: the defect prolong reported
+— a reviewer cannot see the child rows they are attesting about — is a CMS
+problem, not a review-specific one, and anyone editing a record has the same
+blindness. Solving it with a second screen would have meant two places to look
+at the same data, which is what a CMS is supposed to prevent.
 
-Entirely driven by `cms_config.review_queue`. No block, no queue, no route.
+What stays here is the decision itself, because a review is not an ordinary
+save: it enforces the all-ticked gate and writes the attestation. Driven by
+`cms_config.review_queue`; no block, no endpoint worth reaching.
 """
-from flask import render_template, request, redirect, url_for, flash, session, abort
+from flask import request, redirect, url_for, flash, abort
 from bson import ObjectId
 
 from . import (backoffice_bp, get_db, login_required, check_permission,
                get_current_role_in_app, acting_identity)
 from .tenant_routes import get_tenant_db_conn_str
 from ..models import cms_mongo
-from ..models.review_queue import ReviewSchema, load_item, next_ids, pending_count, submit
+from ..models.review_queue import ReviewSchema, submit
 
 
 def _queue_for(db, app_id):
@@ -36,53 +39,6 @@ def _reason_column(cur, schema):
     from ..models.queue_schema import _table_columns
     present = _table_columns(cur, schema.table)
     return next((c for c in schema.reject_reason if c in present), None)
-
-
-@backoffice_bp.route('/app/<app_id>/review')
-@backoffice_bp.route('/app/<app_id>/review/<row_id>')
-@login_required
-def review_queue(app_id, row_id=None):
-    db = get_db()
-    if not check_permission(app_id, "content:read"):
-        abort(403, description="No access to content in this application.")
-
-    app, db_conn_str, schema = _queue_for(db, app_id)
-    if not app:
-        flash("Application not found.", "danger")
-        return redirect(url_for('backoffice.dashboard'))
-    if not schema:
-        flash("No review queue is configured for this application.", "warning")
-        return redirect(url_for('backoffice.view_app'))
-    if not db_conn_str or cms_mongo.handles(db_conn_str):
-        flash("The review queue is available for PostgreSQL tenants only.", "warning")
-        return redirect(url_for('backoffice.view_app'))
-
-    from ..utils.tenant_db import get_tenant_db
-    parent, children, remaining, queue, reason_column = None, [], 0, [], None
-    try:
-        with get_tenant_db(db_conn_str) as conn:
-            with conn.cursor() as cur:
-                queue = next_ids(cur, schema)
-                remaining = pending_count(cur, schema)
-                # No row named: take the head of the queue.
-                target = row_id if row_id is not None else (queue[0] if queue else None)
-                if target is not None:
-                    parent, children = load_item(cur, schema, target)
-                reason_column = _reason_column(cur, schema)
-    except Exception as e:
-        flash(f"Error querying tenant database: {e}", "danger")
-
-    return render_template(
-        'backoffice/review_queue.html',
-        app=app, schema=schema, parent=parent, children=children,
-        remaining=remaining, queue=[str(q) for q in queue],
-        reason_column=reason_column,
-        # Approving is a publish. Content Managers work the queue and tick the
-        # boxes; only content:publish turns that into a published record.
-        can_approve=check_permission(app_id, "content:publish"),
-        can_review=check_permission(app_id, "content:write"),
-        current_role=get_current_role_in_app(app_id),
-    )
 
 
 @backoffice_bp.route('/app/<app_id>/review/<row_id>/submit', methods=['POST'])
@@ -112,21 +68,19 @@ def submit_review(app_id, row_id):
                                 reason_column=reason_column)
     except Exception as e:
         flash(f"Review failed: {e}", "danger")
-        return redirect(url_for('backoffice.review_queue', app_id=app_id, row_id=row_id))
+        return redirect(url_for('backoffice.view_cms_grid', app_id=app_id, table=schema.table))
 
     if not ok:
         flash(result, "danger")
-        return redirect(url_for('backoffice.review_queue', app_id=app_id, row_id=row_id))
+        return redirect(url_for('backoffice.view_cms_grid', app_id=app_id, table=schema.table))
 
     db.log_cms_mutation(app_id, schema.table, f"REVIEW_{decision.upper()}", str(row_id),
                         actor, _jsonable(result), {"decision": decision,
                                                    "ticked": sorted(ticked)})
     flash(f"Review recorded: {decision}d.", "success")
     # Straight to the next item — working a queue, not hunting rows in a grid.
-    nxt = request.form.get('next') or None
-    if nxt:
-        return redirect(url_for('backoffice.review_queue', app_id=app_id, row_id=nxt))
-    return redirect(url_for('backoffice.review_queue', app_id=app_id))
+    return redirect(url_for('backoffice.view_cms_grid', app_id=app_id,
+                            table=schema.table, status=request.form.get('status_filter')))
 
 
 def _jsonable(d):

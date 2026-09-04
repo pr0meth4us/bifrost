@@ -182,43 +182,6 @@ def _cols_sql(columns):
     return ', '.join(f'"{c}"' for c in columns)
 
 
-def pending_count(cur, schema):
-    cur.execute(f'SELECT COUNT(*) FROM "{schema.table}" WHERE "{schema.status}" = ANY(%s)',
-                [list(schema.awaiting)])
-    return cur.fetchone()[0]
-
-
-def next_ids(cur, schema, limit=50):
-    """Ids awaiting review, in queue order. Drives 'next item' without re-querying rows."""
-    cur.execute(
-        f'SELECT "{schema.id}" FROM "{schema.table}" '
-        f'WHERE "{schema.status}" = ANY(%s) ORDER BY "{schema.order_by}" LIMIT %s',
-        [list(schema.awaiting), int(limit)])
-    return [r[0] for r in cur.fetchall()]
-
-
-def load_item(cur, schema, row_id):
-    """One parent row plus its children. Returns (parent_dict, [child_dict]) or (None, [])."""
-    columns = schema.parent_columns()
-    cur.execute(f'SELECT {_cols_sql(columns)} FROM "{schema.table}" WHERE "{schema.id}" = %s',
-                [row_id])
-    row = cur.fetchone()
-    if not row:
-        return None, []
-    parent = dict(zip(columns, row))
-
-    if not schema.child:
-        return parent, []
-    child = schema.child
-    child_cols = [child.id, *child.columns] + ([child.flag] if child.flag else [])
-    cur.execute(
-        f'SELECT {_cols_sql(child_cols)} FROM "{child.table}" '
-        f'WHERE "{child.fk}" = %s ORDER BY "{child.order_by}"',
-        [row_id])
-    children = [dict(zip(child_cols, r)) for r in cur.fetchall()]
-    return parent, children
-
-
 def submit(conn, schema, row_id, ticked, decision, actor, reason=None, reason_column=None):
     """Records a review decision. Returns (ok, message).
 
@@ -266,3 +229,25 @@ def submit(conn, schema, row_id, ticked, decision, actor, reason=None, reason_co
             return False, "That record no longer exists."
     conn.commit()
     return True, before
+
+
+def children_for(cur, schema, parent_ids):
+    """Children for many parents in one query, grouped by parent id.
+
+    The grid shows a page of rows at a time, so fetching children per row would
+    be the N+1 the drawer exists to avoid. Returns {} when there is no child
+    config or nothing to look up.
+    """
+    if not schema.child or not parent_ids:
+        return {}
+    child = schema.child
+    cols = [child.fk, child.id, *child.columns] + ([child.flag] if child.flag else [])
+    cur.execute(
+        f'SELECT {_cols_sql(cols)} FROM "{child.table}" '
+        f'WHERE "{child.fk}" = ANY(%s) ORDER BY "{child.order_by}"',
+        [list(parent_ids)])
+    grouped = {}
+    for row in cur.fetchall():
+        record = dict(zip(cols, row))
+        grouped.setdefault(str(record[child.fk]), []).append(record)
+    return grouped

@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from bifrost.models.review_queue import ReviewSchema, load_item, submit
+from bifrost.models.review_queue import ReviewSchema, children_for, submit
 
 
 PROLONG = {'review_queue': {
@@ -149,23 +149,52 @@ class TestGenericShape(unittest.TestCase):
 
     def test_child_query_filters_by_the_configured_fk(self):
         schema = ReviewSchema.from_config(ARTICLES)
-        store = {'one': ('7', 'submitted', 'Headline', True), 'all': [('1', 'body text')]}
-        cur = FakeCursor(store)
-        parent, children = load_item(cur, schema, '7')
+        cur = FakeCursor({'all': [('7', '1', 'body text')]})
+        grouped = children_for(cur, schema, ['7'])
         child_sql, child_params = cur.sql[-1]
         self.assertIn('"revisions"', child_sql)
-        self.assertIn('"article_id" = %s', child_sql)
-        self.assertEqual(child_params, ['7'])
-        self.assertEqual(children[0]['body'], 'body text')
+        self.assertIn('"article_id" = ANY(%s)', child_sql)
+        self.assertEqual(child_params, [['7']])
+        self.assertEqual(grouped['7'][0]['body'], 'body text')
 
-    def test_a_queue_without_children_is_valid(self):
+    def test_children_are_fetched_for_a_whole_page_in_one_query(self):
+        # One query per drawer-able row would be the N+1 the drawer avoids.
+        schema = ReviewSchema.from_config(PROLONG)
+        cur = FakeCursor({'all': [('q1', 'c1', 'a', 'why', True),
+                                  ('q1', 'c2', 'b', '', False),
+                                  ('q2', 'c3', 'c', '', True)]})
+        grouped = children_for(cur, schema, ['q1', 'q2'])
+        self.assertEqual(len(cur.sql), 1)
+        self.assertEqual(len(grouped['q1']), 2)
+        self.assertEqual(len(grouped['q2']), 1)
+
+    def test_a_queue_without_children_needs_no_query(self):
         schema = ReviewSchema.from_config({'review_queue': {
             'table': 'pages', 'controls': ['checked']}})
         self.assertIsNone(schema.child)
-        cur = FakeCursor({'one': ('1', 'review', True)})
-        parent, children = load_item(cur, schema, '1')
-        self.assertEqual(children, [])
+        cur = FakeCursor({})
+        self.assertEqual(children_for(cur, schema, ['1']), {})
+        self.assertEqual(cur.sql, [])
 
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestReviewControlsAreNotWritableBySave(unittest.TestCase):
+    """The controls share the grid drawer, so they post on an ordinary Save too.
+
+    They must be dropped there: submit() is what enforces the all-ticked gate
+    and writes the attestation, so a plain save setting them would be a way to
+    mark a record reviewed without a review.
+    """
+
+    def test_the_save_path_excludes_them(self):
+        import re
+        src = (Path(__file__).resolve().parents[1]
+               / 'bifrost/backoffice/tenant_routes.py').read_text()
+        # Both the save and the create path build `forbidden`; each must widen
+        # it with the review controls.
+        guards = re.findall(r'forbidden = forbidden \| set\(_review\.controls\)', src)
+        self.assertEqual(len(guards), 2,
+                         "save and create must both exclude the review controls")

@@ -133,6 +133,15 @@ def _validate_review_queue(db, db_conn_str, new_config):
             return schema.validate(cur)
 
 
+def _review_schema(db, app_id):
+    """The app's review queue, or None. A broken block must not break the grid."""
+    from ..models.review_queue import ReviewSchema
+    try:
+        return ReviewSchema.from_config(db.get_cms_config(app_id))
+    except (ValueError, TypeError):
+        return None
+
+
 def _app_and_conn(db, app_id):
     """Loads the tenant app doc, its decrypted connection string and its queue schema.
 
@@ -526,6 +535,7 @@ def view_cms_grid(app_id_or_slug=None):
 
         columns, rows, schema_meta = [], [], []
         total_count = 0
+        review, children_by_parent, reason_column = None, {}, None
         if selected_table:
             columns, rows, total_count = db.get_tenant_table_data(
                 db_conn_str, selected_table, limit, offset, sort_by, sort_dir, search_query
@@ -555,6 +565,22 @@ def view_cms_grid(app_id_or_slug=None):
         # Build augmented schema: merge pg types with cms overrides
         schema_by_col = {s['column_name']: s for s in schema_meta}
 
+        # Child rows for the page, when this table is the configured review
+        # queue. One query for the whole page — the drawer exists so a reviewer
+        # can see a record's children, and fetching them per row would be the
+        # N+1 it is meant to avoid.
+        review = _review_schema(db, app_id)
+        if review and selected_table == review.table and rows:
+            from ..models.review_queue import children_for
+            from ..utils.tenant_db import get_tenant_db
+            with get_tenant_db(db_conn_str) as conn:
+                with conn.cursor() as cur:
+                    children_by_parent = children_for(
+                        cur, review, [r.get(review.id) for r in rows if r.get(review.id) is not None])
+                    reason_column = next(
+                        (c for c in review.reject_reason
+                         if c in {col['column_name'] for col in schema_meta}), None)
+
     except Exception as e:
         flash(f"Error loading tenant schema: {e}", "danger")
         tables, selected_table, columns, rows = [], None, [], []
@@ -562,6 +588,7 @@ def view_cms_grid(app_id_or_slug=None):
         visible_columns, readonly_table = [], False
         page, limit, total_count, sort_by, sort_dir, search_query = 1, 50, 0, 'id', 'desc', None
         current_role = get_current_role_in_app(app_id)
+        review, children_by_parent, reason_column = None, {}, None
 
     # Determine Write Permission for the selected table
     can_write = False
@@ -599,6 +626,10 @@ def view_cms_grid(app_id_or_slug=None):
         sort_by=sort_by,
         sort_dir=sort_dir,
         search_query=search_query,
+        review=review,
+        children_by_parent=children_by_parent,
+        review_reason_column=reason_column,
+        can_approve=check_permission(app_id, "content:publish"),
         role_readonly_cols=role_readonly_cols
     )
 
@@ -683,6 +714,12 @@ def save_cms_row(app_id, table_name, row_id):
     # Exclude internal form variables, and any column this role is not allowed to
     # see — a value it cannot read is a value it cannot write.
     forbidden = hidden_columns_for(db, app_id, table_name) | {'csrf_token', '_method'}
+    # The review controls share the drawer, so they arrive on an ordinary Save
+    # and on Create too. They belong to the review decision — which enforces the
+    # all-ticked gate and writes the attestation — so neither path may set them.
+    _review = _review_schema(db, app_id)
+    if _review and table_name == _review.table:
+        forbidden = forbidden | set(_review.controls) | {'reason', 'decision', 'next'}
     data = {k: v for k, v in request.form.items() if k not in forbidden}
     acting_user = acting_identity()
 
@@ -710,6 +747,12 @@ def create_cms_row(app_id, table_name):
     db_conn_str = get_tenant_db_conn_str(app)
 
     forbidden = hidden_columns_for(db, app_id, table_name) | {'csrf_token', '_method'}
+    # The review controls share the drawer, so they arrive on an ordinary Save
+    # and on Create too. They belong to the review decision — which enforces the
+    # all-ticked gate and writes the attestation — so neither path may set them.
+    _review = _review_schema(db, app_id)
+    if _review and table_name == _review.table:
+        forbidden = forbidden | set(_review.controls) | {'reason', 'decision', 'next'}
     data = {k: v for k, v in request.form.items() if k not in forbidden}
     acting_user = acting_identity()
 

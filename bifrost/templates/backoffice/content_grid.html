@@ -25,6 +25,10 @@
   }
   .drawer[data-open="true"] { transform: none; }
   .drawer-overlay { position: fixed; inset: 0; z-index: 49; background: rgb(0 0 0 / .5); }
+  /* The flagged child — the correct answer — has to be identifiable at a glance;
+     that recognition is the whole point of showing children here. Border as well
+     as tint, so it survives a colour-blind reader and a monochrome print. */
+  .is-primary-child { border-color: rgb(var(--c-success, 34 197 94)); background: rgb(var(--c-success, 34 197 94) / .08); }
 </style>
 {% endblock %}
 
@@ -195,10 +199,51 @@
 
   <form id="drawer-form" method="POST" class="flex-1 min-h-0 flex flex-col">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-    <div class="flex-1 overflow-y-auto card-pad space-y-4" id="drawer-fields"></div>
+    <div class="flex-1 overflow-y-auto card-pad space-y-4">
+      {# Child rows render above the form fields, not below: on a review the
+         children ARE the thing being judged, and a reviewer should not have to
+         scroll past sixteen columns to reach them.
+
+         Deliberately a sibling of #drawer-fields, not a child: buildFields()
+         calls replaceChildren() on that node every time the drawer opens. #}
+      <section id="drawer-children" hidden>
+        <div class="muted text-xs uppercase mb-1" id="drawer-children-label"></div>
+        <ul class="space-y-2" id="drawer-children-list"></ul>
+      </section>
+      <div class="space-y-4" id="drawer-fields"></div>
+    </div>
+
+    {% if review and selected_table == review.table %}
+      <div class="card-pad border-t border-border space-y-2">
+        <div class="muted text-xs uppercase">Review</div>
+        {% for col in review.controls %}
+          <label class="flex items-start gap-2">
+            <input type="checkbox" name="{{ col }}" value="1" form="drawer-form"
+                   class="review-control" data-col="{{ col }}"
+                   {% if not can_write %}disabled{% endif %}/>
+            <span>{{ col.replace('_', ' ')|capitalize }}</span>
+          </label>
+        {% endfor %}
+        {% if review_reason_column %}
+          <textarea name="reason" rows="2" class="input w-full"
+                    placeholder="Reason, if sending back"></textarea>
+        {% endif %}
+      </div>
+    {% endif %}
+
     <div class="card-pad border-t border-border flex justify-end gap-2">
       <button type="button" class="btn" onclick="closeDrawer()">Cancel</button>
-      <button type="submit" class="btn btn-primary">Save</button>
+      {% if review and selected_table == review.table %}
+        {# formaction routes these two through the review endpoint, which is what
+           writes the attestation. An ordinary Save stays an ordinary save. #}
+        <button type="submit" class="btn" name="decision" value="reject"
+                id="review-reject" formaction="">Send back</button>
+        {% if can_approve %}
+          <button type="submit" class="btn btn-primary" name="decision" value="approve"
+                  id="review-approve" formaction="">Approve</button>
+        {% endif %}
+      {% endif %}
+      <button type="submit" class="btn {% if not (review and selected_table == review.table) %}btn-primary{% endif %}">Save</button>
     </div>
   </form>
 </aside>
@@ -217,6 +262,16 @@ const CREATE_URL = {{ url_for('backoffice.create_cms_row', app_id=app._id, table
 // The row id is only known client-side, so the save URL comes from a real
 // url_for() with a placeholder rather than a hand-built path.
 const SAVE_URL   = {{ url_for('backoffice.save_cms_row', app_id=app._id, table_name=selected_table, row_id='__ROW_ID__') | tojson }};
+{% if review and selected_table == review.table %}
+const REVIEW_URL     = {{ url_for('backoffice.submit_review', app_id=app._id, row_id='__ROW_ID__') | tojson }};
+const CHILDREN       = {{ children_by_parent | tojson }};
+const CHILD_LABEL    = {{ review.child.table | tojson if review.child else '""' }};
+const CHILD_COLS     = {{ (review.child.columns | list) | tojson if review.child else '[]' }};
+const CHILD_FLAG     = {{ review.child.flag | tojson if review.child else '""' }};
+const REVIEW_CONTROLS = {{ (review.controls | list) | tojson }};
+{% else %}
+const REVIEW_URL = null, CHILDREN = {}, CHILD_LABEL = '', CHILD_COLS = [], CHILD_FLAG = '', REVIEW_CONTROLS = [];
+{% endif %}
 const LOOKUP_URL = {{ url_for('backoffice.lookup_cms_table', app_id=app._id, table_name='__TABLE__') | tojson }};
 
 const drawer = document.getElementById('drawer');
@@ -359,13 +414,64 @@ function openCreate() {
   form.action = CREATE_URL;
   document.getElementById('drawer-title').textContent = 'New row';
   buildFields(null);
+  buildChildren(null);
+  syncReviewControls(null);
   openDrawer();
+}
+
+// Child rows are built with the DOM API, never by concatenating tenant values
+// into an HTML string — same rule the field builder follows.
+function buildChildren(row) {
+  var section = document.getElementById('drawer-children');
+  var list = document.getElementById('drawer-children-list');
+  list.textContent = '';
+  var kids = (row && CHILDREN[String(row.id)]) || [];
+  if (!kids.length) {
+    section.hidden = true;
+    return;
+  }
+  document.getElementById('drawer-children-label').textContent = CHILD_LABEL;
+  kids.forEach(function (kid) {
+    var li = document.createElement('li');
+    li.className = 'p-2 rounded border border-border';
+    if (CHILD_FLAG && kid[CHILD_FLAG]) {
+      li.classList.add('is-primary-child');
+      var badge = document.createElement('span');
+      badge.className = 'badge badge-success';
+      badge.textContent = 'correct';
+      li.appendChild(badge);
+    }
+    CHILD_COLS.forEach(function (col, i) {
+      var div = document.createElement('div');
+      div.className = i ? 'muted text-sm mt-1' : '';
+      div.style.whiteSpace = 'pre-wrap';
+      div.textContent = kid[col] == null ? '' : String(kid[col]);
+      li.appendChild(div);
+    });
+    list.appendChild(li);
+  });
+  section.hidden = false;
+}
+
+function syncReviewControls(row) {
+  REVIEW_CONTROLS.forEach(function (col) {
+    var box = document.querySelector('.review-control[data-col="' + col + '"]');
+    if (box) box.checked = !!(row && row[col]);
+  });
+  if (!REVIEW_URL) return;
+  var target = REVIEW_URL.replace('__ROW_ID__', row ? row.id : '');
+  ['review-approve', 'review-reject'].forEach(function (id) {
+    var btn = document.getElementById(id);
+    if (btn) btn.setAttribute('formaction', target);
+  });
 }
 
 function openEdit(row) {
   form.action = SAVE_URL.replace('__ROW_ID__', row.id);
   document.getElementById('drawer-title').textContent = 'Edit row #' + row.id;
   buildFields(row);
+  buildChildren(row);
+  syncReviewControls(row);
   openDrawer();
 }
 </script>
