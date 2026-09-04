@@ -424,7 +424,48 @@ def span_check(cur, schema, row_id, new_text, fk_type=None):
                         f"'{ann.target}' as stored — the row is already out of "
                         f"sync. Re-run the extractor before editing.")
 
-    return (f"'{ann.target}' carries {len(spans)} term spans with character "
-            f"offsets. Editing the text moves every span after the edit, and "
-            f"nothing downstream would detect it. Clear the spans or re-run the "
-            f"extractor for this record, then edit.")
+    return (f"'{ann.target}' carries {len(spans)} term spans anchored to character "
+            f"positions. Editing the text moves every span after the edit, and "
+            f"nothing downstream would detect it. Use 'Clear spans to edit' in the "
+            f"row's drawer, then edit.")
+
+
+def span_counts(cur, schema, parent_ids, fk_type=None):
+    """How many spans each record carries, for the whole page in one query.
+
+    Surfaced before an edit is attempted rather than only in the refusal: a
+    reviewer should know the text is pinned before they retype a sentence and
+    lose it to a rejected save.
+    """
+    ann = schema.annotations
+    if not ann or not parent_ids:
+        return {}
+    ids = [str(p) for p in parent_ids]
+    match = (f'"{ann.fk}" = ANY(%s::{safe_ident(fk_type)}[])' if fk_type
+             else f'"{ann.fk}"::text = ANY(%s)')
+    cur.execute(f'SELECT "{ann.fk}", COUNT(*) FROM "{ann.table}" '
+                f'WHERE {match} GROUP BY "{ann.fk}"', [ids])
+    return {str(row[0]): row[1] for row in cur.fetchall()}
+
+
+def clear_spans(conn, schema, row_id, fk_type=None):
+    """Deletes a record's spans so its annotated text can be edited.
+
+    Returns the rows removed, which the caller writes to the audit log — the
+    spans are cheap for a tenant to recompute but nothing else records what was
+    there, and "we deleted 40 somethings" is not an audit trail.
+
+    Whether they can be recomputed is the tenant's business, not this platform's
+    to promise: the extractor and the lexicon are theirs.
+    """
+    ann = schema.annotations
+    if not ann:
+        return []
+    cast = f'::{safe_ident(fk_type)}' if fk_type else ''
+    cols = [ann.start, ann.end] + ([ann.surface] if ann.surface else [])
+    with conn.cursor() as cur:
+        cur.execute(f'DELETE FROM "{ann.table}" WHERE "{ann.fk}" = %s{cast} '
+                    f'RETURNING {_cols_sql(cols)}', [str(row_id)])
+        removed = [dict(zip(cols, r)) for r in cur.fetchall()]
+    conn.commit()
+    return removed

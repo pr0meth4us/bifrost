@@ -142,6 +142,7 @@ def _load_children(db, db_conn_str, review, rows, schema_meta):
     from ..utils.tenant_db import get_tenant_db
 
     parent_ids = [r.get(review.id) for r in rows if r.get(review.id) is not None]
+    spans = {}
     # The FK's declared type, so the bound id array can be cast to match it.
     # Introspection is memoized per request, so this is not an extra round trip
     # when the drawer already needed the child table's schema.
@@ -151,12 +152,21 @@ def _load_children(db, db_conn_str, review, rows, schema_meta):
         fk_type = next((c.get('udt_name') for c in child_schema
                         if c['column_name'] == review.child.fk), None)
 
+    ann_fk_type = None
+    if review.annotations:
+        ann_cols = db.get_tenant_table_schema(db_conn_str, review.annotations.table)
+        ann_fk_type = next((c.get('udt_name') for c in ann_cols
+                            if c['column_name'] == review.annotations.fk), None)
+
     with get_tenant_db(db_conn_str) as conn:
         with conn.cursor() as cur:
             children = children_for(cur, review, parent_ids, fk_type=fk_type)
+            if review.annotations:
+                from ..models.review_queue import span_counts
+                spans = span_counts(cur, review, parent_ids, fk_type=ann_fk_type)
     reason_column = next((c for c in review.reject_reason
                           if c in {col['column_name'] for col in schema_meta}), None)
-    return children, reason_column
+    return children, reason_column, spans
 
 
 def _span_guard(db, db_conn_str, app_id, table_name, row_id, data):
@@ -609,6 +619,7 @@ def view_cms_grid(app_id_or_slug=None):
         columns, rows, schema_meta = [], [], []
         total_count = 0
         review, children_by_parent, reason_column = None, {}, None
+        span_counts_by_parent = {}
         if selected_table:
             columns, rows, total_count = db.get_tenant_table_data(
                 db_conn_str, selected_table, limit, offset, sort_by, sort_dir, search_query
@@ -649,7 +660,7 @@ def view_cms_grid(app_id_or_slug=None):
             # "No tables are visible. Connect a tenant database" — which sends
             # the tenant off to re-check a connection string that was fine.
             try:
-                children_by_parent, reason_column = _load_children(
+                children_by_parent, reason_column, span_counts_by_parent = _load_children(
                     db, db_conn_str, review, rows, schema_meta)
             except Exception as e:
                 log.exception("view_cms_grid failed")
@@ -664,6 +675,7 @@ def view_cms_grid(app_id_or_slug=None):
         page, limit, total_count, sort_by, sort_dir, search_query = 1, 50, 0, 'id', 'desc', None
         current_role = get_current_role_in_app(app_id)
         review, children_by_parent, reason_column = None, {}, None
+        span_counts_by_parent = {}
 
     # Determine Write Permission for the selected table
     can_write = False
@@ -703,6 +715,7 @@ def view_cms_grid(app_id_or_slug=None):
         search_query=search_query,
         review=review,
         children_by_parent=children_by_parent,
+        span_counts_by_parent=span_counts_by_parent,
         review_reason_column=reason_column,
         can_approve=check_permission(app_id, "content:publish"),
         role_readonly_cols=role_readonly_cols

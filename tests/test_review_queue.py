@@ -294,7 +294,7 @@ class TestChildFetchIsIsolated(unittest.TestCase):
     def test_the_grid_route_catches_child_fetch_failures_separately(self):
         src = (Path(__file__).resolve().parents[1]
                / 'bifrost/backoffice/tenant_routes.py').read_text()
-        call = src.index('children_by_parent, reason_column = _load_children(')
+        call = src.index('= _load_children(')
         before, after = src[max(0, call - 400):call], src[call:call + 400]
         self.assertIn('try:', before,
                       "the child fetch must sit in its own try, not the schema handler's")
@@ -366,3 +366,65 @@ class TestUndo(unittest.TestCase):
                             set(schema.controls), 'approve', 'me')
         self.assertTrue(ok)
         self.assertIn('reviewed_by', before)
+
+
+class TestSpanGuard(unittest.TestCase):
+    """Editing annotated text is refused; clearing the spans is the escape hatch."""
+
+    BLOCK = {'review_queue': dict(
+        PROLONG['review_queue'],
+        annotations={'table': 'question_terms', 'fk': 'question_id',
+                     'start': 'start_char', 'end': 'end_char',
+                     'target': 'body_kh', 'surface': 'surface'})}
+
+    def setUp(self):
+        self.schema = ReviewSchema.from_config(self.BLOCK)
+
+    def test_annotation_identifiers_are_checked(self):
+        with self.assertRaises(ValueError):
+            ReviewSchema.from_config({'review_queue': dict(
+                PROLONG['review_queue'],
+                annotations={'table': 'x; DROP TABLE question_terms',
+                             'fk': 'q', 'start': 's', 'end': 'e', 'target': 't'})})
+
+    def test_an_incomplete_block_is_ignored_rather_than_half_applied(self):
+        # A guard that half-exists is worse than none: it would read as protection.
+        schema = ReviewSchema.from_config({'review_queue': dict(
+            PROLONG['review_queue'],
+            annotations={'table': 'question_terms', 'fk': 'question_id'})})
+        self.assertIsNone(schema.annotations)
+
+    def test_no_annotations_configured_means_no_guard(self):
+        from bifrost.models.review_queue import span_check
+        schema = ReviewSchema.from_config(PROLONG)
+        self.assertIsNone(span_check(FakeCursor({}), schema, 'q1', 'new text'))
+
+    def test_a_record_without_spans_is_free_to_edit(self):
+        from bifrost.models.review_queue import span_check
+        cur = FakeCursor({'all': []})
+        self.assertIsNone(span_check(cur, self.schema, 'q1', 'new text'))
+
+    def test_clear_spans_returns_what_it_deleted(self):
+        # The audit log needs the spans themselves: "40 spans deleted" is not a
+        # record of what was there.
+        from bifrost.models.review_queue import clear_spans
+        store = {'all': [(4, 22, 'អនុសញ្ញា')]}
+        removed = clear_spans(FakeConn(store), self.schema, 'q1', fk_type='uuid')
+        sql, params = store['executed'][-1]
+        self.assertIn('DELETE FROM "question_terms"', sql)
+        self.assertIn('RETURNING', sql)
+        self.assertEqual(removed[0]['surface'], 'អនុសញ្ញា')
+
+    def test_clear_spans_without_annotations_deletes_nothing(self):
+        from bifrost.models.review_queue import clear_spans
+        store = {}
+        schema = ReviewSchema.from_config(PROLONG)
+        self.assertEqual(clear_spans(FakeConn(store), schema, 'q1'), [])
+        self.assertNotIn('executed', store)
+
+    def test_span_counts_are_one_query_for_the_page(self):
+        from bifrost.models.review_queue import span_counts
+        cur = FakeCursor({'all': [('q1', 3), ('q2', 40)]})
+        counts = span_counts(cur, self.schema, ['q1', 'q2'], fk_type='uuid')
+        self.assertEqual(len(cur.sql), 1)
+        self.assertEqual(counts, {'q1': 3, 'q2': 40})

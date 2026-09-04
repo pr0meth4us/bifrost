@@ -18,8 +18,8 @@ from . import (backoffice_bp, get_db, login_required, check_permission,
                get_current_role_in_app, acting_identity)
 from .tenant_routes import get_tenant_db_conn_str
 from ..models import cms_mongo
-from ..models.review_queue import (ReviewSchema, children_for, next_awaiting,
-                                   pending_count, restore, submit)
+from ..models.review_queue import (ReviewSchema, children_for, clear_spans,
+                                   next_awaiting, pending_count, restore, submit)
 import logging
 
 log = logging.getLogger(__name__)
@@ -210,3 +210,38 @@ def undo_review(app_id):
                         acting_identity(), None, last['before'])
     session.pop('last_review', None)
     return jsonify(ok=True, row_id=str(last['row_id']))
+
+
+@backoffice_bp.route('/app/<app_id>/review/<row_id>/clear-spans', methods=['POST'])
+@login_required
+def clear_record_spans(app_id, row_id):
+    """Removes a record's text annotations so its text can be edited.
+
+    Deliberate, confirmed and audit-logged, because the alternative — letting an
+    edit through and shifting every span — is corruption nobody detects. The
+    removed spans go into the audit log in full: they are cheap for the tenant to
+    recompute, but nothing else records what was there, and "40 spans deleted" is
+    not an audit trail.
+    """
+    db = get_db()
+    if not check_permission(app_id, "content:write"):
+        abort(403, description="No write access to this application's content.")
+
+    app, db_conn_str, schema = _queue_for(db, app_id)
+    if not (app and schema and schema.annotations and db_conn_str) or cms_mongo.handles(db_conn_str):
+        return jsonify(error="No annotations are configured for this application."), 400
+
+    from ..utils.tenant_db import get_tenant_db
+    try:
+        fk_type = next((c.get('udt_name') for c in
+                        db.get_tenant_table_schema(db_conn_str, schema.annotations.table)
+                        if c['column_name'] == schema.annotations.fk), None)
+        with get_tenant_db(db_conn_str) as conn:
+            removed = clear_spans(conn, schema, row_id, fk_type=fk_type)
+    except Exception:
+        log.exception("clear_record_spans failed")
+        return jsonify(error="Could not clear the spans."), 500
+
+    db.log_cms_mutation(app_id, schema.annotations.table, "SPANS_CLEARED", str(row_id),
+                        acting_identity(), [_jsonable(r) for r in removed], None)
+    return jsonify(ok=True, removed=len(removed))

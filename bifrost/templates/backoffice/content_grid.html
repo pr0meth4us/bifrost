@@ -247,6 +247,19 @@
         </section>
       {% endif %}
 
+      {# Said before an edit is attempted, not only in the refusal: a reviewer
+         should know the text is pinned before retyping a sentence and losing it
+         to a rejected save. #}
+      <section id="drawer-spans" hidden
+               class="p-3 rounded border border-border text-sm space-y-2">
+        <div id="drawer-spans-text"></div>
+        {% if can_write %}
+          <button type="button" class="btn btn-sm" onclick="clearSpans()">
+            Clear spans to edit
+          </button>
+        {% endif %}
+      </section>
+
       <details id="drawer-editor" open>
         <summary class="muted text-xs uppercase cursor-pointer select-none">Edit fields</summary>
         <div class="space-y-4 mt-2" id="drawer-fields"></div>
@@ -309,12 +322,16 @@ const REVIEW_URL = null, CHILDREN = {}, CHILD_LABEL = '', CHILD_COLS = [], CHILD
 const EVIDENCE_COLS = EVIDENCE.map(function (e) { return e.column; });
 {% if review and selected_table == review.table %}
 const ID_COL       = {{ review.id | tojson }};
+const SPAN_COUNTS  = {{ span_counts_by_parent | tojson }};
+const SPAN_TARGET  = {{ review.annotations.target | tojson if review.annotations else '""' }};
+const CLEAR_SPANS_URL = {{ url_for('backoffice.clear_record_spans', app_id=app._id, row_id='__ROW_ID__') | tojson if review.annotations else 'null' }};
 const NEXT_URL     = {{ url_for('backoffice.review_next', app_id=app._id) | tojson }};
 const UNDO_URL     = {{ url_for('backoffice.undo_review', app_id=app._id) | tojson }};
 const AWAITING     = {{ (review.awaiting | list) | tojson }};
 const STATUS_COL   = {{ review.status | tojson }};
 {% else %}
-const NEXT_URL = null, UNDO_URL = null, AWAITING = [], STATUS_COL = '', ID_COL = 'id';
+const NEXT_URL = null, UNDO_URL = null, AWAITING = [], STATUS_COL = '', ID_COL = 'id',
+      SPAN_COUNTS = {}, SPAN_TARGET = '', CLEAR_SPANS_URL = null;
 {% endif %}
 const LOOKUP_URL = {{ url_for('backoffice.lookup_cms_table', app_id=app._id, table_name='__TABLE__') | tojson }};
 
@@ -463,6 +480,7 @@ function openCreate() {
   buildChildren(null);
   syncReviewControls(null);
   paintReview(null);
+  paintSpans(null);
   openDrawer();
 }
 
@@ -597,6 +615,46 @@ function paintReview(row) {
   if (reason) reason.value = '';
 }
 
+function spanCount(row) {
+  var key = row ? String(rowKey(row)) : null;
+  return (key && SPAN_COUNTS[key]) || 0;
+}
+
+function paintSpans(row) {
+  var section = document.getElementById('drawer-spans');
+  if (!section) return;
+  var n = spanCount(row);
+  section.hidden = !n;
+  if (!n) return;
+  document.getElementById('drawer-spans-text').textContent =
+    n + (n === 1 ? ' term span is' : ' term spans are') + ' anchored to character ' +
+    'positions in ' + SPAN_TARGET + '. Editing that text would move them, so the ' +
+    'save is blocked until they are cleared.';
+}
+
+function clearSpans() {
+  var row = reviewRow;
+  if (!row || !CLEAR_SPANS_URL) return;
+  var n = spanCount(row);
+  // The count is the useful part of the confirmation: clearing 3 and clearing
+  // 40 are different decisions. What it does NOT say is that this is
+  // reversible — recomputing spans is the tenant's pipeline, not ours to promise.
+  if (!confirm('Delete ' + n + ' term span' + (n === 1 ? '' : 's') +
+               ' from this record so its text can be edited?\n\n' +
+               'They are removed from the database. Restoring them means ' +
+               're-running your own extractor.')) return;
+  fetch(CLEAR_SPANS_URL.replace('__ROW_ID__', rowKey(row)), {
+    method: 'POST', headers: {'X-Requested-With': 'fetch'}, credentials: 'same-origin'
+  }).then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d.ok) { alert(d.error || 'Could not clear the spans.'); return; }
+      SPAN_COUNTS[String(rowKey(row))] = 0;
+      paintSpans(row);
+      var editor = document.getElementById('drawer-editor');
+      if (editor) editor.open = true;
+    });
+}
+
 function setProgress(remaining) {
   var el = document.getElementById('review-progress');
   if (el) el.textContent = remaining == null ? '' : remaining + ' awaiting';
@@ -703,6 +761,7 @@ function openEdit(row, opts) {
   buildChildren(row);
   syncReviewControls(row);
   paintReview(row);
+  paintSpans(row);
   if (!(opts && opts.keepOpen)) openDrawer();
 }
 </script>
