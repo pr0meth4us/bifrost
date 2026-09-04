@@ -2,6 +2,7 @@
 from flask import render_template, request, redirect, url_for, flash, session, current_app, abort
 from bson import ObjectId
 from . import (backoffice_bp, get_db, login_required, requires, get_current_role_in_app,
+               acting_identity,
                check_permission, cms_full_access, ROLE_PERMISSIONS,
                PLATFORM_GRANTED_ONLY, effective_role_permissions)
 from ..models.payments import (
@@ -212,7 +213,7 @@ def approve_payment(app_id, payment_id):
         flash("Select the exam track to grant before approving.", "danger")
         return redirect(url_for('backoffice.view_manual_payments', app_id=app_id))
 
-    reviewer_id = str(session.get('backoffice_user'))
+    reviewer_id = acting_identity()
     try:
         success, result = db.approve_manual_payment(
             db_conn_str, int(payment_id), int(track_id) if track_id else None, reviewer_id,
@@ -268,7 +269,7 @@ def reject_payment(app_id, payment_id):
 
     try:
         success, result = db.reject_manual_payment(
-            db_conn_str, int(payment_id), str(session.get('backoffice_user')),
+            db_conn_str, int(payment_id), acting_identity(),
             request.form.get('reason_code'), request.form.get('reason_text'), app_id=app_id,
             queue=queue
         )
@@ -292,7 +293,7 @@ def refund_payment(app_id, payment_id):
 
     try:
         success, result = db.refund_manual_payment(
-            db_conn_str, int(payment_id), str(session.get('backoffice_user')),
+            db_conn_str, int(payment_id), acting_identity(),
             request.form.get('reason_code'), request.form.get('reason_text'), app_id=app_id,
             queue=queue
         )
@@ -339,7 +340,7 @@ def suspend_user(app_id, user_id):
 
     try:
         db.suspend_tenant_user(db_conn_str, int(user_id), reason,
-                               actor=str(session.get('backoffice_user')), app_id=app_id,
+                               actor=acting_identity(), app_id=app_id,
                                queue=queue)
         flash("User suspended. Entitlements are preserved and restore on reinstatement.", "warning")
     except Exception as e:
@@ -359,7 +360,7 @@ def reinstate_user(app_id, user_id):
 
     try:
         db.reinstate_tenant_user(db_conn_str, int(user_id),
-                                 actor=str(session.get('backoffice_user')), app_id=app_id,
+                                 actor=acting_identity(), app_id=app_id,
                                  queue=queue)
         flash("User status reinstated to active.", "success")
     except Exception as e:
@@ -381,7 +382,7 @@ def override_entitlement(app_id):
     try:
         db.set_entitlement(
             db_conn_str, int(request.form['user_id']), int(request.form['track_id']),
-            request.form['status'], actor=str(session.get('backoffice_user')), app_id=app_id,
+            request.form['status'], actor=acting_identity(), app_id=app_id,
             queue=queue
         )
         flash("Entitlement overridden and audit-logged.", "success")
@@ -683,7 +684,7 @@ def save_cms_row(app_id, table_name, row_id):
     # see — a value it cannot read is a value it cannot write.
     forbidden = hidden_columns_for(db, app_id, table_name) | {'csrf_token', '_method'}
     data = {k: v for k, v in request.form.items() if k not in forbidden}
-    acting_user = session.get('backoffice_user', 'unknown')
+    acting_user = acting_identity()
 
     blocked = check_publish_permission(app_id, table_name, data, db, db_conn_str, row_id)
     if blocked:
@@ -710,7 +711,7 @@ def create_cms_row(app_id, table_name):
 
     forbidden = hidden_columns_for(db, app_id, table_name) | {'csrf_token', '_method'}
     data = {k: v for k, v in request.form.items() if k not in forbidden}
-    acting_user = session.get('backoffice_user', 'unknown')
+    acting_user = acting_identity()
 
     blocked = check_publish_permission(app_id, table_name, data, db, db_conn_str)
     if blocked:
@@ -735,7 +736,7 @@ def delete_cms_row(app_id, table_name, row_id):
 
     app = db.db.applications.find_one({"_id": ObjectId(app_id)})
     db_conn_str = get_tenant_db_conn_str(app)
-    acting_user = session.get('backoffice_user', 'unknown')
+    acting_user = acting_identity()
     
     try:
         db.delete_tenant_table_row(db_conn_str, table_name, row_id, app_id=app_id, acting_user=acting_user)

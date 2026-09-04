@@ -327,5 +327,18 @@ def _inject_rbac():
     return {"can": can, "pending_requests": pending_requests}
 
 
+def acting_identity():
+    """Who to record as having performed an action, for humans reading it later.
+
+    The email, because attestation columns and audit rows are read from the
+    tenant's side, where a Bifrost ObjectId resolves to nothing. Falls back to
+    the id for sessions issued before the email was carried, and only then to
+    'unknown' — an audit row with no actor is worse than an opaque one.
+    """
+    return (session.get('backoffice_email')
+            or (str(session['backoffice_user']) if session.get('backoffice_user') else None)
+            or 'unknown')
+
+
 from . import (auth_routes, app_routes, heimdall_routes, user_routes, tenant_routes,
                devtools_routes, review_routes)

@@ -11,7 +11,8 @@ Entirely driven by `cms_config.review_queue`. No block, no queue, no route.
 from flask import render_template, request, redirect, url_for, flash, session, abort
 from bson import ObjectId
 
-from . import backoffice_bp, get_db, login_required, check_permission, get_current_role_in_app
+from . import (backoffice_bp, get_db, login_required, check_permission,
+               get_current_role_in_app, acting_identity)
 from .tenant_routes import get_tenant_db_conn_str
 from ..models import cms_mongo
 from ..models.review_queue import ReviewSchema, load_item, next_ids, pending_count, submit
@@ -99,7 +100,7 @@ def submit_review(app_id, row_id):
         return redirect(url_for('backoffice.dashboard'))
 
     ticked = {c for c in schema.controls if request.form.get(c)}
-    actor = session.get('backoffice_user', 'unknown')
+    actor = acting_identity()
 
     from ..utils.tenant_db import get_tenant_db
     try:

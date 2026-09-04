@@ -19,7 +19,7 @@ trusting it. Instead:
 from flask import render_template, request, jsonify, session
 from bson import ObjectId
 
-from . import backoffice_bp, get_db, requires, get_current_role_in_app
+from . import backoffice_bp, get_db, requires, get_current_role_in_app, acting_identity
 from .tenant_routes import get_tenant_db_conn_str
 
 # A query slower than this is a mistake, not a report. Keeps one bad scan from
@@ -78,7 +78,7 @@ def devtools_execute(app_id):
     if not sql:
         return jsonify({"error": "No SQL supplied."}), 400
 
-    actor = str(session.get('backoffice_user'))
+    actor = acting_identity()
 
     # Logged BEFORE execution on purpose: a statement that hangs the database or
     # kills the process must still leave a trace of who ran it.

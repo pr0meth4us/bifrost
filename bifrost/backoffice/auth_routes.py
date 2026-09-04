@@ -36,10 +36,14 @@ def _device_trusted_for(user_id):
         return False
 
 
-def _issue_session(user_id, is_heimdall, app_id):
+def _issue_session(user_id, is_heimdall, app_id, email=None):
     now = datetime.now(timezone.utc).isoformat()
     session.pop('mfa_pending', None)
     session['backoffice_user'] = str(user_id)
+    # Carried alongside the id, not instead of it: the id is the lookup key, the
+    # email is what gets written into tenant attestation columns. An ObjectId in
+    # a tenant's reviewed_by is unresolvable from their database.
+    session['backoffice_email'] = (email or '').lower() or None
     session['is_heimdall'] = is_heimdall
     session['role'] = 'Heimdall' if is_heimdall else 'Tenant'
     session['session_started_at'] = now
@@ -75,7 +79,8 @@ def _start_mfa(db, user_doc, is_heimdall, tenant_app):
 
     if _device_trusted_for(user_doc['_id']):
         return _issue_session(user_doc['_id'], is_heimdall,
-                              str(tenant_app['_id']) if tenant_app else None)
+                              str(tenant_app['_id']) if tenant_app else None,
+                              email=email)
 
     otp, _ = db.create_otp(email, channel="backoffice_mfa", account_id=user_doc['_id'])
     if not send_otp_email(email, otp, app_name="Bifrost Console"):
@@ -151,7 +156,8 @@ def mfa():
         db = get_db()
         if db.verify_otp(identifier=pending['email'], code=request.form.get('otp')):
             resp = make_response(_issue_session(pending['user_id'], pending['is_heimdall'],
-                                                pending.get('app_id')))
+                                                pending.get('app_id'),
+                                                email=pending.get('email')))
             if request.form.get('remember_device'):
                 resp.set_cookie(
                     TRUSTED_DEVICE_COOKIE,
