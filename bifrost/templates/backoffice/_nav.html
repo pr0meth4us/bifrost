@@ -48,6 +48,15 @@
            {% if ep == 'backoffice.view_cms_grid' %}aria-current="page"{% endif %}>Content</a>
       {% endif %}
 
+      {# Only when the tenant has configured a review_queue. The block lives on
+         the app document the nav already has, so this costs no extra query, and
+         a tenant without one never sees a link to a page that would only tell
+         them it is not configured. #}
+      {% if app.cms_config and app.cms_config.get('review_queue', {}).get('table') and can(app_id, 'content:read') %}
+        <a class="nav-link" href="{{ url_for('backoffice.review_queue', app_id=app_id) }}"
+           {% if ep == 'backoffice.review_queue' %}aria-current="page"{% endif %}>Review</a>
+      {% endif %}
+
       {% if can(app_id, 'payments:view') %}
         <a class="nav-link" href="{{ url_for('backoffice.view_manual_payments') }}"
            {% if ep == 'backoffice.view_manual_payments' %}aria-current="page"{% endif %}>Payments</a>
