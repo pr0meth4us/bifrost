@@ -28,6 +28,13 @@
   /* The flagged child — the correct answer — has to be identifiable at a glance;
      that recognition is the whole point of showing children here. Border as well
      as tint, so it survives a colour-blind reader and a monochrome print. */
+  .evidence-citation { font-weight: 600; }
+  .evidence-passage {
+    border-left: 3px solid rgb(var(--c-border));
+    padding: .25rem .75rem;
+    margin: 0;
+    font-style: italic;
+  }
   .is-primary-child { border-color: rgb(var(--c-success, 34 197 94)); background: rgb(var(--c-success, 34 197 94) / .08); }
 </style>
 {% endblock %}
@@ -206,6 +213,10 @@
 
          Deliberately a sibling of #drawer-fields, not a child: buildFields()
          calls replaceChildren() on that node every time the drawer opens. #}
+      {# Evidence first: it is what the record is judged against, so a reviewer
+         should meet it before the record, not hunt for it among the columns. #}
+      <section id="drawer-evidence" hidden class="space-y-2"></section>
+
       <section id="drawer-children" hidden>
         <div class="muted text-xs uppercase mb-1" id="drawer-children-label"></div>
         <ul class="space-y-2" id="drawer-children-list"></ul>
@@ -269,9 +280,15 @@ const CHILD_LABEL    = {{ review.child.table | tojson if review.child else '""' 
 const CHILD_COLS     = {{ (review.child.columns | list) | tojson if review.child else '[]' }};
 const CHILD_FLAG     = {{ review.child.flag | tojson if review.child else '""' }};
 const REVIEW_CONTROLS = {{ (review.controls | list) | tojson }};
+const EVIDENCE       = {{ (review.evidence | list) | tojson }};
 {% else %}
-const REVIEW_URL = null, CHILDREN = {}, CHILD_LABEL = '', CHILD_COLS = [], CHILD_FLAG = '', REVIEW_CONTROLS = [];
+const REVIEW_URL = null, CHILDREN = {}, CHILD_LABEL = '', CHILD_COLS = [], CHILD_FLAG = '', REVIEW_CONTROLS = [], EVIDENCE = [];
 {% endif %}
+// Evidence columns stay in the editable field list as well as rendering above.
+// The complaint was that a citation was not prominent, not that it was present —
+// and the same drawer is where a content manager fixes a wrong citation, so
+// hiding the field would trade a review problem for an editing one.
+const EVIDENCE_COLS = EVIDENCE.map(function (e) { return e.column; });
 const LOOKUP_URL = {{ url_for('backoffice.lookup_cms_table', app_id=app._id, table_name='__TABLE__') | tojson }};
 
 const drawer = document.getElementById('drawer');
@@ -414,6 +431,7 @@ function openCreate() {
   form.action = CREATE_URL;
   document.getElementById('drawer-title').textContent = 'New row';
   buildFields(null);
+  buildEvidence(null);
   buildChildren(null);
   syncReviewControls(null);
   openDrawer();
@@ -421,6 +439,61 @@ function openCreate() {
 
 // Child rows are built with the DOM API, never by concatenating tenant values
 // into an HTML string — same rule the field builder follows.
+// Roles are rendering contracts: citation reads as a reference, passage as a
+// quotation, document as a way out to the source. Built with the DOM API — these
+// are tenant values and never touch innerHTML.
+function buildEvidence(row) {
+  var section = document.getElementById('drawer-evidence');
+  section.textContent = '';
+  if (!EVIDENCE.length || !row) { section.hidden = true; return; }
+
+  var rendered = 0;
+  EVIDENCE.forEach(function (item) {
+    var value = row[item.column];
+    if (value == null || String(value).trim() === '') return;
+    value = String(value);
+    rendered++;
+
+    var wrap = document.createElement('div');
+    var label = document.createElement('div');
+    label.className = 'muted text-xs uppercase';
+    label.textContent = item.label || item.column.replace(/_/g, ' ');
+    wrap.appendChild(label);
+
+    if (item.role === 'document') {
+      // Only an http(s) URL becomes a link. A storage:// or bucket path is not
+      // something a browser can open, and styling it as a link would promise a
+      // click that does nothing.
+      var isWeb = /^https?:\/\//i.test(value);
+      var node = document.createElement(isWeb ? 'a' : 'div');
+      if (isWeb) {
+        node.href = value;
+        node.target = '_blank';
+        node.rel = 'noopener noreferrer';
+        node.className = 'btn btn-sm';
+      } else {
+        node.className = 'text-sm';
+        node.style.wordBreak = 'break-all';
+      }
+      node.textContent = isWeb ? (item.label || 'Open the source') : value;
+      wrap.appendChild(node);
+    } else if (item.role === 'passage') {
+      var quote = document.createElement('blockquote');
+      quote.className = 'evidence-passage';
+      quote.style.whiteSpace = 'pre-wrap';
+      quote.textContent = value;
+      wrap.appendChild(quote);
+    } else {
+      var cite = document.createElement('div');
+      cite.className = 'evidence-citation';
+      cite.textContent = value;
+      wrap.appendChild(cite);
+    }
+    section.appendChild(wrap);
+  });
+  section.hidden = rendered === 0;
+}
+
 function buildChildren(row) {
   var section = document.getElementById('drawer-children');
   var list = document.getElementById('drawer-children-list');
@@ -470,6 +543,7 @@ function openEdit(row) {
   form.action = SAVE_URL.replace('__ROW_ID__', row.id);
   document.getElementById('drawer-title').textContent = 'Edit row #' + row.id;
   buildFields(row);
+  buildEvidence(row);
   buildChildren(row);
   syncReviewControls(row);
   openDrawer();

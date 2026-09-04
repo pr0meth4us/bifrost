@@ -28,6 +28,13 @@ from dataclasses import dataclass, field, fields
 from .queue_schema import safe_ident
 
 
+# Rendering contracts for the material a record is checked against. A citation
+# is a short reference shown beside the record; a passage is quoted text shown as
+# a block; a document is a pointer rendered as a link when it is one. Deliberately
+# a closed set — an open-ended "render this however" would be a template language.
+EVIDENCE_ROLES = ('citation', 'passage', 'document')
+
+
 @dataclass(frozen=True)
 class ReviewChild:
     """The rows that belong to the record under review.
@@ -69,6 +76,10 @@ class ReviewSchema:
 
     child: ReviewChild = None
 
+    # What the record is checked AGAINST. Entries are {column, role, label?};
+    # roles are rendering contracts, not data types.
+    evidence: tuple = ()
+
     @classmethod
     def from_config(cls, cms_config):
         """Builds a schema from an app's cms_config. No block -> None, not defaults.
@@ -92,7 +103,17 @@ class ReviewSchema:
             safe_ident(ident)
         if not self.controls:
             raise ValueError("review_queue.controls must name at least one column")
+        for item in self.evidence:
+            if not isinstance(item, dict) or not item.get('column'):
+                raise ValueError(f"review_queue.evidence entry needs a column: {item!r}")
+            if item.get('role') not in EVIDENCE_ROLES:
+                raise ValueError(
+                    f"review_queue.evidence role must be one of "
+                    f"{', '.join(sorted(EVIDENCE_ROLES))}: {item.get('role')!r}")
         return self
+
+    def evidence_columns(self):
+        return [item['column'] for item in self.evidence if item.get('column')]
 
     def identifiers(self):
         """Every string this schema interpolates into SQL, table names included.
@@ -100,12 +121,12 @@ class ReviewSchema:
         Status vocabulary is excluded: those travel as bound parameters.
         """
         values = ('awaiting', 'on_approve', 'on_reject')
-        out = []
+        out = list(self.evidence_columns())
         for obj in (self, self.child):
             if obj is None:
                 continue
             for f in fields(obj):
-                if f.name in values or f.name == 'child':
+                if f.name in values or f.name in ('child', 'evidence'):
                     continue
                 value = getattr(obj, f.name)
                 if isinstance(value, str) and value:
@@ -144,7 +165,9 @@ class ReviewSchema:
                     errors.append(f"{label}: '{table}' has no column '{col}'.")
             return present
 
-        present = check(self.table, self.parent_columns() + [self.order_by], "review_queue")
+        present = check(self.table,
+                        self.parent_columns() + [self.order_by] + self.evidence_columns(),
+                        "review_queue")
         # The stamp is what makes the attestation worth anything; warn loudly if
         # the tenant's publish constraint expects columns that are not there.
         if present:

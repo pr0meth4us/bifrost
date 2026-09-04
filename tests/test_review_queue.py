@@ -232,6 +232,57 @@ class TestReviewControlsAreNotWritableBySave(unittest.TestCase):
                          "save and create must both exclude the review controls")
 
 
+class TestEvidence(unittest.TestCase):
+    """Evidence is what a record is checked against, declared per app."""
+
+    BLOCK = {'review_queue': {
+        'table': 'questions', 'controls': ['correctness_passed'],
+        'evidence': [{'column': 'source_ref', 'role': 'citation'},
+                     {'column': 'source_excerpt', 'role': 'passage'},
+                     {'column': 'source_uri', 'role': 'document',
+                      'label': 'Open the source'}]}}
+
+    def test_columns_are_exposed_for_validation_and_rendering(self):
+        schema = ReviewSchema.from_config(self.BLOCK)
+        self.assertEqual(schema.evidence_columns(),
+                         ['source_ref', 'source_excerpt', 'source_uri'])
+
+    def test_evidence_columns_are_identifier_checked(self):
+        with self.assertRaises(ValueError):
+            ReviewSchema.from_config({'review_queue': {
+                'table': 'q', 'controls': ['c'],
+                'evidence': [{'column': 'x; DROP TABLE choices', 'role': 'citation'}]}})
+
+    def test_an_unknown_role_is_refused(self):
+        # Roles are rendering contracts; an open set would be a template language.
+        with self.assertRaises(ValueError):
+            ReviewSchema.from_config({'review_queue': {
+                'table': 'q', 'controls': ['c'],
+                'evidence': [{'column': 'source_ref', 'role': 'screenshot'}]}})
+
+    def test_an_entry_without_a_column_is_refused(self):
+        with self.assertRaises(ValueError):
+            ReviewSchema.from_config({'review_queue': {
+                'table': 'q', 'controls': ['c'],
+                'evidence': [{'role': 'citation'}]}})
+
+    def test_absent_evidence_changes_nothing(self):
+        schema = ReviewSchema.from_config(PROLONG)
+        self.assertEqual(schema.evidence, ())
+        self.assertEqual(schema.evidence_columns(), [])
+
+    def test_evidence_columns_are_validated_against_the_live_table(self):
+        schema = ReviewSchema.from_config(self.BLOCK)
+
+        class Cur:
+            def execute(self, *a, **k): pass
+            def fetchall(self): return [('id',), ('status',), ('correctness_passed',),
+                                        ('reviewed_by',), ('reviewed_at',)]
+        errors = schema.validate(Cur())
+        self.assertTrue(any('source_ref' in e for e in errors),
+                        "a missing evidence column must be reported at save time")
+
+
 class TestChildFetchIsIsolated(unittest.TestCase):
     """A failed child fetch costs the drawer its children, not the whole page.
 
