@@ -2,7 +2,7 @@
 from flask import render_template, request, redirect, url_for, flash, session, current_app, abort
 from bson import ObjectId
 from . import (backoffice_bp, get_db, login_required, requires, get_current_role_in_app,
-               acting_identity,
+               acting_identity, requires_sudo,
                check_permission, cms_full_access, ROLE_PERMISSIONS,
                PLATFORM_GRANTED_ONLY, effective_role_permissions)
 from ..models.payments import (
@@ -323,6 +323,7 @@ def reject_payment(app_id, payment_id):
 
 @backoffice_bp.route('/app/<app_id>/payments/<payment_id>/refund', methods=['POST'])
 @requires("payments:approve")
+@requires_sudo
 def refund_payment(app_id, payment_id):
     db = get_db()
     app, db_conn_str, queue = _app_and_conn(db, app_id)

@@ -1,7 +1,7 @@
 # bifrost/backoffice/app_routes.py
 from flask import render_template, request, redirect, url_for, session, flash
 from bson import ObjectId
-from . import backoffice_bp, get_db, login_required, heimdall_required, check_permission, get_current_role_in_app
+from . import backoffice_bp, get_db, login_required, heimdall_required, check_permission, get_current_role_in_app, requires_sudo
 from ..services.email_service import send_invite_email
 
 @backoffice_bp.route('/')
@@ -297,6 +297,7 @@ def update_app_settings(app_id):
 
 @backoffice_bp.route('/app/<app_id>/rotate-secret', methods=['POST'])
 @login_required
+@requires_sudo
 def rotate_secret(app_id):
     db = get_db()
     # HIERARCHY CHECK: Owner Only

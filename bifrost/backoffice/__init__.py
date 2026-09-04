@@ -1,5 +1,6 @@
 # bifrost/backoffice/__init__.py
-from flask import Blueprint, session, redirect, url_for, flash, current_app, request, abort
+from flask import (Blueprint, session, redirect, url_for, flash, current_app, request,
+                   abort, jsonify)
 from functools import wraps
 from datetime import datetime, timedelta, timezone
 
@@ -261,9 +262,27 @@ def requires(permission):
 
 # --- AUTH DECORATORS ---
 
-# Admin sessions expire faster than end-user sessions (SOW 4.6).
-ADMIN_IDLE_TIMEOUT_MINUTES = 30
+# Session length is a poor proxy for risk. A 30-minute idle timeout protected
+# the console against a laptop abandoned for 31 minutes and not one abandoned for
+# 20, while interrupting everyone who reads a log or waits for a deploy — and it
+# left DROP TABLE available for the whole eight hours on the strength of one
+# morning sign-in.
+#
+# So: a working day's session, and a re-authentication window in front of the
+# actions that actually deserve one. This is GitHub's sudo mode, and the trade is
+# deliberate — ordinary work stops being interrupted, and the destructive surface
+# gets more protection than it had, not less.
+ADMIN_IDLE_TIMEOUT_MINUTES = 8 * 60
 ADMIN_MAX_SESSION_HOURS = 8
+
+# How long a re-authentication counts for. Short enough that a walked-away
+# session cannot be used to drain the vault, long enough to run a migration.
+SUDO_WINDOW_MINUTES = 30
+
+# Actions worth re-authenticating for: raw SQL, credentials, and moving money or
+# ownership. Everything else — reviewing content, reading the queue — is not.
+SUDO_PERMISSIONS = frozenset({'db:execute', 'view:secrets', 'manage:secrets',
+                              'transfer:ownership'})
 
 
 def _session_expired():
@@ -279,6 +298,45 @@ def _session_expired():
         return True
     session['last_seen_at'] = now.isoformat()
     return False
+
+
+def has_sudo():
+    """True when the operator re-authenticated recently enough."""
+    stamped = session.get('sudo_at')
+    if not stamped:
+        return False
+    try:
+        age = datetime.now(timezone.utc) - datetime.fromisoformat(stamped)
+    except ValueError:
+        return False
+    return age <= timedelta(minutes=SUDO_WINDOW_MINUTES)
+
+
+def grant_sudo():
+    session['sudo_at'] = datetime.now(timezone.utc).isoformat()
+
+
+def requires_sudo(f):
+    """Re-authenticate before a destructive action, GitHub-style.
+
+    Applied to the GET that opens a dangerous screen AND to the POST that acts,
+    because a gate on the page alone is decoration — the POST is the action.
+    A POST arriving without sudo loses its form data on the way to the prompt;
+    that is the right trade for a handful of rare, destructive operations.
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if has_sudo():
+            return f(*args, **kwargs)
+        target = request.full_path if request.method == 'GET' else (request.referrer or '')
+        confirm = url_for('backoffice.confirm_access', next=target)
+        # A fetch() cannot follow a redirect to a login form usefully — it would
+        # render the HTML into the results pane. Say so in the caller's language.
+        if request.path.startswith('/backoffice/api/') or request.is_json:
+            return jsonify(error="Confirm your identity to run this.",
+                           confirm_url=confirm), 403
+        return redirect(confirm)
+    return decorated
 
 
 def login_required(f):

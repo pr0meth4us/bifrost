@@ -2,7 +2,7 @@
 from flask import render_template, request, jsonify, redirect, url_for, flash
 from bson import ObjectId
 from datetime import datetime, timedelta
-from . import backoffice_bp, get_db, login_required, heimdall_required
+from . import backoffice_bp, get_db, login_required, heimdall_required, requires_sudo
 from ..services.metrics_service import fetch_ai_metrics, fetch_billing_data, PRICING
 from ..utils.encryption import decrypt_value
 import logging
@@ -81,6 +81,7 @@ def global_user_details(user_id):
 @backoffice_bp.route('/heimdall/api-keys')
 @login_required
 @heimdall_required
+@requires_sudo
 def global_api_keys():
     db = get_db()
     # A customer's client_secret and webhook_secret are their credentials, not

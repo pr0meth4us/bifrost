@@ -5,7 +5,7 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import check_password_hash, generate_password_hash
 from ..models.auth import ANY_TENANT
 from ..services.email_service import send_invite_email, send_reset_email, send_otp_email
-from . import backoffice_bp, get_db
+from . import backoffice_bp, get_db, grant_sudo, has_sudo, SUDO_WINDOW_MINUTES
 
 # Admin login rate limit (SOW 4.7). Per source IP, short window.
 LOGIN_MAX_ATTEMPTS = 10
@@ -48,6 +48,9 @@ def _issue_session(user_id, is_heimdall, app_id, email=None):
     session['role'] = 'Heimdall' if is_heimdall else 'Tenant'
     session['session_started_at'] = now
     session['last_seen_at'] = now
+    # Signing in just now IS a recent authentication; making someone re-enter the
+    # password they typed ten seconds ago teaches them the prompt is noise.
+    session['sudo_at'] = now
     session.permanent = True
     if app_id:
         return redirect(url_for('backoffice.view_cms_grid', app_id=app_id))
@@ -170,6 +173,61 @@ def mfa():
         flash("Invalid or expired code.", "danger")
 
     return render_template('backoffice/mfa.html', email=pending['email'])
+
+
+def _safe_next(raw):
+    """Only same-site relative paths. A next= parameter is an open redirect
+    otherwise, and this one is handed out on an authentication screen."""
+    if not raw or not raw.startswith('/') or raw.startswith('//'):
+        return None
+    return raw
+
+
+def _password_matches(db, user_id, password):
+    """Checks the password for the signed-in account, in whichever directory it
+    lives — the console signs in admins and tenant users through two paths."""
+    if not password:
+        return False
+    from bson import ObjectId
+    try:
+        oid = ObjectId(user_id)
+    except Exception:
+        return False
+    for doc in (db.db.admins.find_one({"_id": oid}),
+                db.db.users.find_one({"_id": oid})):
+        if doc and doc.get('password_hash') and check_password_hash(doc['password_hash'], password):
+            return True
+    return False
+
+
+@backoffice_bp.route('/confirm-access', methods=['GET', 'POST'])
+def confirm_access():
+    """Re-authentication in front of a destructive action.
+
+    Password only, not a fresh OTP: the point is to prove the person at the
+    keyboard is still the account holder, and mailing a code for every vault
+    read would put a 7-second SMTP round trip in front of routine work — which
+    is how re-auth prompts get worked around rather than obeyed.
+    """
+    if not session.get('backoffice_user'):
+        return redirect(url_for('backoffice.login'))
+
+    target = _safe_next(request.args.get('next')) or url_for('backoffice.dashboard')
+    if has_sudo():
+        return redirect(target)
+
+    if request.method == 'POST':
+        if _login_rate_limited():
+            flash("Too many attempts. Try again in a few minutes.", "danger")
+            return render_template('backoffice/confirm_access.html', next=target)
+        if _password_matches(get_db(), session['backoffice_user'],
+                             request.form.get('password')):
+            grant_sudo()
+            return redirect(_safe_next(request.form.get('next')) or target)
+        flash("That password did not match.", "danger")
+
+    return render_template('backoffice/confirm_access.html', next=target,
+                           window_minutes=SUDO_WINDOW_MINUTES)
 
 
 @backoffice_bp.route('/logout')

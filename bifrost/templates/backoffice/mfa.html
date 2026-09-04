@@ -21,7 +21,10 @@
   </div>
 
   <label class="flex items-center gap-2 text-[13px] muted" for="remember_device">
-    <input type="checkbox" id="remember_device" name="remember_device" value="1">
+    {# Checked by default: nobody ticks an unticked security box, and the code
+       they just entered is the proof this device is theirs. Unticking is the
+       deliberate act, for a shared or borrowed machine. #}
+    <input type="checkbox" id="remember_device" name="remember_device" value="1" checked>
     Trust this device for 30 days
   </label>
 

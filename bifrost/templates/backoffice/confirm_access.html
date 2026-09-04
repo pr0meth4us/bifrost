@@ -1,0 +1,28 @@
+{% extends "backoffice/base_auth.html" %}
+
+{% block title %}Confirm access{% endblock %}
+
+{% block content %}
+<h1 class="text-lg font-semibold mb-1">Confirm access</h1>
+<p class="muted text-sm mb-4">
+  You're about to use part of the console that can destroy or expose data.
+  Enter your password to continue.
+</p>
+
+<form method="POST" class="space-y-4">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+  <input type="hidden" name="next" value="{{ next }}"/>
+
+  <div>
+    <label class="block text-sm mb-1" for="password">Password</label>
+    <input class="input w-full" id="password" name="password" type="password"
+           autocomplete="current-password" required autofocus/>
+  </div>
+
+  <button type="submit" class="btn btn-primary w-full">Confirm</button>
+</form>
+
+<p class="muted text-xs mt-4">
+  You won't be asked again for {{ window_minutes or 30 }} minutes.
+</p>
+{% endblock %}

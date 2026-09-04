@@ -19,7 +19,7 @@ trusting it. Instead:
 from flask import render_template, request, jsonify, session
 from bson import ObjectId
 
-from . import backoffice_bp, get_db, requires, get_current_role_in_app, acting_identity
+from . import backoffice_bp, get_db, requires, get_current_role_in_app, acting_identity, requires_sudo
 from .tenant_routes import get_tenant_db_conn_str
 import logging
 
@@ -36,6 +36,7 @@ MAX_ROWS = 500
 
 @backoffice_bp.route('/app/<app_id>/devtools')
 @requires("db:execute")
+@requires_sudo
 def devtools(app_id):
     db = get_db()
     app = db.db.applications.find_one({"_id": ObjectId(app_id)})
@@ -65,6 +66,7 @@ def devtools(app_id):
 
 @backoffice_bp.route('/api/app/<app_id>/devtools/execute', methods=['POST'])
 @requires("db:execute")
+@requires_sudo
 def devtools_execute(app_id):
     db = get_db()
     app = db.db.applications.find_one({"_id": ObjectId(app_id)})
