@@ -231,21 +231,34 @@ def submit(conn, schema, row_id, ticked, decision, actor, reason=None, reason_co
     return True, before
 
 
-def children_for(cur, schema, parent_ids):
+def children_for(cur, schema, parent_ids, fk_type=None):
     """Children for many parents in one query, grouped by parent id.
 
     The grid shows a page of rows at a time, so fetching children per row would
     be the N+1 the drawer exists to avoid. Returns {} when there is no child
     config or nothing to look up.
+
+    `fk_type` is the foreign key's Postgres type, from introspection. It matters:
+    ids bound from Python strings arrive as text[], and Postgres will not
+    implicitly compare uuid = text, so an unqualified ANY() fails outright
+    against the UUID keys any Supabase tenant gets by default. Casting the array
+    to the column's own type keeps the comparison sargable, so the FK index is
+    still used. Without a known type we compare on text, which is always correct
+    and merely slower.
     """
     if not schema.child or not parent_ids:
         return {}
     child = schema.child
     cols = [child.fk, child.id, *child.columns] + ([child.flag] if child.flag else [])
+    ids = [str(pid) for pid in parent_ids]
+    if fk_type:
+        match = f'"{child.fk}" = ANY(%s::{safe_ident(fk_type)}[])'
+    else:
+        match = f'"{child.fk}"::text = ANY(%s)'
     cur.execute(
         f'SELECT {_cols_sql(cols)} FROM "{child.table}" '
-        f'WHERE "{child.fk}" = ANY(%s) ORDER BY "{child.order_by}"',
-        [list(parent_ids)])
+        f'WHERE {match} ORDER BY "{child.order_by}"',
+        [ids])
     grouped = {}
     for row in cur.fetchall():
         record = dict(zip(cols, row))

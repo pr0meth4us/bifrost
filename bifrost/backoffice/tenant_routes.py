@@ -133,6 +133,29 @@ def _validate_review_queue(db, db_conn_str, new_config):
             return schema.validate(cur)
 
 
+def _load_children(db, db_conn_str, review, rows, schema_meta):
+    """Child rows for the visible page, plus the reason column if one exists."""
+    from ..models.review_queue import children_for
+    from ..utils.tenant_db import get_tenant_db
+
+    parent_ids = [r.get(review.id) for r in rows if r.get(review.id) is not None]
+    # The FK's declared type, so the bound id array can be cast to match it.
+    # Introspection is memoized per request, so this is not an extra round trip
+    # when the drawer already needed the child table's schema.
+    fk_type = None
+    if review.child:
+        child_schema = db.get_tenant_table_schema(db_conn_str, review.child.table)
+        fk_type = next((c.get('udt_name') for c in child_schema
+                        if c['column_name'] == review.child.fk), None)
+
+    with get_tenant_db(db_conn_str) as conn:
+        with conn.cursor() as cur:
+            children = children_for(cur, review, parent_ids, fk_type=fk_type)
+    reason_column = next((c for c in review.reject_reason
+                          if c in {col['column_name'] for col in schema_meta}), None)
+    return children, reason_column
+
+
 def _review_schema(db, app_id):
     """The app's review queue, or None. A broken block must not break the grid."""
     from ..models.review_queue import ReviewSchema
@@ -571,15 +594,15 @@ def view_cms_grid(app_id_or_slug=None):
         # N+1 it is meant to avoid.
         review = _review_schema(db, app_id)
         if review and selected_table == review.table and rows:
-            from ..models.review_queue import children_for
-            from ..utils.tenant_db import get_tenant_db
-            with get_tenant_db(db_conn_str) as conn:
-                with conn.cursor() as cur:
-                    children_by_parent = children_for(
-                        cur, review, [r.get(review.id) for r in rows if r.get(review.id) is not None])
-                    reason_column = next(
-                        (c for c in review.reject_reason
-                         if c in {col['column_name'] for col in schema_meta}), None)
+            # Its own try: a failed child fetch must cost the drawer its child
+            # rows, not the whole Content page. Letting this escape rendered
+            # "No tables are visible. Connect a tenant database" — which sends
+            # the tenant off to re-check a connection string that was fine.
+            try:
+                children_by_parent, reason_column = _load_children(
+                    db, db_conn_str, review, rows, schema_meta)
+            except Exception as e:
+                flash(f"Could not load related rows for the drawer: {e}", "warning")
 
     except Exception as e:
         flash(f"Error loading tenant schema: {e}", "danger")

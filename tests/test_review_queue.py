@@ -150,12 +150,44 @@ class TestGenericShape(unittest.TestCase):
     def test_child_query_filters_by_the_configured_fk(self):
         schema = ReviewSchema.from_config(ARTICLES)
         cur = FakeCursor({'all': [('7', '1', 'body text')]})
-        grouped = children_for(cur, schema, ['7'])
+        grouped = children_for(cur, schema, ['7'], fk_type='uuid')
         child_sql, child_params = cur.sql[-1]
         self.assertIn('"revisions"', child_sql)
-        self.assertIn('"article_id" = ANY(%s)', child_sql)
+        self.assertIn('"article_id" = ANY(%s::uuid[])', child_sql)
         self.assertEqual(child_params, [['7']])
         self.assertEqual(grouped['7'][0]['body'], 'body text')
+
+    def test_uuid_fks_get_an_explicit_array_cast(self):
+        # psycopg2 interpolates a bound list as ARRAY['a','b'], which resolves
+        # to text[], and Postgres refuses uuid = text. A scalar `= %s` is fine
+        # (an unknown literal coerces to the column type); only arrays break.
+        schema = ReviewSchema.from_config(PROLONG)
+        cur = FakeCursor({'all': []})
+        children_for(cur, schema, ['3f2a1c88-0000-4000-8000-000000000001'],
+                     fk_type='uuid')
+        sql, params = cur.sql[-1]
+        self.assertIn('= ANY(%s::uuid[])', sql)
+        self.assertNotIn('::text = ANY', sql)  # the index on the FK stays usable
+
+    def test_unknown_fk_type_falls_back_to_a_text_comparison(self):
+        schema = ReviewSchema.from_config(PROLONG)
+        cur = FakeCursor({'all': []})
+        children_for(cur, schema, ['1'], fk_type=None)
+        self.assertIn('::text = ANY(%s)', cur.sql[-1][0])
+
+    def test_a_bogus_fk_type_cannot_reach_the_query(self):
+        schema = ReviewSchema.from_config(PROLONG)
+        with self.assertRaises(ValueError):
+            children_for(FakeCursor({'all': []}), schema, ['1'],
+                         fk_type='uuid[]; DROP TABLE choices')
+
+    def test_ids_are_bound_as_strings_whatever_they_arrive_as(self):
+        import uuid as uuid_mod
+        schema = ReviewSchema.from_config(PROLONG)
+        cur = FakeCursor({'all': []})
+        uid = uuid_mod.UUID('3f2a1c88-0000-4000-8000-000000000001')
+        children_for(cur, schema, [uid], fk_type='uuid')
+        self.assertEqual(cur.sql[-1][1], [[str(uid)]])
 
     def test_children_are_fetched_for_a_whole_page_in_one_query(self):
         # One query per drawer-able row would be the N+1 the drawer avoids.
@@ -198,3 +230,22 @@ class TestReviewControlsAreNotWritableBySave(unittest.TestCase):
         guards = re.findall(r'forbidden = forbidden \| set\(_review\.controls\)', src)
         self.assertEqual(len(guards), 2,
                          "save and create must both exclude the review controls")
+
+
+class TestChildFetchIsIsolated(unittest.TestCase):
+    """A failed child fetch costs the drawer its children, not the whole page.
+
+    The first version let the exception escape into the grid's schema-loading
+    handler, which rendered "No tables are visible. Connect a tenant database"
+    — sending the tenant to re-check a connection string that was fine.
+    """
+
+    def test_the_grid_route_catches_child_fetch_failures_separately(self):
+        src = (Path(__file__).resolve().parents[1]
+               / 'bifrost/backoffice/tenant_routes.py').read_text()
+        call = src.index('children_by_parent, reason_column = _load_children(')
+        before, after = src[max(0, call - 400):call], src[call:call + 400]
+        self.assertIn('try:', before,
+                      "the child fetch must sit in its own try, not the schema handler's")
+        self.assertIn('except Exception', after,
+                      "a failed child fetch must degrade the drawer, not the page")
