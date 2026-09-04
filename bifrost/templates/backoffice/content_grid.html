@@ -221,37 +221,55 @@
         <div class="muted text-xs uppercase mb-1" id="drawer-children-label"></div>
         <ul class="space-y-2" id="drawer-children-list"></ul>
       </section>
-      <div class="space-y-4" id="drawer-fields"></div>
-    </div>
+      {# Controls sit with what they judge, above the editor. Sixteen inputs
+         between a reviewer and the checks is an editing UI they are not using. #}
+      {% if review and selected_table == review.table %}
+        <section id="drawer-review" hidden class="space-y-2 p-3 rounded border border-border">
+          <div class="flex items-center justify-between">
+            <span class="muted text-xs uppercase">Checks</span>
+            <span class="muted text-xs" id="review-progress"></span>
+          </div>
+          {% for col in review.controls %}
+            <label class="flex items-start gap-2">
+              <input type="checkbox" name="{{ col }}" value="1"
+                     class="review-control" data-col="{{ col }}"
+                     data-key="{{ loop.index }}"
+                     {% if not can_write %}disabled{% endif %}/>
+              <span>{{ col.replace('_', ' ')|capitalize }}
+                <kbd class="muted text-xs">{{ loop.index }}</kbd></span>
+            </label>
+          {% endfor %}
+          {% if review_reason_column %}
+            <textarea name="reason" rows="2" class="input w-full"
+                      placeholder="Reason, if sending back"></textarea>
+          {% endif %}
+          <div class="muted text-xs" id="review-hint"></div>
+        </section>
+      {% endif %}
 
-    {% if review and selected_table == review.table %}
-      <div class="card-pad border-t border-border space-y-2">
-        <div class="muted text-xs uppercase">Review</div>
-        {% for col in review.controls %}
-          <label class="flex items-start gap-2">
-            <input type="checkbox" name="{{ col }}" value="1" form="drawer-form"
-                   class="review-control" data-col="{{ col }}"
-                   {% if not can_write %}disabled{% endif %}/>
-            <span>{{ col.replace('_', ' ')|capitalize }}</span>
-          </label>
-        {% endfor %}
-        {% if review_reason_column %}
-          <textarea name="reason" rows="2" class="input w-full"
-                    placeholder="Reason, if sending back"></textarea>
-        {% endif %}
-      </div>
-    {% endif %}
+      <details id="drawer-editor" open>
+        <summary class="muted text-xs uppercase cursor-pointer select-none">Edit fields</summary>
+        <div class="space-y-4 mt-2" id="drawer-fields"></div>
+      </details>
+    </div>
 
     <div class="card-pad border-t border-border flex justify-end gap-2">
       <button type="button" class="btn" onclick="closeDrawer()">Cancel</button>
       {% if review and selected_table == review.table %}
-        {# formaction routes these two through the review endpoint, which is what
+        {# formaction routes these through the review endpoint, which is what
            writes the attestation. An ordinary Save stays an ordinary save. #}
-        <button type="submit" class="btn" name="decision" value="reject"
-                id="review-reject" formaction="">Send back</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="review-undo" hidden
+                onclick="undoLast()">Undo</button>
+        {# Failure is where specificity earns its keep: each button records WHICH
+           check failed, rather than a generic rejection someone must interpret. #}
+        {% for col in review.controls %}
+          <button type="submit" class="btn btn-sm review-reject" name="decision" value="reject"
+                  data-col="{{ col }}" formaction=""
+                  title="Send back: {{ col.replace('_', ' ') }}">✕ {{ col.split('_')[0] }}</button>
+        {% endfor %}
         {% if can_approve %}
           <button type="submit" class="btn btn-primary" name="decision" value="approve"
-                  id="review-approve" formaction="">Approve</button>
+                  id="review-approve" formaction="">Approve <kbd class="muted">a</kbd></button>
         {% endif %}
       {% endif %}
       <button type="submit" class="btn {% if not (review and selected_table == review.table) %}btn-primary{% endif %}">Save</button>
@@ -289,6 +307,15 @@ const REVIEW_URL = null, CHILDREN = {}, CHILD_LABEL = '', CHILD_COLS = [], CHILD
 // and the same drawer is where a content manager fixes a wrong citation, so
 // hiding the field would trade a review problem for an editing one.
 const EVIDENCE_COLS = EVIDENCE.map(function (e) { return e.column; });
+{% if review and selected_table == review.table %}
+const ID_COL       = {{ review.id | tojson }};
+const NEXT_URL     = {{ url_for('backoffice.review_next', app_id=app._id) | tojson }};
+const UNDO_URL     = {{ url_for('backoffice.undo_review', app_id=app._id) | tojson }};
+const AWAITING     = {{ (review.awaiting | list) | tojson }};
+const STATUS_COL   = {{ review.status | tojson }};
+{% else %}
+const NEXT_URL = null, UNDO_URL = null, AWAITING = [], STATUS_COL = '', ID_COL = 'id';
+{% endif %}
 const LOOKUP_URL = {{ url_for('backoffice.lookup_cms_table', app_id=app._id, table_name='__TABLE__') | tojson }};
 
 const drawer = document.getElementById('drawer');
@@ -430,10 +457,12 @@ function loadRelations() {
 function openCreate() {
   form.action = CREATE_URL;
   document.getElementById('drawer-title').textContent = 'New row';
+  reviewRow = null;
   buildFields(null);
   buildEvidence(null);
   buildChildren(null);
   syncReviewControls(null);
+  paintReview(null);
   openDrawer();
 }
 
@@ -498,7 +527,7 @@ function buildChildren(row) {
   var section = document.getElementById('drawer-children');
   var list = document.getElementById('drawer-children-list');
   list.textContent = '';
-  var kids = (row && CHILDREN[String(row.id)]) || [];
+  var kids = (row && CHILDREN[String(rowKey(row))]) || [];
   if (!kids.length) {
     section.hidden = true;
     return;
@@ -532,21 +561,149 @@ function syncReviewControls(row) {
     if (box) box.checked = !!(row && row[col]);
   });
   if (!REVIEW_URL) return;
-  var target = REVIEW_URL.replace('__ROW_ID__', row ? row.id : '');
-  ['review-approve', 'review-reject'].forEach(function (id) {
-    var btn = document.getElementById(id);
-    if (btn) btn.setAttribute('formaction', target);
+  var target = REVIEW_URL.replace('__ROW_ID__', row ? rowKey(row) : '');
+  var approve = document.getElementById('review-approve');
+  if (approve) approve.setAttribute('formaction', target);
+  document.querySelectorAll('.review-reject').forEach(function (btn) {
+    btn.setAttribute('formaction', target);
   });
 }
 
-function openEdit(row) {
-  form.action = SAVE_URL.replace('__ROW_ID__', row.id);
-  document.getElementById('drawer-title').textContent = 'Edit row #' + row.id;
+// --- review traversal ------------------------------------------------------
+// A decision keeps the reviewer in the drawer and loads the next awaiting
+// record. Returning to a table after every decision costs the re-orientation of
+// finding your place again, which is most of what makes a queue slow.
+var reviewRow = null;
+
+// The primary key column is configurable, so never assume it is called "id".
+function rowKey(row) { return row ? (row[ID_COL] != null ? row[ID_COL] : row.id) : null; }
+
+function isAwaiting(row) {
+  return !!row && AWAITING.indexOf(String(row[STATUS_COL])) !== -1;
+}
+
+function paintReview(row) {
+  var panel = document.getElementById('drawer-review');
+  if (!panel) return;
+  var awaiting = isAwaiting(row);
+  panel.hidden = !awaiting;
+  // The editor stays available, just out of the way while reviewing.
+  var editor = document.getElementById('drawer-editor');
+  if (editor) editor.open = !awaiting;
+  document.querySelectorAll('.review-reject, #review-approve').forEach(function (b) {
+    b.hidden = !awaiting;
+  });
+  var reason = document.querySelector('#drawer-review textarea[name=reason]');
+  if (reason) reason.value = '';
+}
+
+function setProgress(remaining) {
+  var el = document.getElementById('review-progress');
+  if (el) el.textContent = remaining == null ? '' : remaining + ' awaiting';
+}
+
+function showUndo(on) {
+  var btn = document.getElementById('review-undo');
+  if (btn) btn.hidden = !on;
+}
+
+function loadNext(afterId) {
+  if (!NEXT_URL) { closeDrawer(); return; }
+  var url = NEXT_URL + (afterId ? ('?after=' + encodeURIComponent(afterId)) : '');
+  fetch(url, {headers: {'X-Requested-With': 'fetch'}})
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      setProgress(data.remaining);
+      if (!data.record) {
+        closeDrawer();
+        alert('Nothing left awaiting review.');
+        return;
+      }
+      CHILDREN[String(rowKey(data.record))] = data.children || [];
+      openEdit(data.record, {keepOpen: true});
+    })
+    .catch(function () { closeDrawer(); });
+}
+
+function submitDecision(btn) {
+  var decision = btn.value;
+  var reasonEl = document.querySelector('#drawer-review textarea[name=reason]');
+  var body = new FormData(form);
+  body.set('decision', decision);
+  if (decision === 'reject' && btn.dataset.col) {
+    // The button names the failing check; that IS the reason, without asking
+    // the reviewer to retype what they just clicked.
+    body.set('reason', (reasonEl && reasonEl.value.trim()) ||
+                       ('Failed: ' + btn.dataset.col.replace(/_/g, ' ')));
+  }
+  var current = rowKey(reviewRow);
+  var hint = document.getElementById('review-hint');
+  if (hint) hint.textContent = 'Saving…';
+
+  fetch(btn.getAttribute('formaction'), {
+    method: 'POST', body: body, headers: {'X-Requested-With': 'fetch'},
+    credentials: 'same-origin'
+  }).then(function (r) {
+    return r.json().then(function (d) { return {ok: r.ok, data: d}; });
+  }).then(function (res) {
+    if (!res.ok) {
+      if (hint) hint.textContent = res.data.error || 'That did not save.';
+      return;
+    }
+    if (hint) hint.textContent = '';
+    showUndo(true);
+    loadNext(current);
+  }).catch(function () {
+    if (hint) hint.textContent = 'Network error — nothing was saved.';
+  });
+}
+
+function undoLast() {
+  if (!UNDO_URL) return;
+  fetch(UNDO_URL, {method: 'POST', headers: {'X-Requested-With': 'fetch'},
+                   credentials: 'same-origin'})
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      showUndo(false);
+      if (d.ok) loadNext(null); else alert(d.error || 'Nothing to undo.');
+    });
+}
+
+document.addEventListener('click', function (e) {
+  var btn = e.target.closest('.review-reject, #review-approve');
+  if (!btn || drawer.hidden) return;
+  e.preventDefault();
+  submitDecision(btn);
+});
+
+// Shortcuts only while the drawer is open and the reviewer is not typing.
+document.addEventListener('keydown', function (e) {
+  if (drawer.hidden || !NEXT_URL) return;
+  var t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+  var box = document.querySelector('.review-control[data-key="' + e.key + '"]');
+  if (box && !box.disabled) { box.checked = !box.checked; e.preventDefault(); return; }
+  if (e.key === 'a') {
+    var approve = document.getElementById('review-approve');
+    if (approve && !approve.hidden) { e.preventDefault(); submitDecision(approve); }
+  } else if (e.key === 'u') {
+    e.preventDefault(); undoLast();
+  }
+});
+
+function openEdit(row, opts) {
+  form.action = SAVE_URL.replace('__ROW_ID__', rowKey(row));
+  document.getElementById('drawer-title').textContent =
+    isAwaiting(row) ? 'Review' : ('Edit row #' + rowKey(row));
+  reviewRow = row;
   buildFields(row);
   buildEvidence(row);
   buildChildren(row);
   syncReviewControls(row);
-  openDrawer();
+  paintReview(row);
+  if (!(opts && opts.keepOpen)) openDrawer();
 }
 </script>
 {% endif %}

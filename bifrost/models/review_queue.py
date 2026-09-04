@@ -205,6 +205,62 @@ def _cols_sql(columns):
     return ', '.join(f'"{c}"' for c in columns)
 
 
+def pending_count(cur, schema):
+    cur.execute(f'SELECT COUNT(*) FROM "{schema.table}" WHERE "{schema.status}" = ANY(%s)',
+                [list(schema.awaiting)])
+    return cur.fetchone()[0]
+
+
+def next_awaiting(cur, schema, after_id=None):
+    """The next record awaiting review, as a dict, or None when the queue is empty.
+
+    Ordered by the configured order_by so traversal is stable, and skipping
+    `after_id` so a record the reviewer just decided on cannot be handed back
+    when its new status still matches `awaiting` — a send-back that lands in a
+    tenant's own awaiting set would otherwise loop on the same record forever.
+    """
+    columns = schema.parent_columns() + schema.evidence_columns()
+    seen, ordered = set(), []
+    for c in columns:
+        if c not in seen:
+            seen.add(c)
+            ordered.append(c)
+    sql = (f'SELECT {_cols_sql(ordered)} FROM "{schema.table}" '
+           f'WHERE "{schema.status}" = ANY(%s)')
+    params = [list(schema.awaiting)]
+    if after_id is not None:
+        sql += f' AND "{schema.id}"::text <> %s'
+        params.append(str(after_id))
+    sql += f' ORDER BY "{schema.order_by}" LIMIT 1'
+    cur.execute(sql, params)
+    row = cur.fetchone()
+    return dict(zip(ordered, row)) if row else None
+
+
+def restore(conn, schema, row_id, before):
+    """Puts a record back as it was before a decision. One level, no history.
+
+    Undo is what lets a reviewer move quickly: without it people hesitate on
+    every record. The previous values come from the server's own read, never
+    from the client, so undo cannot be used to write an arbitrary state.
+    """
+    columns = [schema.status, *schema.controls]
+    if schema.reviewed_by:
+        columns.append(schema.reviewed_by)
+    if schema.reviewed_at:
+        columns.append(schema.reviewed_at)
+    columns = [c for c in columns if c in before]
+    if not columns:
+        return False
+    sets = ', '.join(f'"{c}" = %s' for c in columns)
+    params = [before[c] for c in columns] + [row_id]
+    with conn.cursor() as cur:
+        cur.execute(f'UPDATE "{schema.table}" SET {sets} WHERE "{schema.id}" = %s', params)
+        changed = cur.rowcount
+    conn.commit()
+    return bool(changed)
+
+
 def submit(conn, schema, row_id, ticked, decision, actor, reason=None, reason_column=None):
     """Records a review decision. Returns (ok, message).
 
@@ -238,13 +294,18 @@ def submit(conn, schema, row_id, ticked, decision, actor, reason=None, reason_co
         params.append(reason)
 
     params.append(row_id)
+    # The before-state includes the attestation columns, so undo can put back who
+    # had signed it — restoring the status but leaving a stale reviewer would be
+    # worse than not undoing at all.
+    before_cols = schema.parent_columns() + [c for c in (schema.reviewed_by, schema.reviewed_at)
+                                             if c and c not in schema.parent_columns()]
     with conn.cursor() as cur:
-        cur.execute(f'SELECT {_cols_sql(schema.parent_columns())} FROM "{schema.table}" '
+        cur.execute(f'SELECT {_cols_sql(before_cols)} FROM "{schema.table}" '
                     f'WHERE "{schema.id}" = %s', [row_id])
         before = cur.fetchone()
         if not before:
             return False, "That record no longer exists."
-        before = dict(zip(schema.parent_columns(), before))
+        before = dict(zip(before_cols, before))
 
         cur.execute(f'UPDATE "{schema.table}" SET {", ".join(sets)} WHERE "{schema.id}" = %s',
                     params)

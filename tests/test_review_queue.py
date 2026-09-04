@@ -300,3 +300,69 @@ class TestChildFetchIsIsolated(unittest.TestCase):
                       "the child fetch must sit in its own try, not the schema handler's")
         self.assertIn('except Exception', after,
                       "a failed child fetch must degrade the drawer, not the page")
+
+
+class TestTraversal(unittest.TestCase):
+    """Working a queue means never returning to the table between decisions."""
+
+    def test_next_skips_the_record_just_decided(self):
+        # A send-back can land in a status the tenant also counts as awaiting.
+        # Without the skip, that record is handed straight back and the reviewer
+        # loops on it forever.
+        from bifrost.models.review_queue import next_awaiting
+        schema = ReviewSchema.from_config(PROLONG)
+        cur = FakeCursor({'one': None})
+        next_awaiting(cur, schema, after_id='q1')
+        sql, params = cur.sql[-1]
+        self.assertIn('<> %s', sql)
+        self.assertIn('q1', params)
+
+    def test_next_without_a_cursor_takes_the_head_of_the_queue(self):
+        from bifrost.models.review_queue import next_awaiting
+        schema = ReviewSchema.from_config(PROLONG)
+        cur = FakeCursor({'one': None})
+        next_awaiting(cur, schema)
+        sql, _ = cur.sql[-1]
+        self.assertNotIn('<> %s', sql)
+        self.assertIn('ORDER BY "id" LIMIT 1', sql)
+
+    def test_next_selects_evidence_columns_too(self):
+        from bifrost.models.review_queue import next_awaiting
+        schema = ReviewSchema.from_config({'review_queue': dict(
+            PROLONG['review_queue'],
+            evidence=[{'column': 'source_ref', 'role': 'citation'}])})
+        cur = FakeCursor({'one': None})
+        next_awaiting(cur, schema)
+        self.assertIn('"source_ref"', cur.sql[-1][0])
+
+
+class TestUndo(unittest.TestCase):
+    def test_restore_puts_back_status_controls_and_attestation(self):
+        from bifrost.models.review_queue import restore
+        schema = ReviewSchema.from_config(PROLONG)
+        store = {}
+        conn = FakeConn(store)
+        before = {'status': 'review', 'fluency_passed': False,
+                  'distractors_passed': True, 'correctness_passed': False,
+                  'reviewed_by': None, 'reviewed_at': None}
+        self.assertTrue(restore(conn, schema, 'q1', before))
+        sql, params = store['executed'][-1]
+        for col in ('status', 'fluency_passed', 'reviewed_by', 'reviewed_at'):
+            self.assertIn(f'"{col}" = %s', sql)
+        self.assertEqual(params[-1], 'q1')
+
+    def test_restore_of_nothing_is_refused(self):
+        from bifrost.models.review_queue import restore
+        schema = ReviewSchema.from_config(PROLONG)
+        self.assertFalse(restore(FakeConn({}), schema, 'q1', {}))
+
+    def test_the_before_state_carries_the_attestation(self):
+        # Restoring a status but leaving a stale reviewer would be worse than
+        # not undoing at all.
+        schema = ReviewSchema.from_config(PROLONG)
+        store = {'one': ('q1', 'review', 'stem', 'src', True, True, True,
+                         'prior@example.com', None)}
+        ok, before = submit(FakeConn(store), schema, 'q1',
+                            set(schema.controls), 'approve', 'me')
+        self.assertTrue(ok)
+        self.assertIn('reviewed_by', before)
