@@ -312,3 +312,21 @@ body {
   border-radius: var(--radius-lg);
   background: rgb(var(--c-danger) / .05);
 }
+
+/* Busy indicator for in-flight form submits. Respects reduced-motion by
+   holding still rather than disappearing — the ring is the affordance, the
+   spin is decoration. */
+.spinner {
+  display: inline-block;
+  width: .85em;
+  height: .85em;
+  margin-right: .5em;
+  vertical-align: -.1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  opacity: .7;
+  animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }

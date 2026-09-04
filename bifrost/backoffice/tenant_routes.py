@@ -660,7 +660,10 @@ def check_publish_permission(app_id, table_name, data, db, db_conn_str, row_id=N
     from ..models import cms_mongo
     if cms_mongo.handles(db_conn_str):
         return None
-    errors = db.validate_question_publishable(db_conn_str, int(row_id))
+    # No int(): a UUID-keyed questions table raised ValueError here, and this
+    # call sits outside the save route's try block — so publishing a UUID row
+    # from the grid returned a 500 rather than a validation message.
+    errors = db.validate_question_publishable(db_conn_str, row_id)
     if errors:
         return "Cannot publish: " + " ".join(errors)
     return None

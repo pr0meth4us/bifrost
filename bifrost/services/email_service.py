@@ -10,6 +10,8 @@ from ..utils.urls import public_url
 
 log = logging.getLogger(__name__)
 
+SMTP_TIMEOUT_SECONDS = 10
+
 
 def get_default_logo_url():
     base_url = public_url()
@@ -75,7 +77,11 @@ def send_email(to_email, subject, html_content, text_content, app_name, app_doc=
     message.attach(MIMEText(html_content, "html"))
 
     try:
-        server = smtplib.SMTP(smtp_server, smtp_port)
+        # Timeout is not optional: this runs inside the sign-in request, and
+        # smtplib defaults to the global socket timeout — usually none — so an
+        # unresponsive mail host pins a gunicorn worker until the platform kills
+        # it. Ten seconds is well past a healthy send and well short of that.
+        server = smtplib.SMTP(smtp_server, smtp_port, timeout=SMTP_TIMEOUT_SECONDS)
         server.starttls()
         server.login(sender_email, app_password)
         server.sendmail(sender_email, to_email, message.as_string())

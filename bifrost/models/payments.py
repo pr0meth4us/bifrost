@@ -10,6 +10,41 @@ from .queue_schema import (  # noqa: F401 — safe_ident is re-exported for call
     DEFAULT as DEFAULT_QUEUE, IDENT_RE, QueueSchema, _table_columns, safe_ident,
 )
 
+def _request_cache():
+    """Per-request memo dict, or None outside a request context.
+
+    Introspecting a tenant's schema is the most expensive thing the CMS does —
+    a three-way join across information_schema — and one grid load asked for it
+    twice: get_tenant_table_data validates sort_by against it, and the route
+    then fetches it again for the drawer. The tenant's schema cannot change
+    inside one request, so the second call is free.
+
+    ponytail: request-scoped on purpose. A longer-lived cache would need
+    invalidation on every migration a developer runs from devtools, and a stale
+    column list is a silently dropped write.
+    """
+    try:
+        from flask import g, has_request_context
+        if not has_request_context():
+            return None
+        cache = getattr(g, '_bifrost_schema_cache', None)
+        if cache is None:
+            cache = {}
+            g._bifrost_schema_cache = cache
+        return cache
+    except Exception:
+        return None
+
+
+def _memoized(key, produce):
+    cache = _request_cache()
+    if cache is None:
+        return produce()
+    if key not in cache:
+        cache[key] = produce()
+    return cache[key]
+
+
 log = logging.getLogger(__name__)
 UTC = ZoneInfo("UTC")
 
@@ -756,6 +791,10 @@ class PaymentMixin:
 
     def get_tenant_tables(self, db_conn_str):
         """Fetches the tenant's tables from whichever schema its connection is pinned to."""
+        return _memoized(('tables', db_conn_str),
+                         lambda: self._get_tenant_tables(db_conn_str))
+
+    def _get_tenant_tables(self, db_conn_str):
         if cms_mongo.handles(db_conn_str):
             return cms_mongo.get_tenant_tables(db_conn_str)
         from bifrost.utils.tenant_db import get_tenant_db
@@ -771,6 +810,10 @@ class PaymentMixin:
 
     def get_tenant_table_schema(self, db_conn_str, table_name):
         """Returns column metadata: name, data_type, nullable, char_max_length, fk info."""
+        return _memoized(('schema', db_conn_str, table_name),
+                         lambda: self._get_tenant_table_schema(db_conn_str, table_name))
+
+    def _get_tenant_table_schema(self, db_conn_str, table_name):
         if cms_mongo.handles(db_conn_str):
             return cms_mongo.get_tenant_table_schema(db_conn_str, table_name)
         from bifrost.utils.tenant_db import get_tenant_db
@@ -883,7 +926,16 @@ class PaymentMixin:
     # ------------------------------------------------------------------
 
     def get_cms_config(self, app_id):
-        """Returns the CMS config for an app. Creates default if missing."""
+        """Returns the CMS config for an app. Creates default if missing.
+
+        Memoized per request: one grid load asked Atlas for the same document up
+        to eight times — the route body, hidden_columns_for, and each permission
+        check fetched it independently.
+        """
+        return _memoized(('cms_config', str(app_id)),
+                         lambda: self._get_cms_config(app_id))
+
+    def _get_cms_config(self, app_id):
         doc = self.db.applications.find_one(
             {"_id": ObjectId(app_id)},
             {"cms_config": 1}
@@ -892,6 +944,11 @@ class PaymentMixin:
 
     def save_cms_config(self, app_id, config):
         """Persists CMS config dict to MongoDB applications document."""
+        # Drop the memo: a save followed by a read in the same request must not
+        # see the pre-save document.
+        cache = _request_cache()
+        if cache is not None:
+            cache.pop(('cms_config', str(app_id)), None)
         self.db.applications.update_one(
             {"_id": ObjectId(app_id)},
             {"$set": {"cms_config": config}}
@@ -944,7 +1001,10 @@ class PaymentMixin:
                 self.log_cms_mutation(app_id, table_name, "UPDATE", str(row_id),
                                       acting_user, before, after)
             return True
-        row_id = int(row_id)
+        # NOT int(): content tables are commonly keyed by UUID, and the cast
+        # raised ValueError, which the route caught and flashed as "Update
+        # failed" — every grid save on a UUID-keyed table failed silently.
+        # The id travels as a bound parameter; Postgres coerces it either way.
         from bifrost.utils.tenant_db import get_tenant_db
         safe_ident(table_name)
 
@@ -1057,8 +1117,7 @@ class PaymentMixin:
                 self.log_cms_mutation(app_id, table_name, "DELETE", str(row_id),
                                       acting_user, before, None)
             return True
-        row_id = int(row_id)
-        from bifrost.utils.tenant_db import get_tenant_db
+        from bifrost.utils.tenant_db import get_tenant_db  # id stays as given; see save_tenant_table_row
         safe_ident(table_name)
 
         with get_tenant_db(db_conn_str) as conn:

@@ -9,6 +9,23 @@ function toggleTheme() {
   try { localStorage.setItem('valhalla-theme', next); } catch (e) {}
 }
 
+// Any form submit that leaves the page marks its button busy. The console
+// talks to a tenant database over the network on nearly every action, so a
+// second or two of nothing is normal — and indistinguishable from a dead
+// button. Also stops the double-submit that used to send two OTPs.
+document.addEventListener('submit', function (e) {
+  var form = e.target;
+  if (!(form instanceof HTMLFormElement) || form.hasAttribute('data-no-busy')) return;
+  var btn = form.querySelector('button[type=submit], button:not([type])');
+  if (!btn || btn.dataset.busy === 'true') return;
+  // The clicked button's name/value is submitted for us; disabling it outright
+  // would drop it, so it goes inert but stays enabled until after submission.
+  btn.dataset.busy = 'true';
+  btn.setAttribute('aria-busy', 'true');
+  btn.insertAdjacentHTML('afterbegin', '<span class="spinner" aria-hidden="true"></span>');
+  setTimeout(function () { btn.disabled = true; }, 0);
+});
+
 function toggleSidebar(btn) {
   var nav = document.querySelector('.sidebar');
   if (!nav) return;
