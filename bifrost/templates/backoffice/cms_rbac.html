@@ -139,9 +139,9 @@
 
 {% block scripts %}
 <script>
-let rolesConfig = {{ cms_config.get('roles', {}) | tojson | forceescape }};
-const allTables = {{ all_tables | tojson | forceescape }};
-const tableSchemas = {{ table_schemas | tojson | forceescape }};
+let rolesConfig = {{ cms_config.get('roles', {}) | tojson }};
+const allTables = {{ all_tables | tojson }};
+const tableSchemas = {{ table_schemas | tojson }};
 let currentRole = null;
 
 function renderRoleList() {

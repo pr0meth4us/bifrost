@@ -249,7 +249,7 @@ function updatePreview() {
 }
 
 function buildConfigObject() {
-  const config = {{ cms_config | tojson | forceescape }};
+  const config = {{ cms_config | tojson }};
   config.is_onboarded = true;
   config.hidden_tables = [];
   config.table_groups = {};
@@ -294,7 +294,7 @@ function buildConfigObject() {
   });
 
   // Roles are owned by the RBAC screen; carry them through untouched.
-  config.roles = {{ cms_config.get('roles', {}) | tojson | forceescape }};
+  config.roles = {{ cms_config.get('roles', {}) | tojson }};
   return config;
 }
 
