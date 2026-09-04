@@ -52,6 +52,27 @@ class ReviewChild:
 
 
 @dataclass(frozen=True)
+class Annotations:
+    """Spans stored against a text column of the record under review.
+
+    A term link, a citation range, a redaction — anything that says "characters
+    start..end of this column mean something". They are the reason editing that
+    column is not a free action: every edit before a span shifts it, and a shifted
+    span is not detectably wrong, it is quietly wrong.
+
+    Offsets are code point indices with an exclusive end — `text[start:end]` is
+    the annotated surface. That matches Python slicing and, for text in the basic
+    plane, what a browser counting UTF-16 units would see.
+    """
+    table: str
+    fk: str
+    start: str
+    end: str
+    target: str          # the text column the offsets index into
+    surface: str = ''    # optional column holding the expected text of the span
+
+
+@dataclass(frozen=True)
 class ReviewSchema:
     table: str
     id: str = 'id'
@@ -80,6 +101,9 @@ class ReviewSchema:
     # roles are rendering contracts, not data types.
     evidence: tuple = ()
 
+    # Spans into one of the record's text columns, if the tenant keeps any.
+    annotations: Annotations = None
+
     @classmethod
     def from_config(cls, cms_config):
         """Builds a schema from an app's cms_config. No block -> None, not defaults.
@@ -95,7 +119,12 @@ class ReviewSchema:
         child = None
         if child_block.get('table') and child_block.get('fk'):
             child = ReviewChild(**_kwargs_for(ReviewChild, child_block))
-        schema = cls(**_kwargs_for(cls, block, skip=('child',)), child=child)
+        ann_block = block.get('annotations') or {}
+        annotations = None
+        if all(ann_block.get(k) for k in ('table', 'fk', 'start', 'end', 'target')):
+            annotations = Annotations(**_kwargs_for(Annotations, ann_block))
+        schema = cls(**_kwargs_for(cls, block, skip=('child', 'annotations')),
+                     child=child, annotations=annotations)
         return schema.checked()
 
     def checked(self):
@@ -122,11 +151,11 @@ class ReviewSchema:
         """
         values = ('awaiting', 'on_approve', 'on_reject')
         out = list(self.evidence_columns())
-        for obj in (self, self.child):
+        for obj in (self, self.child, self.annotations):
             if obj is None:
                 continue
             for f in fields(obj):
-                if f.name in values or f.name in ('child', 'evidence'):
+                if f.name in values or f.name in ('child', 'evidence', 'annotations'):
                     continue
                 value = getattr(obj, f.name)
                 if isinstance(value, str) and value:
@@ -348,3 +377,54 @@ def children_for(cur, schema, parent_ids, fk_type=None):
         record = dict(zip(cols, row))
         grouped.setdefault(str(record[child.fk]), []).append(record)
     return grouped
+
+
+def span_check(cur, schema, row_id, new_text, fk_type=None):
+    """Would writing `new_text` invalidate this record's spans? Returns a reason, or None.
+
+    Two failures, and they need different words. Drift means the stored spans no
+    longer describe the text that is already there — something changed them
+    behind the check, and re-running the tenant's extractor is the fix. Shift
+    means the edit in hand would move them, which is the ordinary case: a
+    reviewer fixing one word early in a sentence silently relocates every span
+    after it.
+
+    Nothing here recomputes spans. Matching is the tenant's algorithm and their
+    lexicon, and a platform guessing at it would produce annotations nobody
+    asked for. This only answers whether the existing ones survive.
+    """
+    ann = schema.annotations
+    if not ann or new_text is None:
+        return None
+
+    cast = f'::{safe_ident(fk_type)}' if fk_type else ''
+    cols = [ann.start, ann.end] + ([ann.surface] if ann.surface else [])
+    cur.execute(
+        f'SELECT {_cols_sql(cols)} FROM "{ann.table}" WHERE "{ann.fk}" = %s{cast}',
+        [str(row_id)])
+    spans = cur.fetchall()
+    if not spans:
+        return None
+
+    cur.execute(f'SELECT "{ann.target}" FROM "{schema.table}" WHERE "{schema.id}" = %s',
+                [row_id])
+    current = cur.fetchone()
+    current = current[0] if current else None
+    if current is None or current == new_text:
+        return None
+
+    # Drift check first: if the spans do not describe the CURRENT text, the row
+    # is already broken and the reviewer's edit is not the cause.
+    if ann.surface:
+        for start, end, surface in spans:
+            if surface is None:
+                continue
+            if current[start:end] != surface:
+                return (f"This record's {len(spans)} term spans no longer match "
+                        f"'{ann.target}' as stored — the row is already out of "
+                        f"sync. Re-run the extractor before editing.")
+
+    return (f"'{ann.target}' carries {len(spans)} term spans with character "
+            f"offsets. Editing the text moves every span after the edit, and "
+            f"nothing downstream would detect it. Clear the spans or re-run the "
+            f"extractor for this record, then edit.")

@@ -159,6 +159,43 @@ def _load_children(db, db_conn_str, review, rows, schema_meta):
     return children, reason_column
 
 
+def _span_guard(db, db_conn_str, app_id, table_name, row_id, data):
+    """Refuses a save that would silently relocate stored text annotations.
+
+    Refuse rather than flag: a flagged row keeps serving broken spans to end
+    users until somebody reads the flag, and the whole point of an annotation is
+    that something downstream trusts it.
+
+    This is not hypothetical. The review workflow sends records back for wording
+    fixes, and a wording fix IS an edit to the annotated column — so the queue we
+    built is the thing most likely to break the invariant.
+    """
+    review = _review_schema(db, app_id)
+    if not (review and review.annotations and table_name == review.table):
+        return None
+    target = review.annotations.target
+    if target not in data or row_id is None:
+        return None
+    if cms_mongo.handles(db_conn_str or ''):
+        return None
+    from ..models.review_queue import span_check
+    from ..utils.tenant_db import get_tenant_db
+    try:
+        fk_type = next((c.get('udt_name') for c in
+                        db.get_tenant_table_schema(db_conn_str, review.annotations.table)
+                        if c['column_name'] == review.annotations.fk), None)
+        with get_tenant_db(db_conn_str) as conn:
+            with conn.cursor() as cur:
+                return span_check(cur, review, row_id, data.get(target), fk_type=fk_type)
+    except Exception:
+        # Fail closed. An unverifiable invariant is not a satisfied one, and the
+        # cost of a false refusal is an annoyed editor; the cost of a false pass
+        # is corruption nothing detects.
+        log.exception("_span_guard failed")
+        return ("Could not verify this record's term spans, so the edit was not "
+                "saved. Try again, or contact an owner if it persists.")
+
+
 def _review_schema(db, app_id):
     """The app's review queue, or None. A broken block must not break the grid."""
     from ..models.review_queue import ReviewSchema
@@ -761,7 +798,8 @@ def save_cms_row(app_id, table_name, row_id):
     data = {k: v for k, v in request.form.items() if k not in forbidden}
     acting_user = acting_identity()
 
-    blocked = check_publish_permission(app_id, table_name, data, db, db_conn_str, row_id)
+    blocked = (_span_guard(db, db_conn_str, app_id, table_name, row_id, data)
+               or check_publish_permission(app_id, table_name, data, db, db_conn_str, row_id))
     if blocked:
         flash(blocked, "danger")
         return redirect(url_for('backoffice.view_cms_grid', app_id=app_id, table=table_name))
