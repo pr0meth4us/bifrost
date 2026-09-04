@@ -13,6 +13,9 @@ from .queue_schema import (  # noqa: F401 — safe_ident is re-exported for call
 log = logging.getLogger(__name__)
 UTC = ZoneInfo("UTC")
 
+# Columns the CMS fills in itself on update when the tenant table has them.
+REVIEW_STAMP = ('reviewed_by', 'reviewed_at')
+
 # --- Manual payment state machine (SOW 3.1) -------------------------------
 # FREE -> PENDING -> PREMIUM | REJECTED, plus PREMIUM -> REFUNDED.
 # Enforced server-side; the UI is not the gate. This is the default vocabulary;
@@ -944,10 +947,25 @@ class PaymentMixin:
         fields = []
         params = []
         for k, v in data.items():
-            if k == 'id' or k not in valid_columns:
+            if k == 'id' or k in REVIEW_STAMP or k not in valid_columns:
                 continue
             fields.append(f'"{k}" = %s')
             params.append(v if v != '' else None)
+
+        # Attestation columns are stamped server-side from the session, never
+        # from the client: a reviewer must not be able to sign as someone else.
+        # ponytail: stamps on every edit of a table that has these columns, not
+        # just review actions — Bifrost is generic and does not know what
+        # "published" means. Per-app gating belongs in cms_config if needed.
+        if acting_user:
+            for col, val in (('reviewed_by', acting_user),
+                             ('reviewed_at', datetime.now(UTC))):
+                if col in valid_columns:
+                    fields.append(f'"{col}" = %s')
+                    params.append(val)
+
+        if not fields:
+            return True
 
         params.append(row_id)
         sql = f'UPDATE "{table_name}" SET {", ".join(fields)} WHERE id = %s RETURNING *'
