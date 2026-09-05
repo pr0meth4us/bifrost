@@ -316,11 +316,11 @@ const SAVE_URL   = {{ url_for('backoffice.save_cms_row', app_id=app._id, table_n
 {% if review and selected_table == review.table %}
 const REVIEW_URL     = {{ url_for('backoffice.submit_review', app_id=app._id, row_id='__ROW_ID__') | tojson }};
 const CHILDREN       = {{ children_by_parent | tojson }};
-const CHILD_LABEL    = {{ review.child.table | tojson if review.child else '""' }};
-const CHILD_COLS     = {{ (review.child.columns | list) | tojson if review.child else '[]' }};
-const CHILD_FLAG     = {{ review.child.flag | tojson if review.child else '""' }};
+const CHILD_LABEL    = {{ (review.child.table if review.child else '') | tojson }};
+const CHILD_COLS     = {{ (review.child.columns | list if review.child else []) | tojson }};
+const CHILD_FLAG     = {{ (review.child.flag if review.child else '') | tojson }};
 const REVIEW_CONTROLS = {{ (review.controls | list) | tojson }};
-const EVIDENCE       = {{ (review.evidence | list) | tojson }};
+const EVIDENCE       = {{ (review.evidence | list) | tojson }};  // always via tojson — never a literal
 {% else %}
 const REVIEW_URL = null, CHILDREN = {}, CHILD_LABEL = '', CHILD_COLS = [], CHILD_FLAG = '', REVIEW_CONTROLS = [], EVIDENCE = [];
 {% endif %}
@@ -345,8 +345,8 @@ const VERDICTS = {
 {% else %}
 const VERDICTS = null;
 {% endif %}
-const SPAN_TARGET  = {{ review.annotations.target | tojson if review.annotations else '""' }};
-const CLEAR_SPANS_URL = {{ url_for('backoffice.clear_record_spans', app_id=app._id, row_id='__ROW_ID__') | tojson if review.annotations else 'null' }};
+const SPAN_TARGET  = {{ (review.annotations.target if review.annotations else '') | tojson }};
+const CLEAR_SPANS_URL = {{ (url_for('backoffice.clear_record_spans', app_id=app._id, row_id='__ROW_ID__') if review.annotations else None) | tojson }};
 const NEXT_URL     = {{ url_for('backoffice.review_next', app_id=app._id) | tojson }};
 const UNDO_URL     = {{ url_for('backoffice.undo_review', app_id=app._id) | tojson }};
 const AWAITING     = {{ (review.awaiting | list) | tojson }};
