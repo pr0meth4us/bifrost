@@ -2,14 +2,8 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "bifrost",
-      "runtimeExecutable": ".venv/bin/python",
-      "runtimeArgs": ["run.py"],
-      "port": 5001
-    },
-    {
       "name": "bifrost-dev",
-      "runtimeExecutable": "./dev.sh",
+      "runtimeExecutable": "/private/tmp/claude-501/-Users-nicksng-code-bifrost/6947b341-8f91-47ac-b04b-f58cc56680ca/scratchpad/run-dev.sh",
       "runtimeArgs": [],
       "port": 5001
     }

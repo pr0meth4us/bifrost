@@ -416,22 +416,40 @@ function buildFields(row) {
     }
     wrap.append(label);
 
+    // The configured type wins over what the column looks like — that is what
+    // makes it an override. Every value the Schema screen offers is handled
+    // here; three of them used to fall through to the inferred branch and do
+    // nothing, so the screen promised five choices and honoured two.
+    //
+    // A foreign key is a relationship rather than a format, so it keeps the
+    // picker unless a type was set deliberately.
+    const kind = override || (
+      meta.foreign_table                                    ? 'foreign'  :
+      pgType === 'boolean'                                  ? 'boolean'  :
+      (pgType === 'jsonb' || pgType === 'json')             ? 'json'     :
+      (pgType === 'text' || meta.character_maximum_length > 255) ? 'textarea' :
+      (pgType === 'date' || pgType.includes('timestamp'))   ? 'date'     :
+      (pgType.includes('int') || pgType === 'numeric' ||
+       pgType.includes('double') || pgType === 'real')      ? 'number'   :
+                                                              'text'
+    );
+
     let control;
 
-    if (meta.foreign_table) {
+    if (kind === 'foreign') {
       control = document.createElement('select');
       control.className = 'select';
       control.dataset.foreignTable = meta.foreign_table;
       control.dataset.selected = value ?? '';
       control.append(new Option('Loading…', value ?? ''));
 
-    } else if (override === 'boolean' || pgType === 'boolean') {
+    } else if (kind === 'boolean') {
       control = document.createElement('input');
       control.type = 'checkbox';
       control.value = 'true';
       control.checked = value === true || value === 't' || value === 'true';
 
-    } else if (pgType === 'jsonb' || pgType === 'json' || override === 'json') {
+    } else if (kind === 'json') {
       control = document.createElement('textarea');
       control.className = 'textarea';
       control.rows = 5;
@@ -442,18 +460,27 @@ function buildFields(row) {
         control.value = value ?? '';   // malformed JSON stays editable as text
       }
 
-    } else if (pgType === 'text' || meta.character_maximum_length > 255) {
+    } else if (kind === 'textarea') {
       control = document.createElement('textarea');
       control.className = 'textarea kh';
       control.rows = 4;
       control.value = value ?? '';
 
-    } else if (pgType === 'date' || pgType.includes('timestamp')) {
+    } else if (kind === 'date') {
       control = document.createElement('input');
       control.className = 'input';
       control.type = 'date';
       const v = value ?? '';
       control.value = v.length > 10 ? v.slice(0, 10) : v;
+
+    } else if (kind === 'number') {
+      control = document.createElement('input');
+      control.className = 'input';
+      control.type = 'number';
+      // A decimal column must not be restricted to whole numbers by a step it
+      // never asked for.
+      control.step = (pgType.includes('int')) ? '1' : 'any';
+      control.value = value ?? '';
 
     } else {
       control = document.createElement('input');
