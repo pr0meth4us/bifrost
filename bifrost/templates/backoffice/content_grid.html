@@ -28,6 +28,11 @@
   /* The flagged child — the correct answer — has to be identifiable at a glance;
      that recognition is the whole point of showing children here. Border as well
      as tint, so it survives a colour-blind reader and a monochrome print. */
+  .verdict-pass { background: rgb(var(--c-success, 34 197 94) / .15); }
+  .verdict-fail { background: rgb(var(--c-danger, 239 68 68) / .15); }
+  /* "unsupported" is not a pass: the passage was silent, which is exactly where
+     a confident model would bluff. It must not read as a soft yes. */
+  .verdict-unsupported { background: rgb(var(--c-warning, 234 179 8) / .18); }
   .evidence-citation { font-weight: 600; }
   .evidence-passage {
     border-left: 3px solid rgb(var(--c-border));
@@ -235,8 +240,12 @@
                      class="review-control" data-col="{{ col }}"
                      data-key="{{ loop.index }}"
                      {% if not can_write %}disabled{% endif %}/>
-              <span>{{ col.replace('_', ' ')|capitalize }}
-                <kbd class="muted text-xs">{{ loop.index }}</kbd></span>
+              <span class="flex-1">{{ col.replace('_', ' ')|capitalize }}
+                <kbd class="muted text-xs">{{ loop.index }}</kbd>
+                {# The prior verdict, its quote and its reason. A claim invites
+                   checking in a way a blank box does not. #}
+                <span class="verdict" data-for="{{ col }}" hidden></span>
+              </span>
             </label>
           {% endfor %}
           {% if review_reason_column %}
@@ -323,6 +332,19 @@ const EVIDENCE_COLS = EVIDENCE.map(function (e) { return e.column; });
 {% if review and selected_table == review.table %}
 const ID_COL       = {{ review.id | tojson }};
 const SPAN_COUNTS  = {{ span_counts_by_parent | tojson }};
+{% if review.verdicts %}
+const VERDICTS = {
+  column: {{ review.verdicts.column | tojson }},
+  controls: {
+    {% for col in review.controls %}{% if review.verdicts.path_for(col) %}
+    {{ col | tojson }}: {path: {{ review.verdicts.path_for(col) | tojson }},
+                         pretick: {{ 'true' if review.verdicts.may_pretick(col) else 'false' }}},
+    {% endif %}{% endfor %}
+  }
+};
+{% else %}
+const VERDICTS = null;
+{% endif %}
 const SPAN_TARGET  = {{ review.annotations.target | tojson if review.annotations else '""' }};
 const CLEAR_SPANS_URL = {{ url_for('backoffice.clear_record_spans', app_id=app._id, row_id='__ROW_ID__') | tojson if review.annotations else 'null' }};
 const NEXT_URL     = {{ url_for('backoffice.review_next', app_id=app._id) | tojson }};
@@ -331,7 +353,7 @@ const AWAITING     = {{ (review.awaiting | list) | tojson }};
 const STATUS_COL   = {{ review.status | tojson }};
 {% else %}
 const NEXT_URL = null, UNDO_URL = null, AWAITING = [], STATUS_COL = '', ID_COL = 'id',
-      SPAN_COUNTS = {}, SPAN_TARGET = '', CLEAR_SPANS_URL = null;
+      SPAN_COUNTS = {}, SPAN_TARGET = '', CLEAR_SPANS_URL = null, VERDICTS = null;
 {% endif %}
 const LOOKUP_URL = {{ url_for('backoffice.lookup_cms_table', app_id=app._id, table_name='__TABLE__') | tojson }};
 
@@ -573,10 +595,53 @@ function buildChildren(row) {
   section.hidden = false;
 }
 
+// A control may start from a machine's verdict — but only where the row records
+// who ended up asserting it. Where it does not, the verdict still renders as
+// evidence and the box stays empty: a pre-ticked box makes doing nothing produce
+// a record identical to one a human checked, and that is only acceptable when
+// the two remain tellable apart afterwards.
+function paintVerdict(col, row) {
+  var el = document.querySelector('.verdict[data-for="' + col + '"]');
+  if (!el) return null;
+  el.textContent = '';
+  el.hidden = true;
+  if (!VERDICTS || !VERDICTS.controls[col] || !row) return null;
+  var doc = row[VERDICTS.column];
+  if (typeof doc === 'string') { try { doc = JSON.parse(doc); } catch (e) { doc = null; } }
+  var entry = doc && doc[VERDICTS.controls[col].path];
+  if (!entry) return null;
+
+  var head = document.createElement('span');
+  head.className = 'badge verdict-' + (entry.verdict || 'unknown');
+  head.textContent = entry.verdict || 'no verdict';
+  el.appendChild(head);
+  if (entry.reason) {
+    var reason = document.createElement('div');
+    reason.className = 'muted text-xs mt-1';
+    reason.textContent = entry.reason;
+    el.appendChild(reason);
+  }
+  if (entry.quote) {
+    var quote = document.createElement('blockquote');
+    quote.className = 'evidence-passage text-xs mt-1';
+    quote.style.whiteSpace = 'pre-wrap';
+    quote.textContent = entry.quote;
+    el.appendChild(quote);
+  }
+  el.hidden = false;
+  return entry;
+}
+
 function syncReviewControls(row) {
   REVIEW_CONTROLS.forEach(function (col) {
     var box = document.querySelector('.review-control[data-col="' + col + '"]');
-    if (box) box.checked = !!(row && row[col]);
+    if (!box) return;
+    var entry = paintVerdict(col, row);
+    var stored = !!(row && row[col]);
+    var cfg = VERDICTS && VERDICTS.controls[col];
+    box.checked = (!stored && cfg && cfg.pretick && entry)
+      ? entry.verdict === 'pass'
+      : stored;
   });
   if (!REVIEW_URL) return;
   var target = REVIEW_URL.replace('__ROW_ID__', row ? rowKey(row) : '');

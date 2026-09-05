@@ -42,6 +42,11 @@ CONFIG = {'review_queue': {
     'evidence': [{'column': 'source_ref', 'role': 'citation'}],
     'child': {'table': 'choices', 'fk': 'question_id',
               'columns': ['body_kh'], 'flag': 'is_correct'},
+    'verdicts': {'column': 'pipeline_meta', 'controls': {
+        'correctness_passed': {'path': 'correctness',
+                               'provenance': 'correctness_checked_by'},
+        'fluency_passed': {'path': 'fluency', 'provenance': 'fluency_checked_by'},
+        'distractors_passed': 'distractors'}},
     'annotations': {'table': 'question_terms', 'fk': 'question_id',
                     'start': 'start_char', 'end': 'end_char',
                     'target': 'body_kh', 'surface': 'surface'},
@@ -85,7 +90,8 @@ def fresh_row():
     with psycopg2.connect(DSN) as conn, conn.cursor() as cur:
         cur.execute("""UPDATE questions SET status='review', fluency_passed=false,
                        distractors_passed=false, correctness_passed=false,
-                       reviewed_by=NULL, reviewed_at=NULL, reject_reason=NULL
+                       reviewed_by=NULL, reviewed_at=NULL, reject_reason=NULL,
+                       correctness_checked_by=NULL, fluency_checked_by=NULL
                        WHERE id=%s""", [QUESTION])
         conn.commit()
 
@@ -225,6 +231,57 @@ class TestSpanIntegrityOnRealKhmer(unittest.TestCase):
                                      for qt.end_char - qt.start_char)
                            FROM questions q WHERE q.id = qt.question_id""")
             conn.commit()
+
+
+@unittest.skipUnless(HAVE_PG, f"no scratch PostgreSQL at {DSN}")
+class TestVerdictProvenance(unittest.TestCase):
+    """Pre-ticking is honest only because the row records who ended up asserting.
+
+    The model says pass on correctness and 'unsupported' on fluency. Agreeing
+    with a verdict is 'llm'; moving away from it is 'human'. Without that
+    distinction a pre-ticked box makes doing nothing indistinguishable from
+    checking, which is the whole objection to pre-ticking.
+    """
+
+    def setUp(self):
+        fresh_row()
+        self.schema = ReviewSchema.from_config(CONFIG)
+
+    def _submit(self, ticked, decision='approve'):
+        conn = psycopg2.connect(DSN)
+        try:
+            return submit(conn, self.schema, QUESTION, ticked, decision,
+                          'reviewer@example.com')
+        finally:
+            conn.close()
+
+    def test_agreeing_with_the_model_records_the_model(self):
+        # Model said correctness=pass; reviewer ticks it. They did not object.
+        self._submit(set(self.schema.controls))
+        self.assertEqual(read('correctness_checked_by')['correctness_checked_by'], 'llm')
+
+    def test_overriding_the_model_records_the_human(self):
+        # Model said correctness=pass; reviewer unticks it. That is an assertion.
+        self._submit({'fluency_passed', 'distractors_passed'}, decision='reject')
+        self.assertEqual(read('correctness_checked_by')['correctness_checked_by'], 'human')
+
+    def test_ticking_past_an_unsupported_verdict_is_the_human_asserting(self):
+        # 'unsupported' is not a pass. A reviewer ticking it anyway is making a
+        # claim the model declined to make, and the row must say so.
+        self._submit(set(self.schema.controls))
+        self.assertEqual(read('fluency_checked_by')['fluency_checked_by'], 'human')
+
+    def test_a_control_without_a_provenance_column_writes_none(self):
+        self._submit(set(self.schema.controls))
+        row = read('distractors_passed')
+        self.assertTrue(row['distractors_passed'])  # still recorded, just unattributed
+
+    def test_provenance_does_not_disturb_the_other_columns(self):
+        self._submit(set(self.schema.controls))
+        row = read('status', 'reviewed_by', 'correctness_passed')
+        self.assertEqual(row['status'], 'published')
+        self.assertEqual(row['reviewed_by'], 'reviewer@example.com')
+        self.assertTrue(row['correctness_passed'])
 
 
 if __name__ == '__main__':

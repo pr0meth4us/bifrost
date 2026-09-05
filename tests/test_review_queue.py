@@ -428,3 +428,73 @@ class TestSpanGuard(unittest.TestCase):
         counts = span_counts(cur, self.schema, ['q1', 'q2'], fk_type='uuid')
         self.assertEqual(len(cur.sql), 1)
         self.assertEqual(counts, {'q1': 3, 'q2': 40})
+
+
+class TestVerdicts(unittest.TestCase):
+    """Controls may start from a prior machine verdict — under one condition."""
+
+    BLOCK = {'review_queue': dict(
+        PROLONG['review_queue'],
+        verdicts={'column': 'pipeline_meta', 'controls': {
+            'correctness_passed': {'path': 'correctness',
+                                   'provenance': 'correctness_checked_by'},
+            'fluency_passed': 'fluency'}})}
+
+    ROW = {'pipeline_meta': {
+        'correctness': {'verdict': 'pass', 'quote': 'Article 220...', 'reason': 'r'},
+        'fluency': {'verdict': 'unsupported', 'reason': 'passage is silent'}}}
+
+    def setUp(self):
+        self.schema = ReviewSchema.from_config(self.BLOCK)
+
+    def test_pretick_requires_a_provenance_column(self):
+        # The structural rule: you may start from a machine's answer only where
+        # the row can afterwards say who gave it.
+        v = self.schema.verdicts
+        self.assertTrue(v.may_pretick('correctness_passed'))
+        self.assertFalse(v.may_pretick('fluency_passed'))
+
+    def test_unsupported_is_not_a_pass(self):
+        # The honest verdict when the source is silent, and where a confident
+        # model would otherwise bluff. It must never read as a soft yes.
+        v = self.schema.verdicts
+        self.assertTrue(v.passed(self.ROW, 'correctness_passed'))
+        self.assertFalse(v.passed(self.ROW, 'fluency_passed'))
+
+    def test_a_missing_verdict_document_is_not_a_pass(self):
+        v = self.schema.verdicts
+        for row in ({}, {'pipeline_meta': None}, {'pipeline_meta': 'not a dict'},
+                    {'pipeline_meta': {}}):
+            with self.subTest(row=row):
+                self.assertFalse(v.passed(row, 'correctness_passed'))
+
+    def test_verdict_columns_are_selected_from_the_row(self):
+        cols = self.schema.parent_columns()
+        self.assertIn('pipeline_meta', cols)
+        self.assertIn('correctness_checked_by', cols)
+
+    def test_verdict_columns_are_identifier_checked(self):
+        with self.assertRaises(ValueError):
+            ReviewSchema.from_config({'review_queue': dict(
+                PROLONG['review_queue'],
+                verdicts={'column': 'meta; DROP TABLE questions',
+                          'controls': {'fluency_passed': 'fluency'}})})
+
+    def test_a_verdict_for_an_unknown_control_is_refused(self):
+        # Silently ignoring it would leave a tenant believing a control was
+        # pre-filled when nothing reads it.
+        with self.assertRaises(ValueError):
+            ReviewSchema.from_config({'review_queue': dict(
+                PROLONG['review_queue'],
+                verdicts={'column': 'pipeline_meta',
+                          'controls': {'not_a_control': 'x'}})})
+
+    def test_a_control_entry_without_a_path_is_refused(self):
+        with self.assertRaises(ValueError):
+            ReviewSchema.from_config({'review_queue': dict(
+                PROLONG['review_queue'],
+                verdicts={'column': 'pipeline_meta',
+                          'controls': {'fluency_passed': {'provenance': 'x'}}})})
+
+    def test_absent_verdicts_changes_nothing(self):
+        self.assertIsNone(ReviewSchema.from_config(PROLONG).verdicts)

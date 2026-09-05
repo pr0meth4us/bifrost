@@ -73,6 +73,56 @@ class Annotations:
 
 
 @dataclass(frozen=True)
+class Verdicts:
+    """A prior automated judgement each control starts from.
+
+    A classifier flagging a post, a rules engine pricing a claim, a model
+    checking an answer against the passage it was drawn from: the reviewer is
+    agreeing or disagreeing, not deciding cold.
+
+    `controls` maps a control column to {path, provenance}. `path` is a key in
+    the verdict document — read in Python, never interpolated into SQL, so it is
+    free-form. `provenance` is a column recording WHO asserted the control:
+    the machine when the human left the verdict alone, the human when they moved
+    it. Without that column the row cannot tell "a person checked this" from "a
+    person did not object", and only the first is worth anything in an audit.
+    """
+    column: str
+    controls: dict = field(default_factory=dict)
+
+    def path_for(self, control):
+        return (self.controls.get(control) or {}).get('path')
+
+    def provenance_for(self, control):
+        return (self.controls.get(control) or {}).get('provenance')
+
+    def provenance_columns(self):
+        return [c for c in (self.provenance_for(k) for k in self.controls) if c]
+
+    def verdict(self, row, control):
+        """The verdict entry for a control, as a dict, or None."""
+        doc = (row or {}).get(self.column) or {}
+        if not isinstance(doc, dict):
+            return None
+        entry = doc.get(self.path_for(control))
+        return entry if isinstance(entry, dict) else None
+
+    def passed(self, row, control):
+        entry = self.verdict(row, control)
+        return bool(entry) and entry.get('verdict') == 'pass'
+
+    def may_pretick(self, control):
+        """Pre-ticking is allowed only where provenance is recorded.
+
+        A pre-ticked box makes doing nothing produce a record identical to one a
+        human checked. That is acceptable exactly when the row can afterwards say
+        which of the two happened, and not otherwise — so this is a structural
+        rule rather than a per-tenant judgement call.
+        """
+        return bool(self.provenance_for(control))
+
+
+@dataclass(frozen=True)
 class ReviewSchema:
     table: str
     id: str = 'id'
@@ -104,6 +154,9 @@ class ReviewSchema:
     # Spans into one of the record's text columns, if the tenant keeps any.
     annotations: Annotations = None
 
+    # A prior automated judgement the controls start from, if there is one.
+    verdicts: Verdicts = None
+
     @classmethod
     def from_config(cls, cms_config):
         """Builds a schema from an app's cms_config. No block -> None, not defaults.
@@ -123,8 +176,9 @@ class ReviewSchema:
         annotations = None
         if all(ann_block.get(k) for k in ('table', 'fk', 'start', 'end', 'target')):
             annotations = Annotations(**_kwargs_for(Annotations, ann_block))
-        schema = cls(**_kwargs_for(cls, block, skip=('child', 'annotations')),
-                     child=child, annotations=annotations)
+        schema = cls(**_kwargs_for(cls, block, skip=('child', 'annotations', 'verdicts')),
+                     child=child, annotations=annotations,
+                     verdicts=_verdicts_from(block.get('verdicts')))
         return schema.checked()
 
     def checked(self):
@@ -132,6 +186,11 @@ class ReviewSchema:
             safe_ident(ident)
         if not self.controls:
             raise ValueError("review_queue.controls must name at least one column")
+        if self.verdicts:
+            unknown = set(self.verdicts.controls) - set(self.controls)
+            if unknown:
+                raise ValueError("review_queue.verdicts names controls that do not "
+                                 f"exist: {', '.join(sorted(unknown))}")
         for item in self.evidence:
             if not isinstance(item, dict) or not item.get('column'):
                 raise ValueError(f"review_queue.evidence entry needs a column: {item!r}")
@@ -151,11 +210,15 @@ class ReviewSchema:
         """
         values = ('awaiting', 'on_approve', 'on_reject')
         out = list(self.evidence_columns())
+        if self.verdicts:
+            out.append(self.verdicts.column)
+            out.extend(self.verdicts.provenance_columns())
         for obj in (self, self.child, self.annotations):
             if obj is None:
                 continue
             for f in fields(obj):
-                if f.name in values or f.name in ('child', 'evidence', 'annotations'):
+                if f.name in values or f.name in ('child', 'evidence', 'annotations',
+                                                  'verdicts'):
                     continue
                 value = getattr(obj, f.name)
                 if isinstance(value, str) and value:
@@ -167,6 +230,9 @@ class ReviewSchema:
     def parent_columns(self):
         """Everything the queue reads from the parent row, deduped, order kept."""
         cols = [self.id, self.status, *self.display, *self.controls]
+        if self.verdicts:
+            cols.append(self.verdicts.column)
+            cols.extend(self.verdicts.provenance_columns())
         seen, out = set(), []
         for c in cols:
             if c and c not in seen:
@@ -211,6 +277,25 @@ class ReviewSchema:
                 cols.append(self.child.flag)
             check(self.child.table, cols, "review_queue.child")
         return errors
+
+
+def _verdicts_from(block):
+    """Builds a Verdicts from config, accepting the short or the long form.
+
+    A control may map to a bare path string, which declares a verdict with no
+    provenance — rendered as evidence, box left empty.
+    """
+    if not block or not block.get('column'):
+        return None
+    controls = {}
+    for control, spec in (block.get('controls') or {}).items():
+        if isinstance(spec, str):
+            spec = {'path': spec}
+        if not isinstance(spec, dict) or not spec.get('path'):
+            raise ValueError(f"review_queue.verdicts.{control} needs a path")
+        controls[control] = {'path': spec['path'],
+                             'provenance': spec.get('provenance') or ''}
+    return Verdicts(column=block['column'], controls=controls)
 
 
 def _kwargs_for(cls, block, skip=()):
@@ -335,6 +420,25 @@ def submit(conn, schema, row_id, ticked, decision, actor, reason=None, reason_co
         if not before:
             return False, "That record no longer exists."
         before = dict(zip(before_cols, before))
+
+        # Provenance is decided against what the machine said, so it can only be
+        # computed once the row has been read: 'human' when the reviewer moved a
+        # control away from the verdict, 'llm' when they left it alone. Without
+        # this the pre-ticked box would make agreement indistinguishable from
+        # verification, which is the whole reason pre-ticking is allowed at all.
+        if schema.verdicts:
+            extra_sets, extra_params = [], []
+            for control in schema.controls:
+                column = schema.verdicts.provenance_for(control)
+                if not column:
+                    continue
+                asserted = control in ticked
+                agreed = asserted == schema.verdicts.passed(before, control)
+                extra_sets.append(f'"{column}" = %s')
+                extra_params.append('llm' if agreed else 'human')
+            if extra_sets:
+                sets = sets + extra_sets
+                params = params[:-1] + extra_params + [params[-1]]
 
         cur.execute(f'UPDATE "{schema.table}" SET {", ".join(sets)} WHERE "{schema.id}" = %s',
                     params)
